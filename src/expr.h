@@ -42,15 +42,15 @@ class Operator : Expr {
 		Operator(
 			const enum ExprType op_type,
 			const unsigned int size,
-			const std::shared_ptr<const Expr> op1
+			const std::shared_ptr<Expr> op1
 		) : Expr(op_type,size),op_count(1) {
 			operand[0] = op1;
 		}
 		Operator(
 			const enum ExprType op_type,
 			const unsigned int size,
-			const std::shared_ptr<const Expr> op1,
-			const std::shared_ptr<const Expr> op2
+			const std::shared_ptr<Expr> op1,
+			const std::shared_ptr<Expr> op2
 		) : Expr(op_type,size),op_count(2) {
 			operand[0] = op1;
 			operand[1] = op2;
@@ -69,22 +69,22 @@ class Cond {
 
 		Cond(
 			const enum CondType _type,
-			const std::shared_ptr<const Cond> op1
+			const std::shared_ptr<Cond> op1
 		) : type(_type),op_count(1) {
 			cond[0] = op1;
 		}
 		Cond(
 			const enum CondType _type,
-			const std::shared_ptr<const Cond> op1,
-			const std::shared_ptr<const Cond> op2
+			const std::shared_ptr<Cond> op1,
+			const std::shared_ptr<Cond> op2
 		) : type(_type),op_count(2) {
 			cond[0] = op1;
 			cond[1] = op2;
 		}
 		Cond(
 			const enum CondType _type,
-			const std::shared_ptr<const Expr> op1,
-			const std::shared_ptr<const Expr> op2
+			const std::shared_ptr<Expr> op1,
+			const std::shared_ptr<Expr> op2
 		) : type(_type),op_count(2) {
 			expr[0] = op1;
 			expr[1] = op2;
