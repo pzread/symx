@@ -11,6 +11,7 @@ class Context {
 		unsigned int reg_size;
 		unsigned int num_reg;
 		unsigned int num_flag;
+		Context() : last_var_id(0) {}
 };
 
 #endif

@@ -33,5 +33,6 @@ refExpr expr_sub(const refExpr op1,const refExpr op2) {
 	return std::make_shared<Operator>(ExprOpSub,op1->size,op1,op2);
 }
 refCond expr_eq(const refExpr op1,const refExpr op2) {
+	assert(op1->size == op2->size);
 	return std::make_shared<Cond>(CondEq,op1,op2);
 }
