@@ -8,6 +8,9 @@ class Context {
 	public:
 		csh cs;
 		uint64_t last_var_id;
+		unsigned int reg_size;
+		unsigned int num_reg;
+		unsigned int num_flag;
 };
 
 #endif

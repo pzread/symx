@@ -8,15 +8,15 @@ static uint64_t get_next_varid(Context *ctx) {
 	ctx->last_var_id += 1;
 	return ctx->last_var_id;
 }
-BytVec::BytVec(Context *ctx,const unsigned int size):
+BytMem::BytMem(Context *ctx) : Mem(MemVar),id(get_next_varid(ctx)) {}
+BytVec::BytVec(const unsigned int _size,Context *ctx) :
 	Expr(ExprVar,size),
-	data(get_next_varid(ctx)) {}
+	id(get_next_varid(ctx)) {}
 
-
-refMem	mem_store(const refMem mem,const refExpr idx,const refExpr val) {
+refMem expr_store(const refMem mem,const refExpr idx,const refExpr val) {
 	return std::make_shared<StoreMem>(mem,idx,val);
 }
-refExpr mem_select(
+refExpr expr_select(
 	const refMem mem,
 	const refExpr idx,
 	const unsigned int size
