@@ -7,6 +7,7 @@
 
 class State {
 	public:
+		std::shared_ptr<Mem> mem;
 		std::shared_ptr<Expr> reg[64];
 		std::shared_ptr<Cond> flag[64];
 };

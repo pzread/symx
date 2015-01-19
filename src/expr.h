@@ -13,17 +13,40 @@ typedef std::shared_ptr<Mem> refMem;
 typedef std::shared_ptr<Expr> refExpr;
 typedef std::shared_ptr<Cond> refCond;
 
+enum MemType {
+	MemDangle,
+	MemVar,
+	MemStore,
+};
 class Mem {
 	public:
-		Mem() {}
+		const enum MemType type;
+		Mem(const enum MemType _type) : type(_type) {}
+};
+class BytMem : public Mem {
+	public:
+		const unsigned int id;
+		BytMem() : Mem(MemDangle),id(0) {}
+		BytMem(const unsigned short _id) : Mem(MemVar),id(_id) {}
+};
+class StoreMem : public Mem {
+	public:
+		const refMem mem;
+		const refExpr idx;
+		const refExpr val;
+		StoreMem(
+			const refMem _mem,
+			const refExpr _idx,
+			const refExpr _val
+		) : Mem(MemStore),mem(_mem),idx(_idx),val(_val) {}
 };
 
 enum ExprType {
+	ExprDangle,
 	ExprImm,
 	ExprVar,
+	ExprSelect,
 
-	ExprOpSelect,
-	
 	ExprOpAdd,
 	ExprOpSub,
 	ExprOpMul,
@@ -39,11 +62,22 @@ class Expr {
 };
 class BytVec : public Expr {
 	public:
-		uint64_t data;
+		const uint64_t data;
+		BytVec(const unsigned int size,const unsigned short id) :
+			Expr(ExprDangle,size),data(id) {}
 		BytVec(const unsigned int size,const uint64_t imm) :
-			Expr(ExprImm,size),
-			data(imm) {}
+			Expr(ExprImm,size),data(imm) {}
 		BytVec(Context *ctx,const unsigned int size);
+};
+class SelectMem : public Expr {
+	public:
+		const refMem mem;
+		const refExpr idx;
+		SelectMem(
+			const refMem _mem,
+			const refExpr _idx,
+			const unsigned int size
+		) : Expr(ExprSelect,size),mem(_mem),idx(_idx) {}
 };
 class Operator : public Expr {
 	public:
