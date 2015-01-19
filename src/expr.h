@@ -63,6 +63,7 @@ enum ExprType {
 	ExprOpMul,
 	ExprOpUdiv,
 	ExprOpSdiv,
+	ExprOpNot,
 };
 class Expr {
 	public:
@@ -139,6 +140,14 @@ enum CondType {
 	CondFalse,
 	CondTrue,
 	CondEq,
+	CondSl,
+	CondSle,
+	CondUl,
+	CondUle,
+	CondSg,
+	CondSge,
+	CondUg,
+	CondUge,
 };
 class Cond {
 	public:
@@ -183,6 +192,15 @@ refMem expr_store(const refMem mem,const refExpr idx,const refExpr val);
 refExpr expr_select(const refMem mem,const refExpr idx,const unsigned int size);
 refExpr expr_add(const refExpr op1,const refExpr op2);
 refExpr expr_sub(const refExpr op1,const refExpr op2);
-refCond expr_eq(const refExpr op1,const refExpr op2);
+
+refCond cond_eq(const refExpr op1,const refExpr op2);
+refCond cond_sl(const refExpr op1,const refExpr op2);
+refCond cond_sle(const refExpr op1,const refExpr op2);
+refCond cond_ul(const refExpr op1,const refExpr op2);
+refCond cond_ule(const refExpr op1,const refExpr op2);
+refCond cond_sg(const refExpr op1,const refExpr op2);
+refCond cond_sge(const refExpr op1,const refExpr op2);
+refCond cond_ug(const refExpr op1,const refExpr op2);
+refCond cond_uge(const refExpr op1,const refExpr op2);
 
 #endif
