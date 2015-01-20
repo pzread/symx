@@ -2,38 +2,41 @@
 
 #include"utils.h"
 #include"expr.h"
-#include"solver.h"
 
 #ifndef _STATE_H_
 #define _STATE_H_
 
-class Block;
-typedef std::shared_ptr<Block> refBlock;
+namespace symx {
 
-class State {
+using namespace symx;
+
+class Block;
+class State;
+class Probe;
+typedef std::shared_ptr<Block> refBlock;
+typedef std::shared_ptr<State> refState;
+
+class BaseState {
 	public:
-		const unsigned int num_reg;
-		const unsigned int num_flag;
 		refMem mem;
 		refExpr reg[128];
 		refCond flag[64];
-
-		State(
-			const unsigned int _num_reg,
-			const unsigned int _num_flag
-		) : num_reg(_num_reg),num_flag(_num_flag) {}
 };
-class Block : public State {
+class State : public BaseState {
+	public:
+		uint64_t pc;
+		std::shared_ptr<Probe> probe;
+};
+class Block : public BaseState {
 	public:
 		uint64_t start;
 		uint64_t end;
 		refExpr next_pc;
-		Block(
-			const unsigned int num_reg,
-			const unsigned int num_flag
-		) : State(num_reg,num_flag) {}
 };
 
 refBlock state_create_block(Context *ctx);
+int state_executor(Context *ctx,Probe *probe,uint64_t pc);
+
+}
 
 #endif

@@ -5,6 +5,10 @@
 #include"utils.h"
 #include"expr.h"
 
+using namespace symx;
+
+namespace symx {
+
 static uint64_t get_next_varid(Context *ctx) {
 	ctx->last_var_id += 1;
 	return ctx->last_var_id;
@@ -97,3 +101,5 @@ refCond cond_xor(const refCond op1,const refCond op2) {
 refCond cond_not(const refCond op1) {
 	return ref<Cond>(CondNot,op1);
 }
+
+};

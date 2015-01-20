@@ -1,6 +1,9 @@
 #include<stdint.h>
+#include<string.h>
 #include<assert.h>
 #include<unistd.h>
+#include<sys/stat.h>
+#include<sys/mman.h>
 #include<capstone/arm.h>
 
 #include"utils.h"
@@ -9,14 +12,37 @@
 #include"expr.h"
 #include"arm.h"
 
-#define LOG_PREFIX "ARM"
+using namespace symx;
+using namespace arm;
 
+#define LOG_PREFIX "ARM"
 #define err(x,...) {fprintf(stderr,"[%d][" LOG_PREFIX "] " x,getpid(),##__VA_ARGS__);while(1);}
 #define info(x,...) {fprintf(stderr,"[%d][" LOG_PREFIX "] " x,getpid(),##__VA_ARGS__);}
 
-static refExpr imm40,imm41,imm44,imm48;
+namespace arm {
 
-int arm_init(Context *ctx) {
+ARMProbe::ARMProbe(const int fd,const uint64_t _off) : off(_off) {
+	struct stat st;
+	fstat(fd,&st);
+	bin = (uint8_t*)mmap(NULL,st.st_size,PROT_READ,MAP_PRIVATE,fd,0);
+}
+uint64_t ARMProbe::read_reg(const unsigned int regid) {
+	return 0;
+}
+bool ARMProbe::read_flag(const unsigned int flagid) {
+	return 0;
+}
+ssize_t ARMProbe::read_mem(
+	const uint64_t addr,
+	const uint8_t *buf,
+	const size_t len
+) {
+	memcpy((void*)buf,(void*)(bin + off + addr),len);
+	return len;
+}
+
+static refExpr imm40,imm41,imm44,imm48;
+int init(Context *ctx) {
 	ctx->reg_size = ARM_REG_SIZE;
 	ctx->num_reg = ARM_REG_ENDING;
 	ctx->num_flag = ARM_FLAG_NUM;
@@ -26,7 +52,6 @@ int arm_init(Context *ctx) {
 	imm48 = BytVec::create_imm(4,8);
         return 0;
 }
-
 static refExpr get_op_expr(refBlock blk,cs_arm_op *op,uint64_t pc) {
 	refExpr ret;
 	if(op->type == ARM_OP_IMM) {
@@ -57,9 +82,9 @@ static refMem get_cc_mem(refMem mem,cs_arm *det) {
 	err("TODO: get_cc_mem\n");
 	return mem;
 }
-refBlock arm_emit(Context *ctx,uint8_t *bin,uint64_t pc,off_t off) {
+refBlock emit(Context *ctx,ARMProbe *probe,uint64_t pc) {
 	int i;
-        refBlock blk = state_create_block(ctx);
+        refBlock blk;
 	cs_insn *insn,*ins;
         size_t count;
         size_t idx;
@@ -70,13 +95,14 @@ refBlock arm_emit(Context *ctx,uint8_t *bin,uint64_t pc,off_t off) {
 	refExpr nr[ARM_REG_ENDING];
 	refMem nm;
 	refExpr xrd,xrs,xrt;
-
+	
+	blk = state_create_block(ctx);
 	nm = blk->mem;
 	for(i = 0;i < ARM_REG_ENDING;i++){
 		nr[i] = blk->reg[i];
 	}
         
-        count = cs_disasm(ctx->cs,bin + off,64,pc,0,&insn);
+        count = cs_disasm(ctx->cs,probe->bin + probe->off + pc,64,pc,0,&insn);
         ins = insn;
 	end_flag = false;
 	for(idx = 0; idx < 64 && !end_flag; idx++) {
@@ -167,10 +193,11 @@ refBlock arm_emit(Context *ctx,uint8_t *bin,uint64_t pc,off_t off) {
 				nr[i] = blk->reg[i];
 			}
 		}
-
                 ins += 1;
 	}
 	cs_free(insn,count);
 
         return blk;
 }
+
+};

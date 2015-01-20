@@ -1,6 +1,5 @@
 #include<stdint.h>
 
-#include"context.h"
 #include"state.h"
 
 #ifndef _ARM_H_
@@ -13,7 +12,27 @@
 #define ARM_SR_C 31
 #define ARM_SV_N 31
 
-int arm_init(Context *ctx);
-refBlock arm_emit(Context *ctx,uint8_t *bin,uint64_t base,off_t off);
+namespace arm {
+
+using namespace arm;
+
+class ARMProbe : public symx::Probe {
+	public:
+		uint8_t *bin;
+		uint64_t off;
+		ARMProbe(const int fd,const uint64_t _off);
+		uint64_t read_reg(const unsigned int regid);
+		bool read_flag(const unsigned int flagid);
+		ssize_t read_mem(
+			const uint64_t addr,
+			const uint8_t *buf,
+			const size_t len
+		);
+};
+
+int init(symx::Context *ctx);
+symx::refBlock emit(symx::Context *ctx,ARMProbe *probe,uint64_t pc);
+
+};
 
 #endif

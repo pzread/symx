@@ -7,6 +7,9 @@
 #ifndef _EXPR_H_
 #define _EXPR_H_
 
+namespace symx {
+using namespace symx;
+
 class Mem;
 class Expr;
 class Cond;
@@ -230,5 +233,7 @@ refCond cond_and(const refCond op1,const refCond op2);
 refCond cond_or(const refCond op1,const refCond op2);
 refCond cond_xor(const refCond op1,const refCond op2);
 refCond cond_not(const refCond op1);
+
+}
 
 #endif
