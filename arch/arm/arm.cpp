@@ -2,6 +2,8 @@
 #include<assert.h>
 #include<unistd.h>
 #include<capstone/arm.h>
+
+#include"utils.h"
 #include"context.h"
 #include"state.h"
 #include"expr.h"
@@ -64,18 +66,19 @@ refBlock arm_emit(Context *ctx,uint8_t *bin,uint64_t pc,off_t off) {
         cs_arm *det;
         cs_arm_op *ops;
 
-	refExpr nr[ARM_REG_NUM];
+	refExpr nr[ARM_REG_ENDING];
 	refMem nm;
 	refExpr xrd,xrs,xrt;
+	refCond cdt;
 
 	nm = blk->mem;
-	for(i = 0;i < ARM_REG_NUM;i++){
+	for(i = 0;i < ARM_REG_ENDING;i++){
 		nr[i] = blk->reg[i];
 	}
         
         count = cs_disasm(ctx->cs,bin + off,64,pc,0,&insn);
         ins = insn;
-	for(idx = 0; idx < 2; idx++) {
+	for(idx = 0; idx < 10; idx++) {
 		info("%s %s\n",ins->mnemonic,ins->op_str);
 
 		pc = ins->address;
@@ -92,16 +95,52 @@ refBlock arm_emit(Context *ctx,uint8_t *bin,uint64_t pc,off_t off) {
 			}
 			nr[ARM_REG_SP] = xrt;
                         break;
+		case ARM_INS_ADD:
+			if(det->op_count == 2) {
+				xrd = get_op_expr(blk,&ops[0],pc);
+				xrs = get_op_expr(blk,&ops[1],pc);
+			} else {
+				xrd = get_op_expr(blk,&ops[1],pc);
+				xrs = get_op_expr(blk,&ops[2],pc);
+			}
+			nr[ops[0].reg] = expr_add(xrd,xrs);
+			/*
+			cond_sl(xrt,imm40);
+			cond_eq(xrt,imm40);
+			cond_uge(xrd,expr_neg(xrs));
+
+			cdt = cond_sl(xrt,imm40);
+			cond_and(
+				cond_xor(cond_sl(xrd,imm40),cdt),
+				cond_xor(cond_sl(xrs,imm40),cdt));
+			*/
+			break;
 		case ARM_INS_SUB:
 			xrd = get_op_expr(blk,&ops[0],pc);
 			xrs = get_op_expr(blk,&ops[1],pc);
-			xrt = expr_sub(xrd,xrs);
-			nr[ops[0].reg] = xrt;
-
-			cond_sl(xrt,imm40);
-			cond_eq(xrt,imm40);
-			cond_uge(xrd,xrs);
-
+			nr[ops[0].reg] = expr_sub(xrd,xrs);
+			/*
+			if(ins->id == ARM_INS_SUBS){
+				cdt = cond_sl(xrt,imm40);
+				cond_sl(xrt,imm40);
+				cond_eq(xrt,imm40);
+				cond_uge(xrd,xrs);
+				cond_and(
+					cond_xor(cond_sl(xrd,imm40),cdt),
+					cond_xor(
+						cond_sl(expr_neg(xrs),imm40),
+						cdt));
+			}
+			*/
+			break;
+		case ARM_INS_MOV:
+		case ARM_INS_MOVW:
+			nr[ops[0].reg] = get_op_expr(blk,&ops[1],pc);
+			break;
+		case ARM_INS_MOVT:
+			xrd = get_op_expr(blk,&ops[0],pc);
+			xrs = BytVec::create_imm(2,ops[1].imm << 16);
+			nr[ops[0].reg] = expr_concat(expr_extract(xrd,0,4),xrs);
 			break;
 		default:
 			err("TODO: inst\n");
@@ -112,7 +151,7 @@ refBlock arm_emit(Context *ctx,uint8_t *bin,uint64_t pc,off_t off) {
 			blk->mem = get_cc_mem(nm,det);
 			nm = blk->mem;
 		}
-		for(i = 0;i < ARM_REG_NUM;i++){
+		for(i = 0;i < ARM_REG_ENDING;i++){
 			if(nr[i] != blk->reg[i]) {
 				blk->reg[i] = get_cc_expr(nr[i],det);
 				nr[i] = blk->reg[i];

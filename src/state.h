@@ -1,4 +1,6 @@
 #include<memory>
+
+#include"utils.h"
 #include"expr.h"
 #include"solver.h"
 

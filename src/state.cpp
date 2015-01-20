@@ -1,11 +1,13 @@
 #include<memory>
+
+#include"utils.h"
 #include"context.h"
 #include"expr.h"
 #include"state.h"
 
 refBlock state_create_block(Context *ctx) {
 	unsigned int i;
-	refBlock blk =  std::make_shared<Block>(ctx->num_reg,ctx->num_flag);
+	refBlock blk =  ref<Block>(ctx->num_reg,ctx->num_flag);
 
 	blk->mem = BytMem::create_dangle(0);
 	for(i = 0; i < blk->num_reg; i++) {

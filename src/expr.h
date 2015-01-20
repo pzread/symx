@@ -1,6 +1,7 @@
 #include<stdint.h>
 #include<memory>
 
+#include"utils.h"
 #include"context.h"
 
 #ifndef _EXPR_H_
@@ -63,7 +64,10 @@ enum ExprType {
 	ExprOpMul,
 	ExprOpUdiv,
 	ExprOpSdiv,
+	ExprOpNeg,
 	ExprOpNot,
+	ExprOpExtract,
+	ExprOpConcat,
 };
 class Expr {
 	public:
@@ -117,6 +121,7 @@ class Operator : public Expr {
 	public:
 		const unsigned int op_count;
 		refExpr operand[2];
+		unsigned int start;
 
 		Operator(
 			const enum ExprType op_type,
@@ -134,6 +139,14 @@ class Operator : public Expr {
 			operand[0] = op1;
 			operand[1] = op2;
 		}
+		Operator(
+			const unsigned int _size,
+			const refExpr op1,
+			const unsigned int _start
+		) : Expr(ExprOpExtract,_size),op_count(1) {
+			operand[0] = op1;
+			start = _start;
+		}
 };
 
 enum CondType {
@@ -148,6 +161,10 @@ enum CondType {
 	CondSge,
 	CondUg,
 	CondUge,
+	CondAnd,
+	CondOr,
+	CondXor,
+	CondNot,
 };
 class Cond {
 	public:
@@ -192,6 +209,13 @@ refMem expr_store(const refMem mem,const refExpr idx,const refExpr val);
 refExpr expr_select(const refMem mem,const refExpr idx,const unsigned int size);
 refExpr expr_add(const refExpr op1,const refExpr op2);
 refExpr expr_sub(const refExpr op1,const refExpr op2);
+refExpr expr_neg(const refExpr op1);
+refExpr expr_not(const refExpr op1);
+refExpr expr_extract(
+	const refExpr op1,
+	const unsigned int start,
+	const unsigned int end);
+refExpr expr_concat(const refExpr op1,const refExpr op2);
 
 refCond cond_eq(const refExpr op1,const refExpr op2);
 refCond cond_sl(const refExpr op1,const refExpr op2);
@@ -202,5 +226,9 @@ refCond cond_sg(const refExpr op1,const refExpr op2);
 refCond cond_sge(const refExpr op1,const refExpr op2);
 refCond cond_ug(const refExpr op1,const refExpr op2);
 refCond cond_uge(const refExpr op1,const refExpr op2);
+refCond cond_and(const refCond op1,const refCond op2);
+refCond cond_or(const refCond op1,const refCond op2);
+refCond cond_xor(const refCond op1,const refCond op2);
+refCond cond_not(const refCond op1);
 
 #endif
