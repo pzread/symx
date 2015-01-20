@@ -65,11 +65,11 @@ refBlock arm_emit(Context *ctx,uint8_t *bin,uint64_t pc,off_t off) {
         size_t idx;
         cs_arm *det;
         cs_arm_op *ops;
+	bool end_flag;
 
 	refExpr nr[ARM_REG_ENDING];
 	refMem nm;
 	refExpr xrd,xrs,xrt;
-	refCond cdt;
 
 	nm = blk->mem;
 	for(i = 0;i < ARM_REG_ENDING;i++){
@@ -78,12 +78,15 @@ refBlock arm_emit(Context *ctx,uint8_t *bin,uint64_t pc,off_t off) {
         
         count = cs_disasm(ctx->cs,bin + off,64,pc,0,&insn);
         ins = insn;
-	for(idx = 0; idx < 10; idx++) {
+	end_flag = false;
+	for(idx = 0; idx < 64 && !end_flag; idx++) {
 		info("%s %s\n",ins->mnemonic,ins->op_str);
 
 		pc = ins->address;
                 det = &ins->detail->arm;
                 ops = det->operands;
+		blk->reg[ARM_REG_PC] = BytVec::create_imm(4,pc);
+		nr[ARM_REG_PC] = blk->reg[ARM_REG_PC];
 
                 switch(ins->id) {
                 case ARM_INS_PUSH:
@@ -141,6 +144,13 @@ refBlock arm_emit(Context *ctx,uint8_t *bin,uint64_t pc,off_t off) {
 			xrd = get_op_expr(blk,&ops[0],pc);
 			xrs = BytVec::create_imm(2,ops[1].imm << 16);
 			nr[ops[0].reg] = expr_concat(expr_extract(xrd,0,4),xrs);
+			break;
+		case ARM_INS_BL:
+		case ARM_INS_BLX:
+			nr[ARM_REG_LR] = BytVec::create_imm(4,pc + ins->size);
+		case ARM_INS_B:
+			nr[ARM_REG_PC] = get_op_expr(blk,&ops[0],pc);
+			end_flag = true;
 			break;
 		default:
 			err("TODO: inst\n");

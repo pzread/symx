@@ -15,7 +15,7 @@ class State {
 		const unsigned int num_reg;
 		const unsigned int num_flag;
 		refMem mem;
-		refExpr reg[64];
+		refExpr reg[128];
 		refCond flag[64];
 
 		State(
@@ -27,15 +27,11 @@ class Block : public State {
 	public:
 		uint64_t start;
 		uint64_t end;
+		refExpr next_pc;
 		Block(
 			const unsigned int num_reg,
 			const unsigned int num_flag
 		) : State(num_reg,num_flag) {}
-
-		void set_bound(uint64_t _start,uint64_t _end) {
-			start = _start;
-			end = _end;
-		}
 };
 
 refBlock state_create_block(Context *ctx);
