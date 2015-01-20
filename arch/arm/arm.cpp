@@ -48,10 +48,7 @@ ssize_t ARMProbe::read_mem(
 }
 
 static refExpr imm40,imm41,imm44,imm48;
-int init(Context *ctx) {
-	ctx->reg_size = ARM_REG_SIZE;
-	ctx->num_reg = ARM_REG_ENDING;
-	ctx->num_flag = ARM_FLAG_NUM;
+int initialize() {
 	imm40 = BytVec::create_imm(4,0);
 	imm41 = BytVec::create_imm(4,1);
 	imm44 = BytVec::create_imm(4,4);
@@ -88,9 +85,13 @@ static refMem get_cc_mem(refMem mem,cs_arm *det) {
 	err("TODO: get_cc_mem\n");
 	return mem;
 }
-refBlock emit(Context *ctx,std::shared_ptr<ARMProbe> probe,uint64_t pc) {
+refBlock ARMContext::interpret(
+	refProbe _probe,
+	uint64_t pc
+) {
 	int i;
-        refBlock blk;
+	refARMProbe probe = std::dynamic_pointer_cast<ARMProbe>(_probe);
+        refBlock blk = state_create_block(this);
 	cs_insn *insn,*ins;
         size_t count;
         size_t idx;
@@ -102,13 +103,12 @@ refBlock emit(Context *ctx,std::shared_ptr<ARMProbe> probe,uint64_t pc) {
 	refMem nm;
 	refExpr xrd,xrs,xrt;
 	
-	blk = state_create_block(ctx);
 	nm = blk->mem;
 	for(i = 0;i < ARM_REG_ENDING;i++){
 		nr[i] = blk->reg[i];
 	}
         
-        count = cs_disasm(ctx->cs,probe->bin + probe->off + pc,64,pc,0,&insn);
+        count = cs_disasm(cs,probe->bin + probe->off + pc,64,pc,0,&insn);
         ins = insn;
 	end_flag = false;
 	for(idx = 0; idx < 64 && !end_flag; idx++) {

@@ -16,6 +16,9 @@ namespace arm {
 
 using namespace arm;
 
+class ARMProbe;
+typedef std::shared_ptr<ARMProbe> refARMProbe;
+
 class ARMProbe : public symx::Probe {
 	public:
 		uint8_t *bin;
@@ -29,12 +32,18 @@ class ARMProbe : public symx::Probe {
 			const size_t len
 		);
 };
+class ARMContext : public symx::Context {
+	public:
+		ARMContext() : symx::Context(
+			ARM_REG_SIZE,
+			ARM_REG_ENDING,
+			ARM_FLAG_NUM) {}
+		symx::refBlock interpret(
+			symx::refProbe _probe,
+			uint64_t pc);
+};
 
-int init(symx::Context *ctx);
-symx::refBlock emit(
-	symx::Context *ctx,
-	std::shared_ptr<ARMProbe> probe,
-	uint64_t pc);
+int initialize();
 
 };
 

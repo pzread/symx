@@ -24,7 +24,8 @@ refBlock state_create_block(Context *ctx) {
 }
 int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 	unsigned int i;
-	refState nstate;
+	refState nstate,cstate;
+	refBlock cblk;
 	
 	nstate = ref<State>(pc,probe);
 	nstate->mem = BytMem::create_var(ctx);
@@ -40,11 +41,20 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			nstate->flag[i] = Cond::create_false();
 		}
 	}
+	ctx->state.push(nstate);
 
-	while(true) {
+	while(!ctx->state.empty()) {
+		cstate = ctx->state.front();
+		ctx->state.pop();
 
+		auto blk_it = ctx->block.find(pc);
+		if(blk_it == ctx->block.end()) {
+			cblk = ctx->interpret(probe,pc);
+		} else {
+			cblk = blk_it->second;
+		}
+		break;
 	}
-
 	return 0;
 }
 
