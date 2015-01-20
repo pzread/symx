@@ -31,7 +31,10 @@ class ARMProbe : public symx::Probe {
 };
 
 int init(symx::Context *ctx);
-symx::refBlock emit(symx::Context *ctx,ARMProbe *probe,uint64_t pc);
+symx::refBlock emit(
+	symx::Context *ctx,
+	std::shared_ptr<ARMProbe> probe,
+	uint64_t pc);
 
 };
 

@@ -5,6 +5,7 @@
 #include<sys/stat.h>
 #include<sys/mman.h>
 #include<capstone/arm.h>
+#include<memory>
 
 #include"utils.h"
 #include"context.h"
@@ -27,10 +28,15 @@ ARMProbe::ARMProbe(const int fd,const uint64_t _off) : off(_off) {
 	bin = (uint8_t*)mmap(NULL,st.st_size,PROT_READ,MAP_PRIVATE,fd,0);
 }
 uint64_t ARMProbe::read_reg(const unsigned int regid) {
+	//Temp fixed data
+	switch(regid) {
+	case ARM_REG_PC:
+		return 0x8558;
+	}
 	return 0;
 }
 bool ARMProbe::read_flag(const unsigned int flagid) {
-	return 0;
+	return false;
 }
 ssize_t ARMProbe::read_mem(
 	const uint64_t addr,
@@ -82,7 +88,7 @@ static refMem get_cc_mem(refMem mem,cs_arm *det) {
 	err("TODO: get_cc_mem\n");
 	return mem;
 }
-refBlock emit(Context *ctx,ARMProbe *probe,uint64_t pc) {
+refBlock emit(Context *ctx,std::shared_ptr<ARMProbe> probe,uint64_t pc) {
 	int i;
         refBlock blk;
 	cs_insn *insn,*ins;

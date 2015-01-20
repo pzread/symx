@@ -12,6 +12,8 @@ namespace symx {
 
 	class State;
 	class Block;
+	class Probe;
+	typedef std::shared_ptr<Probe> refProbe;
 
 	class Probe {
 		public:

@@ -25,7 +25,9 @@ class BaseState {
 class State : public BaseState {
 	public:
 		uint64_t pc;
-		std::shared_ptr<Probe> probe;
+		refProbe probe;
+		State(const uint64_t _pc,refProbe _probe) :
+			pc(_pc),probe(_probe) {}
 };
 class Block : public BaseState {
 	public:
@@ -35,7 +37,7 @@ class Block : public BaseState {
 };
 
 refBlock state_create_block(Context *ctx);
-int state_executor(Context *ctx,Probe *probe,uint64_t pc);
+int state_executor(Context *ctx,refProbe probe,uint64_t pc);
 
 }
 

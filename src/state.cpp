@@ -22,10 +22,29 @@ refBlock state_create_block(Context *ctx) {
 	}
 	return blk;
 }
-int state_executor(Context *ctx,Probe *probe,uint64_t pc) {
+int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
+	unsigned int i;
+	refState nstate;
+	
+	nstate = ref<State>(pc,probe);
+	nstate->mem = BytMem::create_var(ctx);
+	for(i = 0; i < ctx->num_reg; i++) {
+		nstate->reg[i] = BytVec::create_imm(
+			ctx->reg_size,
+			probe->read_reg(i));
+	}
+	for(i = 0; i < ctx->num_flag; i++) {
+		if(probe->read_flag(i)) {
+			nstate->flag[i] = Cond::create_true();
+		} else {
+			nstate->flag[i] = Cond::create_false();
+		}
+	}
+
 	while(true) {
 
 	}
+
 	return 0;
 }
 
