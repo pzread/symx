@@ -48,12 +48,6 @@ namespace symx {
 				std::shared_ptr<Probe> probe,
 				uint64_t pc) = 0;
 	};
-	class Emu {
-		std::shared_ptr<Block> emit(
-			Context *ctx,
-			std::shared_ptr<Probe> probe,
-			uint64_t pc);
-	};
 };
 
 #endif

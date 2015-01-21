@@ -8,14 +8,29 @@
 #define _EXPR_H_
 
 namespace symx {
+
 using namespace symx;
 
 class Mem;
+class BytMem;
+class StoreMem;
 class Expr;
+class BytVec;
+class Operator;
 class Cond;
+class ExprVisitor;
 typedef std::shared_ptr<Mem> refMem;
 typedef std::shared_ptr<Expr> refExpr;
 typedef std::shared_ptr<Cond> refCond;
+
+class ExprVisitor {
+	public:
+		virtual int eval(BytMem *mem) = 0;
+		virtual int eval(BytVec *vec) = 0;
+		virtual int eval(StoreMem *mem) = 0;
+		virtual int eval(Operator *oper) = 0;
+		virtual int eval(Cond *cond) = 0;
+};
 
 enum MemType {
 	MemDangle,
@@ -26,10 +41,14 @@ class Mem {
 	public:
 		const enum MemType type;
 		Mem(const enum MemType _type) : type(_type) {}
+		virtual int accept(ExprVisitor *visitor) = 0;
 };
 class BytMem : public Mem {
 	public:
 		const unsigned int id;
+		int accept(ExprVisitor *visitor) {
+			return visitor->eval(this);
+		}
 		static std::shared_ptr<BytMem> create_dangle(
 			const unsigned int _id		
 		) {
@@ -54,13 +73,18 @@ class StoreMem : public Mem {
 			const refExpr _idx,
 			const refExpr _val
 		) : Mem(MemStore),mem(_mem),idx(_idx),val(_val) {}
+		int accept(ExprVisitor *visitor) {
+			return visitor->eval(this);
+		}
 };
 
 enum ExprType {
 	ExprDangle,
 	ExprImm,
 	ExprVar,
-	ExprSelect,
+
+	ExprOpSelect,
+	ExprOpExtract,
 
 	ExprOpAdd,
 	ExprOpSub,
@@ -69,7 +93,6 @@ enum ExprType {
 	ExprOpSdiv,
 	ExprOpNeg,
 	ExprOpNot,
-	ExprOpExtract,
 	ExprOpConcat,
 };
 class Expr {
@@ -78,6 +101,7 @@ class Expr {
 		const unsigned int size;
 		Expr(const enum ExprType _type,const unsigned int _size)
 			:type(_type),size(_size) {}
+		virtual int accept(ExprVisitor *visitor) = 0;
 };
 class BytVec : public Expr {
 	public:
@@ -85,6 +109,9 @@ class BytVec : public Expr {
 			const unsigned int id;
 			const uint64_t data;
 		};
+		int accept(ExprVisitor *visitor) {
+			return visitor->eval(this);
+		}
 		static std::shared_ptr<BytVec> create_dangle(
 			const unsigned int _size,
 			const unsigned int _id
@@ -110,21 +137,12 @@ class BytVec : public Expr {
 			Expr(ExprImm,_size),data(imm) {}
 		BytVec(const unsigned int _size,Context *ctx);
 };
-class SelectMem : public Expr {
-	public:
-		const refMem mem;
-		const refExpr idx;
-		SelectMem(
-			const refMem _mem,
-			const refExpr _idx,
-			const unsigned int _size
-		) : Expr(ExprSelect,_size),mem(_mem),idx(_idx) {}
-};
 class Operator : public Expr {
 	public:
-		const unsigned int op_count;
 		refExpr operand[2];
+		refMem mem;
 		unsigned int start;
+		const unsigned int op_count;
 
 		Operator(
 			const enum ExprType op_type,
@@ -143,12 +161,21 @@ class Operator : public Expr {
 			operand[1] = op2;
 		}
 		Operator(
+			const refMem _mem,
+			const refExpr idx,
+			const unsigned int _size
+		) : Expr(ExprOpSelect,_size),mem(_mem),op_count(1) {
+			operand[0] = idx;
+		}
+		Operator(
 			const unsigned int _size,
 			const refExpr op1,
 			const unsigned int _start
-		) : Expr(ExprOpExtract,_size),op_count(1) {
+		) : Expr(ExprOpExtract,_size),start(_start),op_count(1) {
 			operand[0] = op1;
-			start = _start;
+		}
+		int accept(ExprVisitor *visitor) {
+			return visitor->eval(this);
 		}
 };
 
@@ -172,21 +199,22 @@ enum CondType {
 class Cond {
 	public:
 		const enum CondType type;
-		const unsigned int op_count;
+		const unsigned int cond_count;
+		const unsigned int expr_count;
 		refCond cond[2];
 		refExpr expr[2];
 
 		Cond(
 			const enum CondType _type,
 			const refCond op1
-		) : type(_type),op_count(1) {
+		) : type(_type),cond_count(0),expr_count(1) {
 			cond[0] = op1;
 		}
 		Cond(
 			const enum CondType _type,
 			const refCond op1,
 			const refCond op2
-		) : type(_type),op_count(2) {
+		) : type(_type),cond_count(0),expr_count(2) {
 			cond[0] = op1;
 			cond[1] = op2;
 		}
@@ -194,9 +222,12 @@ class Cond {
 			const enum CondType _type,
 			const refExpr op1,
 			const refExpr op2
-		) : type(_type),op_count(2) {
+		) : type(_type),cond_count(2),expr_count(0) {
 			expr[0] = op1;
 			expr[1] = op2;
+		}
+		int accept(ExprVisitor *visitor) {
+			return visitor->eval(this);
 		}
 		static refCond create_false(){
 			return std::shared_ptr<Cond>(new Cond(CondFalse));
@@ -205,7 +236,8 @@ class Cond {
 			return std::shared_ptr<Cond>(new Cond(CondTrue));
 		}
 	private:
-		Cond(const enum CondType _type) : type(_type),op_count(0) {}
+		Cond(const enum CondType _type) :
+			type(_type),cond_count(0),expr_count(0) {}
 };
 
 refMem expr_store(const refMem mem,const refExpr idx,const refExpr val);

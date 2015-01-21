@@ -9,6 +9,63 @@ using namespace symx;
 
 namespace symx {
 
+int expr_walk(ExprVisitor *visitor,refMem mem);
+int expr_walk(ExprVisitor *visitor,refExpr expr);
+int expr_walk(ExprVisitor *visitor,refCond cond);
+int expr_walk(ExprVisitor *visitor,refMem mem) {
+	switch(mem->type) {
+	case MemDangle:
+	case MemVar:
+		break;
+	case MemStore:
+		auto _mem = std::static_pointer_cast<StoreMem>(mem);
+		expr_walk(visitor,_mem->mem);
+		expr_walk(visitor,_mem->idx);
+		expr_walk(visitor,_mem->val);
+		break;
+	}
+	return mem->accept(visitor);
+}
+int expr_walk(ExprVisitor *visitor,refExpr expr) {
+	unsigned int i;
+	switch(expr->type) {
+	case ExprDangle:
+	case ExprImm:
+	case ExprVar:
+		break;
+	case ExprOpSelect:
+	{
+		auto oper = std::static_pointer_cast<Operator>(expr);
+		expr_walk(visitor,oper->mem);
+		expr_walk(visitor,oper->operand[0]);
+		break;
+	}
+	case ExprOpExtract:
+	{
+		auto oper = std::static_pointer_cast<Operator>(expr);
+		expr_walk(visitor,oper->operand[0]);
+		break;
+	}
+	default:
+		auto oper = std::static_pointer_cast<Operator>(expr);
+		for(i = 0; i < oper->op_count; i++) {
+			expr_walk(visitor,oper->operand[i]);
+		}
+		break;
+	}
+	return expr->accept(visitor);
+}
+int expr_walk(ExprVisitor *visitor,refCond cond) {
+	unsigned int i;
+	for(i = 0; i < cond->cond_count; i++) {
+		expr_walk(visitor,cond->cond[i]);
+	}
+	for(i = 0; i < cond->expr_count; i++) {
+		expr_walk(visitor,cond->expr[i]);
+	}
+	return cond->accept(visitor);
+}
+
 static uint64_t get_next_varid(Context *ctx) {
 	ctx->last_var_id += 1;
 	return ctx->last_var_id;
@@ -26,7 +83,7 @@ refExpr expr_select(
 	const refExpr idx,
 	const unsigned int size
 ) {
-	return ref<SelectMem>(mem,idx,size);
+	return ref<Operator>(mem,idx,size);
 }
 refExpr expr_add(const refExpr op1,const refExpr op2) {
 	assert(op1->size == op2->size);

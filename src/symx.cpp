@@ -25,8 +25,6 @@ int main() {
 
 	binfd = open("./demo",O_RDONLY);
 	
-	cs_open(CS_ARCH_ARM,CS_MODE_THUMB,&ctx->cs);
-	cs_option(ctx->cs,CS_OPT_DETAIL,1);
 	//<main> block emit test
 	arm::initialize();
 	auto probe = ref<arm::ARMProbe>(binfd,-0x8000);

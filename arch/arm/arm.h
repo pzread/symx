@@ -34,10 +34,7 @@ class ARMProbe : public symx::Probe {
 };
 class ARMContext : public symx::Context {
 	public:
-		ARMContext() : symx::Context(
-			ARM_REG_SIZE,
-			ARM_REG_ENDING,
-			ARM_FLAG_NUM) {}
+		ARMContext();
 		symx::refBlock interpret(
 			symx::refProbe _probe,
 			uint64_t pc);

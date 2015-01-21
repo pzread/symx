@@ -22,6 +22,15 @@ using namespace arm;
 
 namespace arm {
 
+static refExpr imm40,imm41,imm44,imm48;
+int initialize() {
+	imm40 = BytVec::create_imm(4,0);
+	imm41 = BytVec::create_imm(4,1);
+	imm44 = BytVec::create_imm(4,4);
+	imm48 = BytVec::create_imm(4,8);
+        return 0;
+}
+
 ARMProbe::ARMProbe(const int fd,const uint64_t _off) : off(_off) {
 	struct stat st;
 	fstat(fd,&st);
@@ -47,13 +56,13 @@ ssize_t ARMProbe::read_mem(
 	return len;
 }
 
-static refExpr imm40,imm41,imm44,imm48;
-int initialize() {
-	imm40 = BytVec::create_imm(4,0);
-	imm41 = BytVec::create_imm(4,1);
-	imm44 = BytVec::create_imm(4,4);
-	imm48 = BytVec::create_imm(4,8);
-        return 0;
+ARMContext::ARMContext() : Context(
+	ARM_REG_SIZE,
+	ARM_REG_ENDING,
+	ARM_FLAG_NUM
+) {
+	cs_open(CS_ARCH_ARM,CS_MODE_THUMB,&cs);
+	cs_option(cs,CS_OPT_DETAIL,1);
 }
 static refExpr get_op_expr(refBlock blk,cs_arm_op *op,uint64_t pc) {
 	refExpr ret;
