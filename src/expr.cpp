@@ -9,37 +9,14 @@ using namespace symx;
 
 namespace symx {
 
-int expr_walk(ExprVisitor *visitor,refMem mem);
-int expr_walk(ExprVisitor *visitor,refExpr expr);
-int expr_walk(ExprVisitor *visitor,refCond cond);
-int expr_walk(ExprVisitor *visitor,refMem mem) {
-	switch(mem->type) {
-	case MemDangle:
-	case MemVar:
-		break;
-	case MemStore:
-		auto _mem = std::static_pointer_cast<StoreMem>(mem);
-		expr_walk(visitor,_mem->mem);
-		expr_walk(visitor,_mem->idx);
-		expr_walk(visitor,_mem->val);
-		break;
-	}
-	return mem->accept(visitor);
-}
 int expr_walk(ExprVisitor *visitor,refExpr expr) {
 	unsigned int i;
 	switch(expr->type) {
 	case ExprDangle:
 	case ExprImm:
 	case ExprVar:
+	case ExprMem:
 		break;
-	case ExprOpSelect:
-	{
-		auto oper = std::static_pointer_cast<Operator>(expr);
-		expr_walk(visitor,oper->mem);
-		expr_walk(visitor,oper->operand[0]);
-		break;
-	}
 	case ExprOpExtract:
 	{
 		auto oper = std::static_pointer_cast<Operator>(expr);
@@ -70,20 +47,20 @@ static uint64_t get_next_varid(Context *ctx) {
 	ctx->last_var_id += 1;
 	return ctx->last_var_id;
 }
-BytMem::BytMem(Context *ctx) : Mem(MemVar),id(get_next_varid(ctx)) {}
+BytMem::BytMem(Context *ctx) : Expr(ExprMem,0),id(get_next_varid(ctx)) {}
 BytVec::BytVec(const unsigned int _size,Context *ctx) :
 	Expr(ExprVar,size),
 	id(get_next_varid(ctx)) {}
 
-refMem expr_store(const refMem mem,const refExpr idx,const refExpr val) {
-	return ref<StoreMem>(mem,idx,val);
+refExpr expr_store(const refExpr mem,const refExpr idx,const refExpr val) {
+	return ref<Operator>(mem,idx,val);
 }
 refExpr expr_select(
-	const refMem mem,
+	const refExpr mem,
 	const refExpr idx,
 	const unsigned int size
 ) {
-	return ref<Operator>(mem,idx,size);
+	return ref<Operator>(size,mem,idx);
 }
 refExpr expr_add(const refExpr op1,const refExpr op2) {
 	assert(op1->size == op2->size);

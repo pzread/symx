@@ -1,3 +1,5 @@
+#define LOG_PREFIX "ARM"
+
 #include<stdint.h>
 #include<string.h>
 #include<assert.h>
@@ -15,10 +17,6 @@
 
 using namespace symx;
 using namespace arm;
-
-#define LOG_PREFIX "ARM"
-#define err(x,...) {fprintf(stderr,"[%d][" LOG_PREFIX "] " x,getpid(),##__VA_ARGS__);while(1);}
-#define info(x,...) {fprintf(stderr,"[%d][" LOG_PREFIX "] " x,getpid(),##__VA_ARGS__);}
 
 namespace arm {
 
@@ -41,6 +39,8 @@ uint64_t ARMProbe::read_reg(const unsigned int regid) {
 	switch(regid) {
 	case ARM_REG_PC:
 		return 0x8558;
+	case ARM_REG_SP:
+		return 0x7FFFFFF0;
 	}
 	return 0;
 }
@@ -87,7 +87,7 @@ static refExpr get_cc_expr(refExpr expr,cs_arm *det) {
 	err("TODO: get_cc_expr\n");
 	return expr;
 }
-static refMem get_cc_mem(refMem mem,cs_arm *det) {
+static refExpr get_cc_mem(refExpr mem,cs_arm *det) {
 	if(det->cc == ARM_CC_INVALID || det->cc == ARM_CC_AL) {
 		return mem;
 	}
@@ -109,8 +109,7 @@ refBlock ARMContext::interpret(
 	bool end_flag;
 
 	refExpr nr[ARM_REG_ENDING];
-	refMem nm;
-	refExpr xrd,xrs,xrt;
+	refExpr nm,xrd,xrs,xrt;
 	
 	nm = blk->mem;
 	for(i = 0;i < ARM_REG_ENDING;i++){

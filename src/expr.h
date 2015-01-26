@@ -11,78 +11,31 @@ namespace symx {
 
 using namespace symx;
 
-class Mem;
-class BytMem;
-class StoreMem;
 class Expr;
+class BytMem;
 class BytVec;
 class Operator;
 class Cond;
 class ExprVisitor;
-typedef std::shared_ptr<Mem> refMem;
 typedef std::shared_ptr<Expr> refExpr;
 typedef std::shared_ptr<Cond> refCond;
 
 class ExprVisitor {
 	public:
-		virtual int eval(BytMem *mem) = 0;
-		virtual int eval(BytVec *vec) = 0;
-		virtual int eval(StoreMem *mem) = 0;
-		virtual int eval(Operator *oper) = 0;
-		virtual int eval(Cond *cond) = 0;
-};
-
-enum MemType {
-	MemDangle,
-	MemVar,
-	MemStore,
-};
-class Mem {
-	public:
-		const enum MemType type;
-		Mem(const enum MemType _type) : type(_type) {}
-		virtual int accept(ExprVisitor *visitor) = 0;
-};
-class BytMem : public Mem {
-	public:
-		const unsigned int id;
-		int accept(ExprVisitor *visitor) {
-			return visitor->eval(this);
-		}
-		static std::shared_ptr<BytMem> create_dangle(
-			const unsigned int _id		
-		) {
-			return std::shared_ptr<BytMem>(new BytMem(_id));
-		}
-		static std::shared_ptr<BytMem> create_var(
-			Context *ctx
-		) {
-			return std::shared_ptr<BytMem>(new BytMem(ctx));
-		}
-	private:
-		BytMem(const unsigned int _id) : Mem(MemDangle),id(_id) {}
-		BytMem(Context *ctx);
-};
-class StoreMem : public Mem {
-	public:
-		const refMem mem;
-		const refExpr idx;
-		const refExpr val;
-		StoreMem(
-			const refMem _mem,
-			const refExpr _idx,
-			const refExpr _val
-		) : Mem(MemStore),mem(_mem),idx(_idx),val(_val) {}
-		int accept(ExprVisitor *visitor) {
-			return visitor->eval(this);
-		}
+		virtual ~ExprVisitor() {}
+		virtual int visit(BytMem *mem) = 0;
+		virtual int visit(BytVec *vec) = 0;
+		virtual int visit(Operator *oper) = 0;
+		virtual int visit(Cond *cond) = 0;
 };
 
 enum ExprType {
 	ExprDangle,
+	ExprMem,
 	ExprImm,
 	ExprVar,
 
+	ExprOpStore,
 	ExprOpSelect,
 	ExprOpExtract,
 
@@ -110,7 +63,7 @@ class BytVec : public Expr {
 			const uint64_t data;
 		};
 		int accept(ExprVisitor *visitor) {
-			return visitor->eval(this);
+			return visitor->visit(this);
 		}
 		static std::shared_ptr<BytVec> create_dangle(
 			const unsigned int _size,
@@ -137,10 +90,29 @@ class BytVec : public Expr {
 			Expr(ExprImm,_size),data(imm) {}
 		BytVec(const unsigned int _size,Context *ctx);
 };
+class BytMem : public Expr {
+	public:
+		const unsigned int id;
+		int accept(ExprVisitor *visitor) {
+			return visitor->visit(this);
+		}
+		static std::shared_ptr<BytMem> create_dangle(
+			const unsigned int _id		
+		) {
+			return std::shared_ptr<BytMem>(new BytMem(_id));
+		}
+		static std::shared_ptr<BytMem> create_var(
+			Context *ctx
+		) {
+			return std::shared_ptr<BytMem>(new BytMem(ctx));
+		}
+	private:
+		BytMem(const unsigned int _id) : Expr(ExprDangle,0),id(_id) {}
+		BytMem(Context *ctx);
+};
 class Operator : public Expr {
 	public:
-		refExpr operand[2];
-		refMem mem;
+		refExpr operand[3];
 		unsigned int start;
 		const unsigned int op_count;
 
@@ -161,11 +133,21 @@ class Operator : public Expr {
 			operand[1] = op2;
 		}
 		Operator(
-			const refMem _mem,
+			const refExpr mem,
 			const refExpr idx,
-			const unsigned int _size
-		) : Expr(ExprOpSelect,_size),mem(_mem),op_count(1) {
-			operand[0] = idx;
+			const refExpr val
+		) : Expr(ExprOpStore,0),op_count(3) {
+			operand[0] = mem;
+			operand[1] = idx;
+			operand[2] = val;
+		}
+		Operator(
+			const unsigned int _size,
+			const refExpr mem,
+			const refExpr idx
+		) : Expr(ExprOpSelect,_size),op_count(2) {
+			operand[0] = mem;
+			operand[1] = idx;
 		}
 		Operator(
 			const unsigned int _size,
@@ -175,7 +157,7 @@ class Operator : public Expr {
 			operand[0] = op1;
 		}
 		int accept(ExprVisitor *visitor) {
-			return visitor->eval(this);
+			return visitor->visit(this);
 		}
 };
 
@@ -227,7 +209,7 @@ class Cond {
 			expr[1] = op2;
 		}
 		int accept(ExprVisitor *visitor) {
-			return visitor->eval(this);
+			return visitor->visit(this);
 		}
 		static refCond create_false(){
 			return std::shared_ptr<Cond>(new Cond(CondFalse));
@@ -240,8 +222,11 @@ class Cond {
 			type(_type),cond_count(0),expr_count(0) {}
 };
 
-refMem expr_store(const refMem mem,const refExpr idx,const refExpr val);
-refExpr expr_select(const refMem mem,const refExpr idx,const unsigned int size);
+int expr_walk(ExprVisitor *visitor,refExpr expr);
+int expr_walk(ExprVisitor *visitor,refCond cond);
+
+refExpr expr_store(const refExpr mem,const refExpr idx,const refExpr val);
+refExpr expr_select(const refExpr mem,const refExpr idx,const unsigned int size);
 refExpr expr_add(const refExpr op1,const refExpr op2);
 refExpr expr_sub(const refExpr op1,const refExpr op2);
 refExpr expr_neg(const refExpr op1);
@@ -266,6 +251,6 @@ refCond cond_or(const refCond op1,const refCond op2);
 refCond cond_xor(const refCond op1,const refCond op2);
 refCond cond_not(const refCond op1);
 
-}
+};
 
 #endif
