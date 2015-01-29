@@ -18,15 +18,18 @@ class Operator;
 class Cond;
 class ExprVisitor;
 typedef std::shared_ptr<Expr> refExpr;
+typedef std::shared_ptr<BytVec> refBytVec;
+typedef std::shared_ptr<BytMem> refBytMem;
+typedef std::shared_ptr<Operator> refOperator;
 typedef std::shared_ptr<Cond> refCond;
 
 class ExprVisitor {
 	public:
 		virtual ~ExprVisitor() {}
-		virtual int visit(BytMem *mem) = 0;
-		virtual int visit(BytVec *vec) = 0;
-		virtual int visit(Operator *oper) = 0;
-		virtual int visit(Cond *cond) = 0;
+		virtual int visit(refBytVec vec) = 0;
+		virtual int visit(refBytMem mem) = 0;
+		virtual int visit(refOperator oper) = 0;
+		virtual int visit(refCond cond) = 0;
 };
 
 enum ExprType {
@@ -48,7 +51,7 @@ enum ExprType {
 	ExprOpNot,
 	ExprOpConcat,
 };
-class Expr {
+class Expr : public std::enable_shared_from_this<Expr> {
 	public:
 		const enum ExprType type;
 		const unsigned int size;
@@ -63,7 +66,9 @@ class BytVec : public Expr {
 			const uint64_t data;
 		};
 		int accept(ExprVisitor *visitor) {
-			return visitor->visit(this);
+			return visitor->visit(
+					std::static_pointer_cast<BytVec>(
+						shared_from_this()));
 		}
 		static std::shared_ptr<BytVec> create_dangle(
 			const unsigned int _size,
@@ -94,7 +99,9 @@ class BytMem : public Expr {
 	public:
 		const unsigned int id;
 		int accept(ExprVisitor *visitor) {
-			return visitor->visit(this);
+			return visitor->visit(
+					std::static_pointer_cast<BytMem>(
+						shared_from_this()));
 		}
 		static std::shared_ptr<BytMem> create_dangle(
 			const unsigned int _id		
@@ -157,7 +164,9 @@ class Operator : public Expr {
 			operand[0] = op1;
 		}
 		int accept(ExprVisitor *visitor) {
-			return visitor->visit(this);
+			return visitor->visit(
+					std::static_pointer_cast<Operator>(
+						shared_from_this()));
 		}
 };
 
@@ -178,7 +187,7 @@ enum CondType {
 	CondXor,
 	CondNot,
 };
-class Cond {
+class Cond : public std::enable_shared_from_this<Cond> {
 	public:
 		const enum CondType type;
 		const unsigned int cond_count;
@@ -209,7 +218,9 @@ class Cond {
 			expr[1] = op2;
 		}
 		int accept(ExprVisitor *visitor) {
-			return visitor->visit(this);
+			return visitor->visit(
+					std::static_pointer_cast<Cond>(
+						shared_from_this()));
 		}
 		static refCond create_false(){
 			return std::shared_ptr<Cond>(new Cond(CondFalse));

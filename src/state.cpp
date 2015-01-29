@@ -20,7 +20,7 @@ class PrintVisitor : public ExprVisitor {
 			info("%s\n",str_stack.front().c_str());
 			return 0;
 		}
-		int visit(BytMem *mem) {
+		int visit(refBytMem mem) {
 			if(mem->type == ExprMem) {
 				str_stack.push_back(
 					"(mem " +
@@ -34,7 +34,7 @@ class PrintVisitor : public ExprVisitor {
 			}
 			return 0;
 		}
-		int visit(BytVec *vec) {
+		int visit(refBytVec vec) {
 			if(vec->type == ExprImm) {
 				str_stack.push_back(
 					"(imm " +
@@ -53,18 +53,19 @@ class PrintVisitor : public ExprVisitor {
 			}
 			return 0;
 		}
-		int visit(Operator *oper) {
+		int visit(refOperator oper) {
 			unsigned int i;
 			std::string params;
 
 			switch(oper->type) {
 			case ExprOpSelect:
-				params = str_stack[1] + "," + str_stack[0];
+				params = "select " +
+					str_stack[1] + "," + str_stack[0];
 				str_stack.pop_back();
 				str_stack.pop_back();
 				break;
 			case ExprOpExtract:
-				params = str_stack[0] + "," +
+				params = "extract " + str_stack[0] + "," +
 					std::to_string(oper->start);
 				str_stack.pop_back();
 				break;
@@ -81,7 +82,7 @@ class PrintVisitor : public ExprVisitor {
 			str_stack.push_back("(" + params + ")");
 			return 0;
 		}
-		int visit(Cond *cond) {
+		int visit(refCond cond) {
 			return 0;
 		}
 	private:
