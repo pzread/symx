@@ -1,4 +1,5 @@
 #include<z3.h>
+#include<unordered_map>
 #include"utils.h"
 #include"expr.h"
 
@@ -26,14 +27,20 @@ namespace z3_solver {
 	};
 	class TransVisitor : public symx::ExprVisitor {
 		public:
-			TransVisitor(const Solver *_solver);
+			TransVisitor(
+				const Solver *_solver,
+				const symx::State &state
+			);
 			int visit(symx::refBytVec vec);
 			int visit(symx::refBytMem mem);
 			int visit(symx::refOperator oper);
 			int visit(symx::refCond cond);
 		private:
 			const Solver *solver;
+			const symx::State &state;
+			Z3_sort bvsort1;
 			Z3_sort bvsort4;
+			std::unordered_map<symx::refExpr,Z3_ast> expr_ast;
 	};
 };
 

@@ -19,7 +19,7 @@ typedef std::shared_ptr<State> refState;
 class BaseState {
 	public:
 		refExpr mem;
-		refExpr reg[128];
+		refExpr reg[256];
 		refCond flag[64];
 };
 class State : public BaseState {

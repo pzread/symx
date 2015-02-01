@@ -4,6 +4,7 @@
 #include"utils.h"
 #include"expr.h"
 #include"solver.h"
+#include"state.h"
 
 using namespace symx;
 
@@ -11,15 +12,16 @@ using namespace symx;
 #define DECREF(x) Z3_dec_ref(solver->context,(x))
 
 namespace z3_solver {
-	TransVisitor::TransVisitor(const Solver *_solver) : solver(_solver) {
+	TransVisitor::TransVisitor(const Solver *_solver,const State &_state)
+		: solver(_solver),state(_state) {
+		bvsort1 = Z3_mk_bv_sort(solver->context,8);
 		bvsort4 = Z3_mk_bv_sort(solver->context,32);
 	}
 	int TransVisitor::visit(const refBytVec vec) {
 		Z3_ast res_ast;
-
 		switch(vec->type) {
 		case ExprDangle:
-			break;
+			res_ast = expr_ast[state.reg[vec->index]];
 		case ExprImm:
 			res_ast = Z3_mk_unsigned_int64(
 				solver->context,
@@ -38,10 +40,34 @@ namespace z3_solver {
 			break;
 		default:
 			err("illegal case\n");
+			return -1;
 		}
+		expr_ast[vec] = res_ast;
 		return 0;
 	}
 	int TransVisitor::visit(const refBytMem mem) {
+		Z3_ast res_ast;
+		switch(mem->type) {
+		case ExprDangle:
+			res_ast = expr_ast[state.mem];
+			break;
+		case ExprMem:
+			res_ast = Z3_mk_const(
+					solver->context,
+					Z3_mk_int_symbol(
+						solver->context,
+						mem->id),
+					Z3_mk_array_sort(
+						solver->context,
+						bvsort4,
+						bvsort1));
+			INCREF(res_ast);
+			break;
+		default:
+			err("illegal case\n");
+			return -1;
+		}
+		expr_ast[mem] = res_ast;
 		return 0;
 	}
 	int TransVisitor::visit(const refOperator oper) {

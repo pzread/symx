@@ -34,9 +34,9 @@ class ExprVisitor {
 
 enum ExprType {
 	ExprDangle,
-	ExprMem,
 	ExprImm,
 	ExprVar,
+	ExprMem,
 
 	ExprOpStore,
 	ExprOpSelect,
@@ -63,6 +63,7 @@ class BytVec : public Expr {
 	public:
 		union {
 			const unsigned int id;
+			const unsigned int index;
 			const uint64_t data;
 		};
 		int accept(ExprVisitor *visitor) {
@@ -72,9 +73,10 @@ class BytVec : public Expr {
 		}
 		static std::shared_ptr<BytVec> create_dangle(
 			const unsigned int _size,
-			const unsigned int _id
+			const unsigned int _index
 		) {
-			return std::shared_ptr<BytVec>(new BytVec(_size,_id));
+			return std::shared_ptr<BytVec>(
+					new BytVec(_size,_index));
 		}
 		static std::shared_ptr<BytVec> create_imm(
 			const unsigned int _size,
@@ -89,24 +91,27 @@ class BytVec : public Expr {
 			return std::shared_ptr<BytVec>(new BytVec(_size,ctx));
 		}
 	private:
-		BytVec(const unsigned int _size,const unsigned int _id) :
-			Expr(ExprDangle,_size),id(_id) {}
+		BytVec(const unsigned int _size,const unsigned int _index) :
+			Expr(ExprDangle,_size),index(_index) {}
 		BytVec(const unsigned int _size,const uint64_t imm) :
 			Expr(ExprImm,_size),data(imm) {}
 		BytVec(const unsigned int _size,Context *ctx);
 };
 class BytMem : public Expr {
 	public:
-		const unsigned int id;
+		union {
+			const unsigned int id;
+			const unsigned int index;
+		};
 		int accept(ExprVisitor *visitor) {
 			return visitor->visit(
 					std::static_pointer_cast<BytMem>(
 						shared_from_this()));
 		}
 		static std::shared_ptr<BytMem> create_dangle(
-			const unsigned int _id		
+			const unsigned int _index	
 		) {
-			return std::shared_ptr<BytMem>(new BytMem(_id));
+			return std::shared_ptr<BytMem>(new BytMem(_index));
 		}
 		static std::shared_ptr<BytMem> create_var(
 			Context *ctx
@@ -114,7 +119,8 @@ class BytMem : public Expr {
 			return std::shared_ptr<BytMem>(new BytMem(ctx));
 		}
 	private:
-		BytMem(const unsigned int _id) : Expr(ExprDangle,0),id(_id) {}
+		BytMem(const unsigned int _index)
+			: Expr(ExprDangle,0),index(_index) {}
 		BytMem(Context *ctx);
 };
 class Operator : public Expr {
