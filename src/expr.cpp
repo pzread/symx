@@ -41,11 +41,17 @@ int expr_walk(ExprVisitor *visitor,refCond cond) {
 	if(visitor->cond_set.find(cond) != visitor->cond_set.end()) {
 		return 0;
 	}
-	for(i = 0; i < cond->cond_count; i++) {
-		expr_walk(visitor,cond->cond[i]);
-	}
-	for(i = 0; i < cond->expr_count; i++) {
-		expr_walk(visitor,cond->expr[i]);
+	switch(cond->type) {
+	case CondDangle:
+		break;
+	default:
+		for(i = 0; i < cond->cond_count; i++) {
+			expr_walk(visitor,cond->cond[i]);
+		}
+		for(i = 0; i < cond->expr_count; i++) {
+			expr_walk(visitor,cond->expr[i]);
+		}
+		break;
 	}
 	return cond->accept(visitor);
 }
