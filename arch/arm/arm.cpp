@@ -120,7 +120,7 @@ refBlock ARMContext::interpret(
         count = cs_disasm(cs,probe->bin + probe->off + pc,64,pc,0,&insn);
         ins = insn;
 	end_flag = false;
-	for(idx = 0; idx < 64 && !end_flag; idx++) {
+	for(idx = 0; idx < 1 && !end_flag; idx++) {
 		info("%s %s\n",ins->mnemonic,ins->op_str);
 
 		pc = ins->address;
@@ -132,10 +132,11 @@ refBlock ARMContext::interpret(
                 switch(ins->id) {
                 case ARM_INS_PUSH:
 			xrt = blk->reg[ARM_REG_SP];
+			nm = blk->mem;
 			for(i = det->op_count - 1; i >= 0; i--) {
 				xrt = expr_sub(xrt,imm44);
 				xrs = get_op_expr(blk,&ops[i],pc);
-				nm = expr_store(blk->mem,xrt,xrs);
+				nm = expr_store(nm,xrt,xrs);
 			}
 			nr[ARM_REG_SP] = xrt;
                         break;

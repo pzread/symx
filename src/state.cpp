@@ -1,7 +1,6 @@
 #define LOG_PREFIX "state"
 
 #include<memory>
-#include<vector>
 #include<string>
 #include<unordered_map>
 
@@ -17,40 +16,35 @@ namespace symx {
 
 class PrintVisitor : public ExprVisitor {
 	public:
-		int print(){
-			info("%s\n",str_stack.front().c_str());
+		int print(refExpr expr){
+			info("%s\n",expr_map[expr].c_str());
 			return 0;
 		}
 		int visit(refBytMem mem) {
 			if(mem->type == ExprMem) {
-				str_stack.push_back(
-					"(mem " +
+				expr_map[mem] = "(mem " +
 					std::to_string(mem->id) +
-					")");
+					")";
 			} else if(mem->type == ExprDangle) {
-				str_stack.push_back(
-					"(dmem " +
-					std::to_string(mem->id) +
-					")");
+				expr_map[mem] = "(dmem " +
+					std::to_string(mem->index) +
+					")";
 			}
 			return 0;
 		}
 		int visit(refBytVec vec) {
 			if(vec->type == ExprImm) {
-				str_stack.push_back(
-					"(imm " +
+				expr_map[vec] = "(imm " +
 					std::to_string(vec->data) +
-					")");
+					")";
 			} else if(vec->type == ExprVar) {
-				str_stack.push_back(
-					"(var " +
+				expr_map[vec] = "(var " +
 					std::to_string(vec->id) +
-					")");
+					")";
 			} else if(vec->type == ExprDangle) {
-				str_stack.push_back(
-					"(dvec " +
-					std::to_string(vec->id) +
-					")");
+				expr_map[vec] = "(dvec " +
+					std::to_string(vec->index) +
+					")";
 			}
 			return 0;
 		}
@@ -61,34 +55,30 @@ class PrintVisitor : public ExprVisitor {
 			switch(oper->type) {
 			case ExprOpSelect:
 				params = "select " +
-					str_stack[1] + "," + str_stack[0];
-				str_stack.pop_back();
-				str_stack.pop_back();
+					expr_map[oper->operand[0]] + "," +
+					expr_map[oper->operand[1]];
 				break;
 			case ExprOpExtract:
-				params = "extract " + str_stack[0] + "," +
+				params = "extract " +
+					expr_map[oper->operand[0]] + "," +
 					std::to_string(oper->start);
-				str_stack.pop_back();
 				break;
 			default:
-				params = str_stack.back();
-				str_stack.pop_back();
+				params = expr_map[oper->operand[0]];
 				for(i = 1; i < oper->op_count; i++) {
-					params = str_stack.back() +
-						"," + params;
-					str_stack.pop_back();
+					params += "," +
+						expr_map[oper->operand[i]];
 				}
 				break;
 			}
-			str_stack.push_back("(" + params + ")");
+			expr_map[oper] = "(" + params + ")";
 			return 0;
 		}
 		int visit(refCond cond) {
 			return 0;
 		}
 	private:
-		std::vector<std::string> str_stack;
-		std::unordered_map<refExpr,int> expr_map;
+		std::unordered_map<refExpr,std::string> expr_map;
 };
 
 refBlock state_create_block(Context *ctx) {
@@ -104,14 +94,10 @@ refBlock state_create_block(Context *ctx) {
 	}
 	return blk;
 }
-int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
+static refState create_static_state(Context *ctx,refProbe probe,uint64_t pc) {
 	unsigned int i;
-	refState nstate,cstate;
-	refBlock cblk;
-	TransVisitor *vis;
-	
-	vis = ctx->solver->create_translator();
-	nstate = ref<State>(pc,probe);
+	auto nstate = ref<State>(pc,probe);
+	auto vis = ctx->solver->create_translator();
 
 	nstate->mem = BytMem::create_var(ctx);
 	expr_walk(vis,nstate->mem);
@@ -133,6 +119,17 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		expr_walk(vis,nstate->flag[i]);
 		nstate->solver_flag[i] = vis->get_solver_cond(nstate->flag[i]);
 	}
+
+	delete vis;
+
+	return nstate;
+}
+int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
+	unsigned int i;
+	refState nstate,cstate;
+	refBlock cblk;
+
+	nstate = create_static_state(ctx,probe,pc);
 	ctx->state.push(nstate);
 
 	while(!ctx->state.empty()) {
@@ -148,12 +145,12 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 
 		auto vis = new PrintVisitor();
 		expr_walk(vis,cblk->mem);
-		vis->print();
+		vis->print(cblk->mem);
 		delete vis;
 		for(i = 0; i < ctx->num_reg; i++) {
 			auto vis = new PrintVisitor();
 			expr_walk(vis,cblk->reg[i]);
-			vis->print();
+			vis->print(cblk->reg[i]);
 			delete vis;
 		}
 

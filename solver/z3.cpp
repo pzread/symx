@@ -72,7 +72,6 @@ namespace z3_solver {
 			auto expr = std::static_pointer_cast<Z3SolverExpr>(
 					expr_it->second);
 			res_ast = expr->ast;
-			INCREF(res_ast);
 			break;
 		}
 		case ExprImm:
@@ -80,7 +79,6 @@ namespace z3_solver {
 				solver->context,
 				vec->data,
 				bvsort4);
-			INCREF(res_ast);
 			break;
 		case ExprVar:
 			res_ast = Z3_mk_const(
@@ -89,12 +87,12 @@ namespace z3_solver {
 						solver->context,
 						vec->id),
 					bvsort4);
-			INCREF(res_ast);
 			break;
 		default:
 			err("illegal case\n");
 			return -1;
 		}
+		INCREF(res_ast);
 		expr_ast[vec] = res_ast;
 		return 0;
 	}
@@ -108,7 +106,6 @@ namespace z3_solver {
 			auto expr = std::static_pointer_cast<Z3SolverExpr>(
 					dangle_mem);
 			res_ast = expr->ast;
-			INCREF(res_ast);
 			break;
 		}
 		case ExprMem:
@@ -121,12 +118,12 @@ namespace z3_solver {
 						solver->context,
 						bvsort4,
 						bvsort1));
-			INCREF(res_ast);
 			break;
 		default:
 			err("illegal case\n");
 			return -1;
 		}
+		INCREF(res_ast);
 		expr_ast[mem] = res_ast;
 		return 0;
 	}
@@ -145,13 +142,19 @@ namespace z3_solver {
 			auto cond = std::static_pointer_cast<Z3SolverCond>(
 					cond_it->second);
 			res_ast = cond->ast;
-			INCREF(res_ast);
 			break;
 		}
+		case CondFalse:
+			res_ast = Z3_mk_false(solver->context);
+			break;
+		case CondTrue:
+			res_ast = Z3_mk_true(solver->context);
+			break;
 		default:
 			err("illegal case\n");
 			return -1;
 		}
+		INCREF(res_ast);
 		cond_ast[cond] = res_ast;
 		return 0;
 	}
