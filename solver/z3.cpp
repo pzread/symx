@@ -92,7 +92,9 @@ namespace z3_solver {
 		Z3_ast res_ast;
 		switch(mem->type) {
 		case ExprDangle:
-		{
+		if(dangle_mem == nullptr) {
+			err("undefined dangle bytmem\n");
+		} else {
 			auto expr = std::static_pointer_cast<Z3SolverExpr>(
 					dangle_mem);
 			res_ast = expr->ast;
