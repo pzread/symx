@@ -73,24 +73,23 @@ class BytVec : public Expr {
 					std::static_pointer_cast<BytVec>(
 						shared_from_this()));
 		}
-		static std::shared_ptr<BytVec> create_dangle(
-			const unsigned int _size,
-			const unsigned int _index
+		static refBytVec create_dangle(
+			const unsigned int size,
+			const unsigned int index
 		) {
-			return std::shared_ptr<BytVec>(
-					new BytVec(_size,_index));
+			return refBytVec(new BytVec(size,index));
 		}
-		static std::shared_ptr<BytVec> create_imm(
-			const unsigned int _size,
+		static refBytVec create_imm(
+			const unsigned int size,
 			const uint64_t imm
 		) {
-			return std::shared_ptr<BytVec>(new BytVec(_size,imm));
+			return refBytVec(new BytVec(size,imm));
 		}
-		static std::shared_ptr<BytVec> create_var(
-			const unsigned int _size,
+		static refBytVec create_var(
+			const unsigned int size,
 			Context *ctx
 		) {
-			return std::shared_ptr<BytVec>(new BytVec(_size,ctx));
+			return refBytVec(new BytVec(size,ctx));
 		}
 	private:
 		BytVec(const unsigned int _size,const unsigned int _index) :
@@ -110,15 +109,11 @@ class BytMem : public Expr {
 					std::static_pointer_cast<BytMem>(
 						shared_from_this()));
 		}
-		static std::shared_ptr<BytMem> create_dangle(
-			const unsigned int _index	
-		) {
-			return std::shared_ptr<BytMem>(new BytMem(_index));
+		static refBytMem create_dangle(const unsigned int index) {
+			return refBytMem(new BytMem(index));
 		}
-		static std::shared_ptr<BytMem> create_var(
-			Context *ctx
-		) {
-			return std::shared_ptr<BytMem>(new BytMem(ctx));
+		static refBytMem create_var(Context *ctx) {
+			return refBytMem(new BytMem(ctx));
 		}
 	private:
 		BytMem(const unsigned int _index)
@@ -179,6 +174,7 @@ class Operator : public Expr {
 };
 
 enum CondType {
+	CondDangle,
 	CondFalse,
 	CondTrue,
 	CondEq,
@@ -200,6 +196,7 @@ class Cond : public std::enable_shared_from_this<Cond> {
 		const enum CondType type;
 		const unsigned int cond_count;
 		const unsigned int expr_count;
+		unsigned int index;
 		refCond cond[2];
 		refExpr expr[2];
 
@@ -230,13 +227,21 @@ class Cond : public std::enable_shared_from_this<Cond> {
 					std::static_pointer_cast<Cond>(
 						shared_from_this()));
 		}
-		static refCond create_false(){
-			return std::shared_ptr<Cond>(new Cond(CondFalse));
+		static refCond create_dangle(const unsigned int index) {
+			return refCond(new Cond(index));
 		}
-		static refCond create_true(){
-			return std::shared_ptr<Cond>(new Cond(CondTrue));
+		static refCond create_false() {
+			return refCond(new Cond(CondFalse));
+		}
+		static refCond create_true() {
+			return refCond(new Cond(CondTrue));
 		}
 	private:
+		Cond(const unsigned int _index) :
+			type(CondDangle),
+			cond_count(0),
+			expr_count(0),
+			index(_index) {}
 		Cond(const enum CondType _type) :
 			type(_type),cond_count(0),expr_count(0) {}
 };

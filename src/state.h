@@ -41,8 +41,8 @@ class Block : public BaseState {
 };
 class TransVisitor : public symx::ExprVisitor {
 	public:
-		virtual refSolverExpr get_solverexpr(const refExpr expr) = 0;
-		virtual refSolverCond get_solvercond(const refCond cond) = 0;
+		virtual refSolverExpr get_solver_expr(const refExpr expr) = 0;
+		virtual refSolverCond get_solver_cond(const refCond cond) = 0;
 };
 
 refBlock state_create_block(Context *ctx);

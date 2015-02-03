@@ -10,7 +10,7 @@ void internal_err(std::string prefix,std::string fmt,...) {
 
 	cfmt = "[" + std::to_string(getpid()) + "][" + prefix + "] " + fmt;
 	va_start(args,fmt);
-	fprintf(stderr,cfmt.c_str(),args);
+	vfprintf(stderr,cfmt.c_str(),args);
 	va_end(args);
 	while(1);
 }
@@ -20,6 +20,6 @@ void internal_info(std::string prefix,std::string fmt,...) {
 
 	cfmt = "[" + std::to_string(getpid()) + "][" + prefix + "] " + fmt;
 	va_start(args,fmt);
-	fprintf(stderr,cfmt.c_str(),args);
+	vfprintf(stderr,cfmt.c_str(),args);
 	va_end(args);
 }

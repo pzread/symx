@@ -100,7 +100,7 @@ refBlock state_create_block(Context *ctx) {
 		blk->reg[i] = BytVec::create_dangle(ctx->reg_size,i);
 	}
 	for(i = 0;i < ctx->num_flag; i++) {
-		blk->flag[i] = Cond::create_false();
+		blk->flag[i] = Cond::create_dangle(i);
 	}
 	return blk;
 }
@@ -115,14 +115,14 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 
 	nstate->mem = BytMem::create_var(ctx);
 	expr_walk(vis,nstate->mem);
-	nstate->solver_mem = vis->get_solverexpr(nstate->mem);
+	nstate->solver_mem = vis->get_solver_expr(nstate->mem);
 
 	for(i = 0; i < ctx->num_reg; i++) {
 		nstate->reg[i] = BytVec::create_imm(
 			ctx->reg_size,
 			probe->read_reg(i));
 		expr_walk(vis,nstate->reg[i]);
-		nstate->solver_reg[i] = vis->get_solverexpr(nstate->reg[i]);
+		nstate->solver_reg[i] = vis->get_solver_expr(nstate->reg[i]);
 	}
 	for(i = 0; i < ctx->num_flag; i++) {
 		if(probe->read_flag(i)) {
@@ -131,7 +131,7 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			nstate->flag[i] = Cond::create_false();
 		}
 		expr_walk(vis,nstate->flag[i]);
-		nstate->solver_flag[i] = vis->get_solvercond(nstate->flag[i]);
+		nstate->solver_flag[i] = vis->get_solver_cond(nstate->flag[i]);
 	}
 	ctx->state.push(nstate);
 

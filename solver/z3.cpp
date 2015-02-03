@@ -28,27 +28,37 @@ namespace z3_solver {
 	}
 	Z3TransVisitor::Z3TransVisitor(
 		const Z3Solver *_solver,
-		const refSolverExpr _mem,
-		const std::unordered_map <unsigned int,refSolverExpr> &_reg,
-		const std::unordered_map <unsigned int,refSolverCond> &_cond
+		const refSolverExpr mem,
+		const std::unordered_map <unsigned int,refSolverExpr> &reg,
+		const std::unordered_map <unsigned int,refSolverCond> &flag
 	) :
 		solver(_solver),
-		dangle_mem(_mem),
-		dangle_reg(_reg),
-		dangle_cond(_cond) 
+		dangle_mem(mem),
+		dangle_reg(reg),
+		dangle_flag(flag) 
 	{
 		bvsort1 = Z3_mk_bv_sort(solver->context,8);
 		bvsort4 = Z3_mk_bv_sort(solver->context,32);
 	}
-	symx::refSolverExpr Z3TransVisitor::get_solverexpr(
-			const symx::refExpr expr) {
-		auto z3expr = ref<Z3SolverExpr>(solver->context,expr_ast[expr]);
-		return z3expr;
+	Z3TransVisitor::~Z3TransVisitor() {
+		for(auto it = expr_ast.begin();
+				it != expr_ast.end();
+				it++){
+			DECREF(it->second);
+		}
+		for(auto it = cond_ast.begin();
+				it != cond_ast.end();
+				it++){
+			DECREF(it->second);
+		}
 	}
-	symx::refSolverCond Z3TransVisitor::get_solvercond(
+	symx::refSolverExpr Z3TransVisitor::get_solver_expr(
+			const symx::refExpr expr) {
+		return ref<Z3SolverExpr>(solver->context,expr_ast[expr]);
+	}
+	symx::refSolverCond Z3TransVisitor::get_solver_cond(
 			const symx::refCond cond) {
-		auto z3cond = ref<Z3SolverCond>(solver->context,cond_ast[cond]);
-		return z3cond;
+		return ref<Z3SolverCond>(solver->context,cond_ast[cond]);
 	}
 	int Z3TransVisitor::visit(const refBytVec vec) {
 		Z3_ast res_ast;
@@ -124,6 +134,25 @@ namespace z3_solver {
 		return 0;
 	}
 	int Z3TransVisitor::visit(const refCond cond) {
+		Z3_ast res_ast;
+		switch(cond->type) {
+		case CondDangle:
+		{
+			auto cond_it = dangle_flag.find(cond->index);
+			if(cond_it == dangle_flag.end()) {
+				err("undefined dangle bytvec\n");
+			}
+			auto cond = std::static_pointer_cast<Z3SolverCond>(
+					cond_it->second);
+			res_ast = cond->ast;
+			INCREF(res_ast);
+			break;
+		}
+		default:
+			err("illegal case\n");
+			return -1;
+		}
+		cond_ast[cond] = res_ast;
 		return 0;
 	}
 	Z3Solver::Z3Solver() {
@@ -147,14 +176,12 @@ namespace z3_solver {
 				symx::refSolverCond>{});
 	}
 	symx::TransVisitor* Z3Solver::create_translator(
-			const symx::refSolverExpr _mem,
+			const symx::refSolverExpr mem,
 			const std::unordered_map
-			<unsigned int,
-			symx::refSolverExpr> &_reg,
+				<unsigned int,symx::refSolverExpr> &reg,
 			const std::unordered_map
-			<unsigned int,
-			symx::refSolverCond> &_cond
+				<unsigned int,symx::refSolverCond> &flag
 	) {
-		return new Z3TransVisitor(this,_mem,_reg,_cond);
+		return new Z3TransVisitor(this,mem,reg,flag);
 	}
 };
