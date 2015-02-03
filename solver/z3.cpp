@@ -40,6 +40,7 @@ namespace z3_solver {
 		bvsort1 = Z3_mk_bv_sort(solver->context,8);
 		bvsort4 = Z3_mk_bv_sort(solver->context,32);
 		bvimm41 = Z3_mk_unsigned_int64(solver->context,1,bvsort4);
+		INCREF(bvimm41);
 	}
 	Z3TransVisitor::~Z3TransVisitor() {
 		for(auto it = expr_ast.begin();
