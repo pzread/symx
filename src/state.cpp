@@ -26,9 +26,7 @@ class PrintVisitor : public ExprVisitor {
 					std::to_string(mem->id) +
 					")";
 			} else if(mem->type == ExprDangle) {
-				expr_map[mem] = "(dmem " +
-					std::to_string(mem->index) +
-					")";
+				expr_map[mem] = "(dmem)";
 			}
 			return 0;
 		}

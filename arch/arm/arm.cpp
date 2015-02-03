@@ -120,7 +120,7 @@ refBlock ARMContext::interpret(
         count = cs_disasm(cs,probe->bin + probe->off + pc,64,pc,0,&insn);
         ins = insn;
 	end_flag = false;
-	for(idx = 0; idx < 1 && !end_flag; idx++) {
+	for(idx = 0; idx < count && !end_flag; idx++) {
 		info("%s %s\n",ins->mnemonic,ins->op_str);
 
 		pc = ins->address;
@@ -184,7 +184,7 @@ refBlock ARMContext::interpret(
 			break;
 		case ARM_INS_MOVT:
 			xrd = get_op_expr(blk,&ops[0],pc);
-			xrs = BytVec::create_imm(2,ops[1].imm << 16);
+			xrs = BytVec::create_imm(2,ops[1].imm);
 			nr[ops[0].reg] = expr_concat(expr_extract(xrd,0,4),xrs);
 			break;
 		case ARM_INS_BL:
