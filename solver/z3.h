@@ -39,7 +39,6 @@ namespace z3_solver {
 			int visit(symx::refBytMem mem);
 			int visit(symx::refOperator oper);
 			int visit(symx::refCond cond);
-
 		private:
 			const Z3Solver *solver;
 			const symx::refSolverExpr dangle_mem;
@@ -51,6 +50,8 @@ namespace z3_solver {
 			Z3_sort bvsort4;
 			std::unordered_map<symx::refExpr,Z3_ast> expr_ast;
 			std::unordered_map<symx::refCond,Z3_ast> cond_ast;
+			Z3_ast expr_to_ast(const symx::refExpr expr);
+			Z3_ast cond_to_ast(const symx::refCond cond);
 	};
 	class Z3Solver : public symx::Solver {
 		public:

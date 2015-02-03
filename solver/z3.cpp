@@ -60,6 +60,20 @@ namespace z3_solver {
 			const symx::refCond cond) {
 		return ref<Z3SolverCond>(solver->context,cond_ast[cond]);
 	}
+	Z3_ast Z3TransVisitor::expr_to_ast(const symx::refExpr expr) {
+		auto it = expr_ast.find(expr);
+		if(it == expr_ast.end()) {
+			err("expr not exist\n");
+		}
+		return it->second;
+	}
+	Z3_ast Z3TransVisitor::cond_to_ast(const symx::refCond cond) {
+		auto it = cond_ast.find(cond);
+		if(it == cond_ast.end()) {
+			err("cond not exist\n");
+		}
+		return it->second;
+	}
 	int Z3TransVisitor::visit(const refBytVec vec) {
 		Z3_ast res_ast;
 		switch(vec->type) {
@@ -128,6 +142,69 @@ namespace z3_solver {
 		return 0;
 	}
 	int Z3TransVisitor::visit(const refOperator oper) {
+		Z3_ast res_ast;
+		switch(oper->type) {
+		case ExprOpStore:
+			res_ast = Z3_mk_store(solver->context,
+					expr_to_ast(oper->operand[0]),
+					expr_to_ast(oper->operand[1]),
+					expr_to_ast(oper->operand[2]));
+			break;
+		case ExprOpSelect:
+			res_ast = Z3_mk_select(solver->context,
+					expr_to_ast(oper->operand[0]),
+					expr_to_ast(oper->operand[1]));
+			break;
+		case ExprOpExtract:
+			res_ast = Z3_mk_extract(solver->context,
+					oper->start + oper->size - 1,
+					oper->start,
+					expr_to_ast(oper->operand[0]));
+			break;
+		case ExprOpAdd:
+			res_ast = Z3_mk_bvadd(solver->context,
+					expr_to_ast(oper->operand[0]),
+					expr_to_ast(oper->operand[1]));
+			break;
+		case ExprOpSub:
+			res_ast = Z3_mk_bvsub(solver->context,
+					expr_to_ast(oper->operand[0]),
+					expr_to_ast(oper->operand[1]));
+			break;
+		case ExprOpMul:
+			res_ast = Z3_mk_bvmul(solver->context,
+					expr_to_ast(oper->operand[0]),
+					expr_to_ast(oper->operand[1]));
+			break;
+		case ExprOpUdiv:
+			res_ast = Z3_mk_bvudiv(solver->context,
+					expr_to_ast(oper->operand[0]),
+					expr_to_ast(oper->operand[1]));
+			break;
+		case ExprOpSdiv:
+			res_ast = Z3_mk_bvsdiv(solver->context,
+					expr_to_ast(oper->operand[0]),
+					expr_to_ast(oper->operand[1]));
+			break;
+		case ExprOpNeg:
+			res_ast = Z3_mk_bvneg(solver->context,
+					expr_to_ast(oper->operand[0]));
+			break;
+		case ExprOpNot:
+			res_ast = Z3_mk_bvnot(solver->context,
+					expr_to_ast(oper->operand[0]));
+			break;
+		case ExprOpConcat:
+			res_ast = Z3_mk_concat(solver->context,
+					expr_to_ast(oper->operand[0]),
+					expr_to_ast(oper->operand[1]));
+			break;
+		default:
+			err("illegal case\n");
+			return -1;
+		}
+		INCREF(res_ast);
+		expr_ast[oper] = res_ast;
 		return 0;
 	}
 	int Z3TransVisitor::visit(const refCond cond) {
