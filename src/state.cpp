@@ -126,6 +126,8 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 	unsigned int i;
 	refState nstate,cstate;
 	refBlock cblk;
+	std::unordered_map<unsigned int,refSolverExpr> solver_reg;
+	std::unordered_map<unsigned int,refSolverCond> solver_flag;
 
 	nstate = create_static_state(ctx,probe,pc);
 	ctx->state.push(nstate);
@@ -141,6 +143,7 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			cblk = blk_it->second;
 		}
 
+		/*
 		auto vis = new PrintVisitor();
 		expr_walk(vis,cblk->mem);
 		vis->print(cblk->mem);
@@ -151,6 +154,20 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			vis->print(cblk->reg[i]);
 			delete vis;
 		}
+		*/
+
+		solver_reg.clear();
+		solver_flag.clear();
+		for(i = 0;i < ctx->num_reg;i++) {
+			solver_reg[i] = cstate->solver_reg[i];
+		}
+		for(i = 0;i < ctx->num_flag;i++) {
+			solver_flag[i] = cstate->solver_flag[i];
+		}
+		auto vis = ctx->solver->create_translator(
+				cstate->solver_mem,solver_reg,solver_flag);
+		expr_walk(vis,cblk->reg[ctx->regidx_pc]);
+		delete vis;
 
 		break;
 	}

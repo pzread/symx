@@ -60,7 +60,8 @@ ARMContext::ARMContext(Solver *_solver) : Context(
 	_solver,
 	ARM_REG_SIZE,
 	ARM_REG_ENDING,
-	ARM_FLAG_NUM
+	ARM_FLAG_NUM,
+	ARM_REG_PC
 ) {
 	cs_open(CS_ARCH_ARM,CS_MODE_THUMB,&cs);
 	cs_option(cs,CS_OPT_DETAIL,1);
