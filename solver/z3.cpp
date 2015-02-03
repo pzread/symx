@@ -39,6 +39,7 @@ namespace z3_solver {
 	{
 		bvsort1 = Z3_mk_bv_sort(solver->context,8);
 		bvsort4 = Z3_mk_bv_sort(solver->context,32);
+		bvimm41 = Z3_mk_unsigned_int64(solver->context,1,bvsort4);
 	}
 	Z3TransVisitor::~Z3TransVisitor() {
 		for(auto it = expr_ast.begin();
@@ -145,65 +146,146 @@ namespace z3_solver {
 		Z3_ast res_ast;
 		switch(oper->type) {
 		case ExprOpStore:
-			res_ast = Z3_mk_store(solver->context,
-					expr_to_ast(oper->operand[0]),
-					expr_to_ast(oper->operand[1]),
-					expr_to_ast(oper->operand[2]));
+		{
+			unsigned int i;
+			unsigned int size;
+			Z3_ast mem_ast = expr_to_ast(oper->operand[0]);
+			Z3_ast idx_ast = expr_to_ast(oper->operand[1]);
+			Z3_ast val_ast = expr_to_ast(oper->operand[2]);
+			Z3_ast old_mem_ast,old_idx_ast;
+
+			size = oper->operand[2]->size;
+			INCREF(mem_ast);
+			INCREF(idx_ast);
+			for(i = 0;i < size;i++) {
+				Z3_ast tmp_ast = Z3_mk_extract(
+						solver->context,
+						i * 8 + 7,
+						i * 8,
+						val_ast);
+				INCREF(tmp_ast);
+				old_mem_ast = mem_ast;
+				mem_ast = Z3_mk_store(
+						solver->context,
+						mem_ast,
+						idx_ast,
+						tmp_ast);
+				INCREF(mem_ast);
+				DECREF(tmp_ast);
+				DECREF(old_mem_ast);
+				old_idx_ast = idx_ast;
+				idx_ast = Z3_mk_bvadd(
+						solver->context,
+						idx_ast,
+						bvimm41);
+				INCREF(idx_ast);
+				DECREF(old_idx_ast);
+			}
+			DECREF(idx_ast);
+			res_ast = mem_ast;
 			break;
+		}
 		case ExprOpSelect:
+		{
 			res_ast = Z3_mk_select(solver->context,
 					expr_to_ast(oper->operand[0]),
 					expr_to_ast(oper->operand[1]));
+			INCREF(res_ast);
+
+			unsigned int i;
+			unsigned int size;
+			Z3_ast mem_ast = expr_to_ast(oper->operand[0]);
+			Z3_ast idx_ast = expr_to_ast(oper->operand[1]);
+			Z3_ast old_idx_ast,old_res_ast;
+
+			if((size = oper->size) == 0){
+				err("illegal size\n");
+			}
+			res_ast = Z3_mk_select(solver->context,mem_ast,idx_ast);
+			INCREF(res_ast);
+			INCREF(idx_ast);
+			for(i = 1;i < size;i++) {
+				old_idx_ast = idx_ast;
+				idx_ast = Z3_mk_bvadd(
+						solver->context,
+						idx_ast,
+						bvimm41);
+				INCREF(idx_ast);
+				DECREF(old_idx_ast);
+				Z3_ast tmp_ast = Z3_mk_select(
+						solver->context,
+						mem_ast,
+						idx_ast);
+				INCREF(tmp_ast);
+				old_res_ast = res_ast;
+				res_ast = Z3_mk_concat(
+						solver->context,
+						res_ast,
+						tmp_ast);
+				INCREF(res_ast);
+				DECREF(tmp_ast);
+				DECREF(old_res_ast);
+			}
+			DECREF(idx_ast);
 			break;
+		}
 		case ExprOpExtract:
 			res_ast = Z3_mk_extract(solver->context,
-					oper->start + oper->size - 1,
-					oper->start,
+					(oper->start + oper->size) * 8 - 1,
+					oper->start * 8,
 					expr_to_ast(oper->operand[0]));
+			INCREF(res_ast);
 			break;
 		case ExprOpAdd:
 			res_ast = Z3_mk_bvadd(solver->context,
 					expr_to_ast(oper->operand[0]),
 					expr_to_ast(oper->operand[1]));
+			INCREF(res_ast);
 			break;
 		case ExprOpSub:
 			res_ast = Z3_mk_bvsub(solver->context,
 					expr_to_ast(oper->operand[0]),
 					expr_to_ast(oper->operand[1]));
+			INCREF(res_ast);
 			break;
 		case ExprOpMul:
 			res_ast = Z3_mk_bvmul(solver->context,
 					expr_to_ast(oper->operand[0]),
 					expr_to_ast(oper->operand[1]));
+			INCREF(res_ast);
 			break;
 		case ExprOpUdiv:
 			res_ast = Z3_mk_bvudiv(solver->context,
 					expr_to_ast(oper->operand[0]),
 					expr_to_ast(oper->operand[1]));
+			INCREF(res_ast);
 			break;
 		case ExprOpSdiv:
 			res_ast = Z3_mk_bvsdiv(solver->context,
 					expr_to_ast(oper->operand[0]),
 					expr_to_ast(oper->operand[1]));
+			INCREF(res_ast);
 			break;
 		case ExprOpNeg:
 			res_ast = Z3_mk_bvneg(solver->context,
 					expr_to_ast(oper->operand[0]));
+			INCREF(res_ast);
 			break;
 		case ExprOpNot:
 			res_ast = Z3_mk_bvnot(solver->context,
 					expr_to_ast(oper->operand[0]));
+			INCREF(res_ast);
 			break;
 		case ExprOpConcat:
 			res_ast = Z3_mk_concat(solver->context,
 					expr_to_ast(oper->operand[0]),
 					expr_to_ast(oper->operand[1]));
+			INCREF(res_ast);
 			break;
 		default:
 			err("illegal case\n");
 			return -1;
 		}
-		INCREF(res_ast);
 		expr_ast[oper] = res_ast;
 		return 0;
 	}

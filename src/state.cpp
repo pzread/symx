@@ -167,6 +167,7 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		auto vis = ctx->solver->create_translator(
 				cstate->solver_mem,solver_reg,solver_flag);
 		expr_walk(vis,cblk->reg[ctx->regidx_pc]);
+		expr_walk(vis,cblk->mem);
 		delete vis;
 
 		break;

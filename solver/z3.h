@@ -48,6 +48,7 @@ namespace z3_solver {
 				<unsigned int,symx::refSolverCond> &dangle_flag;
 			Z3_sort bvsort1;
 			Z3_sort bvsort4;
+			Z3_ast bvimm41;
 			std::unordered_map<symx::refExpr,Z3_ast> expr_ast;
 			std::unordered_map<symx::refCond,Z3_ast> cond_ast;
 			Z3_ast expr_to_ast(const symx::refExpr expr);
