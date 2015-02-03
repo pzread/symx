@@ -13,6 +13,7 @@
 #include"context.h"
 #include"state.h"
 #include"arch/arm/arm.h"
+#include"solver/z3.h"
 
 /*
 	For quick testing
@@ -21,7 +22,8 @@ int main() {
 	//Parameter
 	int binfd;
 
-	auto *ctx = new arm::ARMContext();
+	auto *solver = new z3_solver::Z3Solver();
+	auto *ctx = new arm::ARMContext(solver);
 
 	binfd = open("./demo",O_RDONLY);
 	

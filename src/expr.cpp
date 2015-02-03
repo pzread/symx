@@ -2,6 +2,7 @@
 #include<assert.h>
 #include<memory>
 
+#include"context.h"
 #include"utils.h"
 #include"expr.h"
 
@@ -11,6 +12,9 @@ namespace symx {
 
 int expr_walk(ExprVisitor *visitor,refExpr expr) {
 	unsigned int i;
+	if(visitor->expr_set.find(expr) != visitor->expr_set.end()) {
+		return 0;
+	}
 	switch(expr->type) {
 	case ExprDangle:
 	case ExprImm:
@@ -34,6 +38,9 @@ int expr_walk(ExprVisitor *visitor,refExpr expr) {
 }
 int expr_walk(ExprVisitor *visitor,refCond cond) {
 	unsigned int i;
+	if(visitor->cond_set.find(cond) != visitor->cond_set.end()) {
+		return 0;
+	}
 	for(i = 0; i < cond->cond_count; i++) {
 		expr_walk(visitor,cond->cond[i]);
 	}

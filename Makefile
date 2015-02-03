@@ -5,4 +5,5 @@ default:
 		src/utils.cpp \
 		src/solver.cpp \
 		arch/arm/arm.cpp \
+		solver/z3.cpp \
 		src/symx.cpp

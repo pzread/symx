@@ -1,8 +1,6 @@
 #include<stdint.h>
 #include<memory>
-
-#include"utils.h"
-#include"context.h"
+#include<unordered_set>
 
 #ifndef _EXPR_H_
 #define _EXPR_H_
@@ -11,6 +9,7 @@ namespace symx {
 
 using namespace symx;
 
+class Context;
 class Expr;
 class BytMem;
 class BytVec;
@@ -25,7 +24,10 @@ typedef std::shared_ptr<Cond> refCond;
 
 class ExprVisitor {
 	public:
-		virtual ~ExprVisitor() {}
+		std::unordered_set<refExpr> expr_set;
+		std::unordered_set<refCond> cond_set;
+
+		virtual ~ExprVisitor() {};
 		virtual int visit(refBytVec vec) = 0;
 		virtual int visit(refBytMem mem) = 0;
 		virtual int visit(refOperator oper) = 0;
@@ -243,7 +245,10 @@ int expr_walk(ExprVisitor *visitor,refExpr expr);
 int expr_walk(ExprVisitor *visitor,refCond cond);
 
 refExpr expr_store(const refExpr mem,const refExpr idx,const refExpr val);
-refExpr expr_select(const refExpr mem,const refExpr idx,const unsigned int size);
+refExpr expr_select(
+	const refExpr mem,
+	const refExpr idx,
+	const unsigned int size);
 refExpr expr_add(const refExpr op1,const refExpr op2);
 refExpr expr_sub(const refExpr op1,const refExpr op2);
 refExpr expr_neg(const refExpr op1);
@@ -267,6 +272,11 @@ refCond cond_and(const refCond op1,const refCond op2);
 refCond cond_or(const refCond op1,const refCond op2);
 refCond cond_xor(const refCond op1,const refCond op2);
 refCond cond_not(const refCond op1);
+
+class SolverExpr{};
+class SolverCond{};
+typedef std::shared_ptr<SolverExpr> refSolverExpr;
+typedef std::shared_ptr<SolverCond> refSolverCond;
 
 };
 

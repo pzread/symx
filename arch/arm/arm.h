@@ -1,5 +1,6 @@
 #include<stdint.h>
 
+#include"context.h"
 #include"state.h"
 
 #ifndef _ARM_H_
@@ -34,7 +35,7 @@ class ARMProbe : public symx::Probe {
 };
 class ARMContext : public symx::Context {
 	public:
-		ARMContext();
+		ARMContext(symx::Solver *solver);
 		symx::refBlock interpret(
 			symx::refProbe _probe,
 			uint64_t pc);

@@ -56,7 +56,8 @@ ssize_t ARMProbe::read_mem(
 	return len;
 }
 
-ARMContext::ARMContext() : Context(
+ARMContext::ARMContext(Solver *_solver) : Context(
+	_solver,
 	ARM_REG_SIZE,
 	ARM_REG_ENDING,
 	ARM_FLAG_NUM

@@ -2,7 +2,7 @@
 #include<capstone/capstone.h>
 #include<memory>
 #include<queue>
-#include<map>
+#include<unordered_map>
 
 #ifndef _CONTEXT_H_
 #define _CONTEXT_H_
@@ -13,8 +13,26 @@ namespace symx {
 	class State;
 	class Block;
 	class Probe;
+	class SolverExpr;
+	class SolverCond;
+	class TransVisitor;
+	typedef std::shared_ptr<SolverExpr> refSolverExpr;
+	typedef std::shared_ptr<SolverCond> refSolverCond;
 	typedef std::shared_ptr<Probe> refProbe;
 
+	class Solver {
+		public:
+			virtual TransVisitor* create_translator() = 0;
+			virtual TransVisitor* create_translator(
+					const refSolverExpr _mem,
+					const std::unordered_map
+						<unsigned int,
+						refSolverExpr> &_reg,
+					const std::unordered_map
+						<unsigned int,
+						refSolverCond> &_cond
+				) = 0;
+	};
 	class Probe {
 		public:
 			virtual uint64_t read_reg(const unsigned int regid) = 0;
@@ -28,18 +46,22 @@ namespace symx {
 	class Context {
 		public:
 			csh cs;
+			Solver *solver;
 			const unsigned int reg_size;
 			const unsigned int num_reg;
 			const unsigned int num_flag;
 			uint64_t last_var_id;
 			std::queue<std::shared_ptr<State>> state;
-			std::map<uint64_t,std::shared_ptr<Block>> block;
+			std::unordered_map
+				<uint64_t,std::shared_ptr<Block> > block;
 
 			Context(
+				Solver *_solver,
 				const unsigned int _reg_size,
 				const unsigned int _num_reg,
 				const unsigned int _num_flag
 			) :
+				solver(_solver),
 				reg_size(_reg_size),
 				num_reg(_num_reg),
 				num_flag(_num_flag),

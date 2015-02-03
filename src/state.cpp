@@ -9,6 +9,7 @@
 #include"context.h"
 #include"expr.h"
 #include"state.h"
+#include"solver.h"
 
 using namespace symx;
 
@@ -107,13 +108,21 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 	unsigned int i;
 	refState nstate,cstate;
 	refBlock cblk;
+	TransVisitor *vis;
 	
+	vis = ctx->solver->create_translator();
 	nstate = ref<State>(pc,probe);
+
 	nstate->mem = BytMem::create_var(ctx);
+	expr_walk(vis,nstate->mem);
+	nstate->solver_mem = vis->get_solverexpr(nstate->mem);
+
 	for(i = 0; i < ctx->num_reg; i++) {
 		nstate->reg[i] = BytVec::create_imm(
 			ctx->reg_size,
 			probe->read_reg(i));
+		expr_walk(vis,nstate->reg[i]);
+		nstate->solver_reg[i] = vis->get_solverexpr(nstate->reg[i]);
 	}
 	for(i = 0; i < ctx->num_flag; i++) {
 		if(probe->read_flag(i)) {
@@ -121,6 +130,8 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		} else {
 			nstate->flag[i] = Cond::create_false();
 		}
+		expr_walk(vis,nstate->flag[i]);
+		nstate->solver_flag[i] = vis->get_solvercond(nstate->flag[i]);
 	}
 	ctx->state.push(nstate);
 
