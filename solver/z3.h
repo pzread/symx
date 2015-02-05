@@ -70,7 +70,8 @@ namespace z3_solver {
 			);
 			bool solve(
 				const std::vector<symx::refSolverCond> &cons,
-				std::unordered_map<unsigned int,uint64_t> *var
+				std::unordered_map
+					<symx::refSolverExpr,uint64_t> *var
 			);
 
 		private:

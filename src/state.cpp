@@ -125,10 +125,13 @@ static refState create_static_state(Context *ctx,refProbe probe,uint64_t pc) {
 }
 int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 	unsigned int i;
+	Solver *solver = ctx->solver;
 	refState nstate,cstate;
 	refBlock cblk;
 	std::unordered_map<unsigned int,refSolverExpr> solver_reg;
 	std::unordered_map<unsigned int,refSolverCond> solver_flag;
+	std::vector<refSolverCond> cons;
+	std::unordered_map<refSolverExpr,uint64_t> var;
 
 	nstate = create_static_state(ctx,probe,pc);
 	ctx->state.push(nstate);
@@ -166,16 +169,24 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			solver_flag[i] = cstate->solver_flag[i];
 		}
 
-		auto vis = ctx->solver->create_translator(
+		auto vis = solver->create_translator(
 				cstate->solver_mem,solver_reg,solver_flag);
 		expr_walk(vis,cblk->mem);
 		for(i = 0;i < ctx->num_reg;i++) {
 			expr_walk(vis,cblk->reg[i]);
 		}
-		
-		auto var_pc = BytVec::create_var(ctx->reg_size,ctx);
-		auto cons_get_pc = cond_eq(var_pc,cblk->reg[ctx->regidx_pc]);
-		expr_walk(vis,cons_get_pc);
+		for(i = 0;i < ctx->num_flag;i++) {
+			expr_walk(vis,cblk->flag[i]);
+		}
+
+		auto solexpr_pc = vis->get_solver_expr(
+				cblk->reg[ctx->REGIDX_PC]);
+		cons.clear();
+		var.clear();
+		var[solexpr_pc] = 0;
+		solver->solve(cons,&var);
+
+		info("next pc %lx\n",var[solexpr_pc]);
 
 		delete vis;
 

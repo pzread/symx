@@ -32,7 +32,7 @@ namespace symx {
 			) = 0;
 			virtual bool solve(
 				const std::vector<refSolverCond> &cons,
-				std::unordered_map<unsigned int,uint64_t> *var
+				std::unordered_map<refSolverExpr,uint64_t> *var
 			) = 0;
 	};
 	class Probe {
@@ -52,7 +52,7 @@ namespace symx {
 			const unsigned int reg_size;
 			const unsigned int num_reg;
 			const unsigned int num_flag;
-			const unsigned int regidx_pc;
+			const unsigned int REGIDX_PC;
 			uint64_t last_var_id;
 			std::queue<std::shared_ptr<State>> state;
 			std::unordered_map
@@ -63,13 +63,13 @@ namespace symx {
 				const unsigned int _reg_size,
 				const unsigned int _num_reg,
 				const unsigned int _num_flag,
-				const unsigned int _regidx_pc
+				const unsigned int _REGIDX_PC
 			) :
 				solver(_solver),
 				reg_size(_reg_size),
 				num_reg(_num_reg),
 				num_flag(_num_flag),
-				regidx_pc(_regidx_pc),
+				REGIDX_PC(_REGIDX_PC),
 				last_var_id(0) {}
 			virtual std::shared_ptr<Block> interpret(
 				std::shared_ptr<Probe> probe,

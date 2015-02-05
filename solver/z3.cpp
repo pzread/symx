@@ -430,11 +430,48 @@ namespace z3_solver {
 	}
 	bool Z3Solver::solve(
 			const std::vector<symx::refSolverCond> &cons,
-			std::unordered_map<unsigned int,uint64_t> *var
+			std::unordered_map<refSolverExpr,uint64_t> *var
 	) {
+		refZ3SolverExpr expr;
+		Z3_model model;
+		Z3_ast res_ast;
+
+		Z3_solver_reset(context,solver);
 		for(auto it = cons.begin();it != cons.end();it++) {
 			auto cond = std::static_pointer_cast<Z3SolverCond>(*it);
+			Z3_solver_assert(context,solver,cond->ast);
 		}
+		if(Z3_solver_check(context,solver) == Z3_FALSE) {
+			return false;
+		}
+
+		model = Z3_solver_get_model(context,solver);
+		Z3_model_inc_ref(context,model);
+		
+		for(auto it = var->begin();it != var->end();it++) {
+			expr = std::static_pointer_cast
+				<Z3SolverExpr>(it->first);
+			if(Z3_model_eval(
+				context,
+				model,
+				expr->ast,
+				Z3_TRUE,
+				&res_ast
+			) == Z3_FALSE) {
+				err("evaluate error\n");
+				return false;
+			}
+			if(Z3_get_numeral_uint64(
+				context,
+				res_ast,
+				(unsigned __int64*)&it->second
+			) == Z3_FALSE) {
+				err("get numeral error\n");
+				return false;
+			}
+		}
+
+		Z3_model_dec_ref(context,model);
 		return false;
 	}
 };
