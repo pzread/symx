@@ -3,6 +3,7 @@
 #include<memory>
 #include<string>
 #include<unordered_map>
+#include<vector>
 
 #include"utils.h"
 #include"context.h"
@@ -164,12 +165,18 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		for(i = 0;i < ctx->num_flag;i++) {
 			solver_flag[i] = cstate->solver_flag[i];
 		}
+
 		auto vis = ctx->solver->create_translator(
 				cstate->solver_mem,solver_reg,solver_flag);
 		expr_walk(vis,cblk->mem);
 		for(i = 0;i < ctx->num_reg;i++) {
 			expr_walk(vis,cblk->reg[i]);
 		}
+		
+		auto var_pc = BytVec::create_var(ctx->reg_size,ctx);
+		auto cons_get_pc = cond_eq(var_pc,cblk->reg[ctx->regidx_pc]);
+		expr_walk(vis,cons_get_pc);
+
 		delete vis;
 
 		break;

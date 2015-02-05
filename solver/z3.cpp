@@ -347,4 +347,13 @@ namespace z3_solver {
 	) {
 		return new Z3TransVisitor(this,mem,reg,flag);
 	}
+	bool Z3Solver::solve(
+			const std::vector<symx::refSolverCond> &cons,
+			std::unordered_map<unsigned int,uint64_t> *var
+	) {
+		for(auto it = cons.begin();it != cons.end();it++) {
+			auto cond = std::static_pointer_cast<Z3SolverCond>(*it);
+		}
+		return false;
+	}
 };

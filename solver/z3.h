@@ -68,6 +68,10 @@ namespace z3_solver {
 				const std::unordered_map
 					<unsigned int,symx::refSolverCond> &flag
 			);
+			bool solve(
+				const std::vector<symx::refSolverCond> &cons,
+				std::unordered_map<unsigned int,uint64_t> *var
+			);
 
 		private:
 			static void error_handler(

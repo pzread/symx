@@ -194,8 +194,8 @@ enum CondType {
 class Cond : public std::enable_shared_from_this<Cond> {
 	public:
 		const enum CondType type;
-		const unsigned int cond_count;
 		const unsigned int expr_count;
+		const unsigned int cond_count;
 		unsigned int index;
 		refCond cond[2];
 		refExpr expr[2];
@@ -203,14 +203,14 @@ class Cond : public std::enable_shared_from_this<Cond> {
 		Cond(
 			const enum CondType _type,
 			const refCond op1
-		) : type(_type),cond_count(0),expr_count(1) {
+		) : type(_type),expr_count(0),cond_count(1) {
 			cond[0] = op1;
 		}
 		Cond(
 			const enum CondType _type,
 			const refCond op1,
 			const refCond op2
-		) : type(_type),cond_count(0),expr_count(2) {
+		) : type(_type),expr_count(0),cond_count(2) {
 			cond[0] = op1;
 			cond[1] = op2;
 		}
@@ -218,7 +218,7 @@ class Cond : public std::enable_shared_from_this<Cond> {
 			const enum CondType _type,
 			const refExpr op1,
 			const refExpr op2
-		) : type(_type),cond_count(2),expr_count(0) {
+		) : type(_type),expr_count(2),cond_count(0) {
 			expr[0] = op1;
 			expr[1] = op2;
 		}
@@ -239,11 +239,11 @@ class Cond : public std::enable_shared_from_this<Cond> {
 	private:
 		Cond(const unsigned int _index) :
 			type(CondDangle),
-			cond_count(0),
 			expr_count(0),
+			cond_count(0),
 			index(_index) {}
 		Cond(const enum CondType _type) :
-			type(_type),cond_count(0),expr_count(0) {}
+			type(_type),expr_count(0),cond_count(0) {}
 };
 
 int expr_walk(ExprVisitor *visitor,refExpr expr);

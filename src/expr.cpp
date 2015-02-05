@@ -1,3 +1,5 @@
+#define LOG_PREFIX "expr"
+
 #include<stdint.h>
 #include<assert.h>
 #include<memory>
@@ -61,7 +63,7 @@ static uint64_t get_next_varid(Context *ctx) {
 	return ctx->last_var_id;
 }
 BytVec::BytVec(const unsigned int _size,Context *ctx) :
-	Expr(ExprVar,size),
+	Expr(ExprVar,_size),
 	id(get_next_varid(ctx)) {}
 BytMem::BytMem(Context *ctx) : Expr(ExprMem,0),id(get_next_varid(ctx)) {}
 

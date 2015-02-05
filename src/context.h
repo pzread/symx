@@ -24,14 +24,16 @@ namespace symx {
 		public:
 			virtual TransVisitor* create_translator() = 0;
 			virtual TransVisitor* create_translator(
-					const refSolverExpr mem,
-					const std::unordered_map
-						<unsigned int,
-						refSolverExpr> &reg,
-					const std::unordered_map
-						<unsigned int,
-						refSolverCond> &flag
-				) = 0;
+				const refSolverExpr mem,
+				const std::unordered_map
+					<unsigned int,refSolverExpr> &reg,
+				const std::unordered_map
+					<unsigned int,refSolverCond> &flag
+			) = 0;
+			virtual bool solve(
+				const std::vector<refSolverCond> &cons,
+				std::unordered_map<unsigned int,uint64_t> *var
+			) = 0;
 	};
 	class Probe {
 		public:
