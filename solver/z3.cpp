@@ -310,6 +310,87 @@ namespace z3_solver {
 		case CondTrue:
 			res_ast = Z3_mk_true(solver->context);
 			break;
+		case CondEq:
+			res_ast = Z3_mk_eq(
+					solver->context,
+					expr_to_ast(cond->expr[0]),
+					expr_to_ast(cond->expr[1]));
+			break;
+		case CondSl:
+			res_ast = Z3_mk_bvslt(
+					solver->context,
+					expr_to_ast(cond->expr[0]),
+					expr_to_ast(cond->expr[1]));
+			break;
+		case CondSle:
+			res_ast = Z3_mk_bvsle(
+					solver->context,
+					expr_to_ast(cond->expr[0]),
+					expr_to_ast(cond->expr[1]));
+			break;
+		case CondUl:
+			res_ast = Z3_mk_bvult(
+					solver->context,
+					expr_to_ast(cond->expr[0]),
+					expr_to_ast(cond->expr[1]));
+			break;
+		case CondUle:
+			res_ast = Z3_mk_bvule(
+					solver->context,
+					expr_to_ast(cond->expr[0]),
+					expr_to_ast(cond->expr[1]));
+			break;
+		case CondSg:
+			res_ast = Z3_mk_bvsgt(
+					solver->context,
+					expr_to_ast(cond->expr[0]),
+					expr_to_ast(cond->expr[1]));
+			break;
+		case CondSge:
+			res_ast = Z3_mk_bvsge(
+					solver->context,
+					expr_to_ast(cond->expr[0]),
+					expr_to_ast(cond->expr[1]));
+			break;
+		case CondUg:
+			res_ast = Z3_mk_bvugt(
+					solver->context,
+					expr_to_ast(cond->expr[0]),
+					expr_to_ast(cond->expr[1]));
+			break;
+		case CondUge:
+			res_ast = Z3_mk_bvuge(
+					solver->context,
+					expr_to_ast(cond->expr[0]),
+					expr_to_ast(cond->expr[1]));
+			break;
+		case CondAnd:
+		{
+			Z3_ast conds[] = {
+				cond_to_ast(cond->cond[0]),
+				cond_to_ast(cond->cond[1])};
+			res_ast = Z3_mk_and(solver->context,2,conds);
+			break;
+		}
+		case CondOr:
+		{
+			Z3_ast conds[] = {
+				cond_to_ast(cond->cond[0]),
+				cond_to_ast(cond->cond[1])};
+			res_ast = Z3_mk_or(solver->context,2,conds);
+			break;
+		}
+		case CondXor:
+			res_ast = Z3_mk_xor(
+					solver->context,
+					cond_to_ast(cond->cond[0]),
+					cond_to_ast(cond->cond[1]));
+			break;
+		case CondNot:
+			res_ast = Z3_mk_not(
+					solver->context,
+					cond_to_ast(cond->cond[0]));
+			break;
 		default:
 			err("illegal case\n");
 			return -1;
