@@ -120,11 +120,19 @@ int BuildVisitor::pre_visit(symx::refCond cond) {
 	return 1;
 }
 int BuildVisitor::visit(symx::refBytVec vec) {
-	expr_map[vec] = ref<BytVec>(vec);
+	if(vec->type == ExprDangle) {
+		expr_map[vec] = state->reg[vec->index];
+	} else {
+		expr_map[vec] = ref<BytVec>(vec);
+	}
 	return 1;
 }
 int BuildVisitor::visit(symx::refBytMem mem) {
-	expr_map[mem] = ref<BytMem>(mem);
+	if(mem->type == ExprDangle) {
+		expr_map[mem] = state->mem;
+	} else {
+		expr_map[mem] = ref<BytMem>(mem);
+	}
 	return 1;
 }
 int BuildVisitor::visit(symx::refOperator oper) {
@@ -259,6 +267,21 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		} else {
 			cblk = blk_it->second;
 		}
+
+		nstate = ref<State>(cstate->pc,cstate->probe);
+
+		auto bldvis = new BuildVisitor(cstate);
+		expr_walk(bldvis,cblk->mem);
+		nstate->mem = bldvis->get_expr(cblk->mem);
+		for(i = 0; i < ctx->num_reg; i++) {
+			expr_walk(bldvis,cblk->reg[i]);
+			nstate->reg[i] = bldvis->get_expr(cblk->reg[i]);
+		}
+		for(i = 0; i < ctx->num_flag; i++) {
+			expr_walk(bldvis,cblk->flag[i]);
+			nstate->flag[i] = bldvis->get_cond(cblk->flag[i]);
+		}
+		delete bldvis;
 
 		/*
 		auto vis = new PrintVisitor();
