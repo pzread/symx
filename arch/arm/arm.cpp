@@ -64,14 +64,33 @@ ARMContext::ARMContext(Solver *_solver) : Context(
 	ARM_REG_PC
 ) {
 	cs_open(CS_ARCH_ARM,CS_MODE_THUMB,&cs);
-	cs_option(cs,CS_OPT_DETAIL,1);
+	cs_option(cs,CS_OPT_DETAIL,CS_OPT_ON);
 }
 static refExpr get_op_expr(refBlock blk,cs_arm_op *op,uint64_t pc) {
 	refExpr ret;
 	if(op->type == ARM_OP_IMM) {
 		ret = BytVec::create_imm(4,op->imm);
-	}else if(op->type == ARM_OP_REG) {
+	} else if(op->type == ARM_OP_REG) {
 		ret = blk->reg[op->reg];
+	} else if(op->type == ARM_OP_MEM) {
+		refExpr index;
+		if(op->mem.base != ARM_REG_INVALID) {
+			ret = blk->reg[op->mem.base];
+		} else {
+			ret = BytVec::create_imm(4,0);
+		}
+		if(op->mem.index != ARM_REG_INVALID) {
+			if(op->mem.scale == 1) {
+				ret = expr_add(ret,blk->reg[op->mem.index]);
+			} else {
+				ret = expr_add(ret,expr_mul(
+					blk->reg[op->mem.index],
+					BytVec::create_imm(4,op->mem.scale)));
+			}
+		}
+		if(op->mem.disp != 0) {
+			ret = expr_add(ret,blk->reg[op->mem.disp]);
+		}
 	}
 	switch(op->shift.type) {
 	case ARM_SFT_INVALID:
@@ -187,6 +206,15 @@ refBlock ARMContext::interpret(
 			xrd = get_op_expr(blk,&ops[0],pc);
 			xrs = BytVec::create_imm(2,ops[1].imm);
 			nr[ops[0].reg] = expr_concat(expr_extract(xrd,0,4),xrs);
+			break;
+		case ARM_INS_STR:
+			xrs = get_op_expr(blk,&ops[0],pc);
+			xrd = get_op_expr(blk,&ops[1],pc);
+			nm = expr_store(blk->mem,xrd,xrs);
+			break;
+		case ARM_INS_LDR:
+			xrs = get_op_expr(blk,&ops[1],pc);
+			nr[ops[0].reg] = expr_select(blk->mem,xrs,4);
 			break;
 		case ARM_INS_BL:
 		case ARM_INS_BLX:
