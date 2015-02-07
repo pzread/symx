@@ -205,7 +205,7 @@ refBlock ARMContext::interpret(
 		case ARM_INS_MOVT:
 			xrd = get_op_expr(blk,&ops[0],pc);
 			xrs = BytVec::create_imm(2,ops[1].imm);
-			nr[ops[0].reg] = expr_concat(expr_extract(xrd,0,4),xrs);
+			nr[ops[0].reg] = expr_concat(expr_extract(xrd,0,2),xrs);
 			break;
 		case ARM_INS_STR:
 			xrs = get_op_expr(blk,&ops[0],pc);

@@ -94,15 +94,15 @@ namespace z3_solver {
 			res_ast = Z3_mk_unsigned_int64(
 				solver->context,
 				vec->data,
-				bvsort4);
+				Z3_mk_bv_sort(solver->context,vec->size * 8));
 			break;
 		case ExprVar:
 			res_ast = Z3_mk_const(
+				solver->context,
+				Z3_mk_int_symbol(
 					solver->context,
-					Z3_mk_int_symbol(
-						solver->context,
-						vec->id),
-					bvsort4);
+					vec->id),
+				Z3_mk_bv_sort(solver->context,vec->size * 8));
 			break;
 		default:
 			err("illegal case\n");
@@ -188,11 +188,6 @@ namespace z3_solver {
 		}
 		case ExprOpSelect:
 		{
-			res_ast = Z3_mk_select(solver->context,
-					expr_to_ast(oper->operand[0]),
-					expr_to_ast(oper->operand[1]));
-			INCREF(res_ast);
-
 			unsigned int i;
 			unsigned int size;
 			Z3_ast mem_ast = expr_to_ast(oper->operand[0]);
@@ -202,6 +197,7 @@ namespace z3_solver {
 			if((size = oper->size) == 0){
 				err("illegal size\n");
 			}
+			info("%s\n",Z3_ast_to_string(solver->context,idx_ast));
 			res_ast = Z3_mk_select(solver->context,mem_ast,idx_ast);
 			INCREF(res_ast);
 			INCREF(idx_ast);
