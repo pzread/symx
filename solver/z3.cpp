@@ -355,6 +355,16 @@ namespace z3_solver {
 					expr_to_ast(cond->expr[1]));
 			INCREF(res_ast);
 			break;
+		case CondIte:
+		{
+			res_ast = Z3_mk_ite(
+				solver->context,
+				cond_to_ast(cond->cond[0]),
+				cond_to_ast(cond->cond[1]),
+				cond_to_ast(cond->cond[2]));
+			INCREF(res_ast);
+			break;
+		}
 		case CondAnd:
 		{
 			Z3_ast conds[] = {

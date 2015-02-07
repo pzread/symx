@@ -157,6 +157,9 @@ refCond cond_uge(const refExpr op1,const refExpr op2) {
 	assert(op1->size == op2->size);
 	return ref<Cond>(CondUge,op1,op2);
 }
+refCond cond_ite(const refCond cond,const refCond op1,const refCond op2) {
+	return ref<Cond>(cond,op1,op2);
+}
 refCond cond_and(const refCond op1,const refCond op2) {
 	return ref<Cond>(CondAnd,op1,op2);
 }

@@ -217,6 +217,7 @@ class Operator : public Expr {
 
 enum CondType {
 	CondDangle,
+	CondIte,
 	CondFalse,
 	CondTrue,
 	CondEq,
@@ -239,7 +240,7 @@ class Cond : public std::enable_shared_from_this<Cond> {
 		const unsigned int expr_count;
 		const unsigned int cond_count;
 		unsigned int index;
-		refCond cond[2];
+		refCond cond[3];
 		refExpr expr[2];
 		refSolvCond solver_cond = nullptr;
 
@@ -256,6 +257,15 @@ class Cond : public std::enable_shared_from_this<Cond> {
 		) : type(_type),expr_count(0),cond_count(2) {
 			cond[0] = op1;
 			cond[1] = op2;
+		}
+		Cond(
+			const refCond op1,
+			const refCond op2,
+			const refCond op3
+		) : type(CondIte),expr_count(0),cond_count(3) {
+			cond[0] = op1;
+			cond[1] = op2;
+			cond[2] = op3;
 		}
 		Cond(
 			const enum CondType _type,
@@ -323,6 +333,7 @@ refCond cond_sg(const refExpr op1,const refExpr op2);
 refCond cond_sge(const refExpr op1,const refExpr op2);
 refCond cond_ug(const refExpr op1,const refExpr op2);
 refCond cond_uge(const refExpr op1,const refExpr op2);
+refCond cond_ite(const refCond cond,const refCond op1,const refCond op2);
 refCond cond_and(const refCond op1,const refCond op2);
 refCond cond_or(const refCond op1,const refCond op2);
 refCond cond_xor(const refCond op1,const refCond op2);

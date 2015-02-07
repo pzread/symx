@@ -101,58 +101,161 @@ static refExpr get_op_expr(refBlock blk,cs_arm_op *op,uint64_t pc) {
 	}
 	return ret;
 }
-static refExpr get_cc_expr(refExpr expr,cs_arm *det) {
+static refExpr get_cc_expr(
+	const refExpr old_expr,
+	const refExpr new_expr,
+	const refCond flag[],
+	cs_arm *det
+) {
 	refExpr ret_expr;
 
 	switch(det->cc) {
 	case ARM_CC_INVALID:
 	case ARM_CC_AL:
-		ret_expr = expr;
+		ret_expr = new_expr;
 		break;
 	case ARM_CC_EQ:
+		ret_expr = expr_ite(flag[ARM_SR_Z],new_expr,old_expr);
 		break;
 	case ARM_CC_NE:
+		ret_expr = expr_ite(flag[ARM_SR_Z],old_expr,new_expr);
 		break;
 	case ARM_CC_HS:
+		ret_expr = expr_ite(flag[ARM_SR_C],new_expr,old_expr);
 		break;
 	case ARM_CC_LO:
+		ret_expr = expr_ite(flag[ARM_SR_C],old_expr,new_expr);
 		break;
 	case ARM_CC_MI:
+		ret_expr = expr_ite(flag[ARM_SR_N],new_expr,old_expr);
 		break;
 	case ARM_CC_PL:
+		ret_expr = expr_ite(flag[ARM_SR_N],old_expr,new_expr);
 		break;
 	case ARM_CC_VS:
+		ret_expr = expr_ite(flag[ARM_SR_V],new_expr,old_expr);
 		break;
 	case ARM_CC_VC:
+		ret_expr = expr_ite(flag[ARM_SR_V],old_expr,new_expr);
 		break;
 	case ARM_CC_HI:
+		ret_expr = expr_ite(
+			cond_and(flag[ARM_SR_C],cond_not(flag[ARM_SR_Z])),
+			new_expr,
+			old_expr);
 		break;
 	case ARM_CC_LS:
+		ret_expr = expr_ite(
+			cond_and(flag[ARM_SR_C],cond_not(flag[ARM_SR_Z])),
+			old_expr,
+			new_expr);
 		break;
 	case ARM_CC_GE:
+		ret_expr = expr_ite(
+			cond_xor(flag[ARM_SR_N],flag[ARM_SR_V]),
+			old_expr,
+			new_expr);
 		break;
 	case ARM_CC_LT:
+		ret_expr = expr_ite(
+			cond_xor(flag[ARM_SR_N],flag[ARM_SR_V]),
+			new_expr,
+			old_expr);
 		break;
 	case ARM_CC_GT:
+		ret_expr = expr_ite(
+			cond_or(flag[ARM_SR_Z],
+				cond_xor(flag[ARM_SR_N],flag[ARM_SR_V])),
+			old_expr,
+			new_expr);
 		break;
 	case ARM_CC_LE:
+		ret_expr = expr_ite(
+			cond_or(flag[ARM_SR_Z],
+				cond_xor(flag[ARM_SR_N],flag[ARM_SR_V])),
+			new_expr,
+			old_expr);
 		break;
 	}
 	return ret_expr;
 }
-static refExpr get_cc_mem(refExpr mem,cs_arm *det) {
-	if(det->cc == ARM_CC_INVALID || det->cc == ARM_CC_AL) {
-		return mem;
+static refCond get_cc_cond(
+	const refCond old_cond,
+	const refCond new_cond,
+	const refCond flag[],
+	cs_arm *det
+) {
+	refCond ret_cond;
+
+	switch(det->cc) {
+	case ARM_CC_INVALID:
+	case ARM_CC_AL:
+		ret_cond = new_cond;
+		break;
+	case ARM_CC_EQ:
+		ret_cond = cond_ite(flag[ARM_SR_Z],new_cond,old_cond);
+		break;
+	case ARM_CC_NE:
+		ret_cond = cond_ite(flag[ARM_SR_Z],old_cond,new_cond);
+		break;
+	case ARM_CC_HS:
+		ret_cond = cond_ite(flag[ARM_SR_C],new_cond,old_cond);
+		break;
+	case ARM_CC_LO:
+		ret_cond = cond_ite(flag[ARM_SR_C],old_cond,new_cond);
+		break;
+	case ARM_CC_MI:
+		ret_cond = cond_ite(flag[ARM_SR_N],new_cond,old_cond);
+		break;
+	case ARM_CC_PL:
+		ret_cond = cond_ite(flag[ARM_SR_N],old_cond,new_cond);
+		break;
+	case ARM_CC_VS:
+		ret_cond = cond_ite(flag[ARM_SR_V],new_cond,old_cond);
+		break;
+	case ARM_CC_VC:
+		ret_cond = cond_ite(flag[ARM_SR_V],old_cond,new_cond);
+		break;
+	case ARM_CC_HI:
+		ret_cond = cond_ite(
+			cond_and(flag[ARM_SR_C],cond_not(flag[ARM_SR_Z])),
+			new_cond,
+			old_cond);
+		break;
+	case ARM_CC_LS:
+		ret_cond = cond_ite(
+			cond_and(flag[ARM_SR_C],cond_not(flag[ARM_SR_Z])),
+			old_cond,
+			new_cond);
+		break;
+	case ARM_CC_GE:
+		ret_cond = cond_ite(
+			cond_xor(flag[ARM_SR_N],flag[ARM_SR_V]),
+			old_cond,
+			new_cond);
+		break;
+	case ARM_CC_LT:
+		ret_cond = cond_ite(
+			cond_xor(flag[ARM_SR_N],flag[ARM_SR_V]),
+			new_cond,
+			old_cond);
+		break;
+	case ARM_CC_GT:
+		ret_cond = cond_ite(
+			cond_or(flag[ARM_SR_Z],
+				cond_xor(flag[ARM_SR_N],flag[ARM_SR_V])),
+			old_cond,
+			new_cond);
+		break;
+	case ARM_CC_LE:
+		ret_cond = cond_ite(
+			cond_or(flag[ARM_SR_Z],
+				cond_xor(flag[ARM_SR_N],flag[ARM_SR_V])),
+			new_cond,
+			old_cond);
+		break;
 	}
-	err("TODO: get_cc_mem\n");
-	return mem;
-}
-static refCond get_cc_cond(refCond cond,cs_arm *det) {
-	if(det->cc == ARM_CC_INVALID || det->cc == ARM_CC_AL) {
-		return cond;
-	}
-	err("TODO: get_cc_cond\n");
-	return cond;
+	return ret_cond;
 }
 refBlock ARMContext::interpret(
 	refProbe _probe,
@@ -285,20 +388,30 @@ refBlock ARMContext::interpret(
                 }
 
 		if(nm != blk->mem) {
-			blk->mem = get_cc_mem(nm,det);
+			blk->mem = get_cc_expr(blk->mem,nm,blk->flag,det);
 			nm = blk->mem;
 		}
 		for(i = 0;i < ARM_REG_ENDING;i++){
 			if(nr[i] != blk->reg[i]) {
-				blk->reg[i] = get_cc_expr(nr[i],det);
+				blk->reg[i] = get_cc_expr(
+					blk->reg[i],
+					nr[i],
+					blk->flag,
+					det);
 				nr[i] = blk->reg[i];
 			}
 		}
 		for(i = 0;i < ARM_FLAG_NUM;i++){
 			if(nf[i] != blk->flag[i]) {
-				blk->flag[i] = get_cc_cond(nf[i],det);
-				nf[i] = blk->flag[i];
+				nf[i] = get_cc_cond(
+					blk->flag[i],
+					nf[i],
+					blk->flag,
+					det);
 			}
+		}
+		for(i = 0;i < ARM_FLAG_NUM;i++){
+			blk->flag[i] = nf[i];
 		}
                 ins += 1;
 	}

@@ -196,13 +196,16 @@ int BuildVisitor::visit(symx::refCond cond) {
 			cond_map[cond] = ref<Cond>(
 				cond->type,
 				cond_map[cond->cond[0]]);
-
 		} else if(cond->cond_count == 2 && cond->expr_count == 0) {
 			cond_map[cond] = ref<Cond>(
 				cond->type,
 				cond_map[cond->cond[0]],
 				cond_map[cond->cond[1]]);
-
+		} else if(cond->cond_count == 3 && cond->expr_count == 0) {
+			cond_map[cond] = cond_ite(
+				cond_map[cond->cond[0]],
+				cond_map[cond->cond[1]],
+				cond_map[cond->cond[2]]);
 		}
 		break;
 	}
