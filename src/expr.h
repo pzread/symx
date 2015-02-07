@@ -80,6 +80,8 @@ class BytVec : public Expr {
 			const unsigned int index;
 			const uint64_t data;
 		};
+		BytVec(const refBytVec old)
+			: Expr(old->type,old->size),data(old->data) {}
 		int pre_accept(ExprVisitor *visitor) {
 			return visitor->pre_visit(
 					std::static_pointer_cast<BytVec>(
@@ -121,6 +123,8 @@ class BytMem : public Expr {
 			const unsigned int id;
 			const unsigned int index;
 		};
+		BytMem(const refBytMem old)
+			: Expr(old->type,old->size),index(old->index) {}
 		int pre_accept(ExprVisitor *visitor) {
 			return visitor->pre_visit(
 					std::static_pointer_cast<BytMem>(

@@ -79,6 +79,117 @@ class PrintVisitor : public ExprVisitor {
 	private:
 		std::unordered_map<refExpr,std::string> expr_map;
 };
+refExpr BuildVisitor::get_expr(const refExpr expr) {
+	auto it = expr_map.find(expr);
+	if(it == expr_map.end()) {
+		err("expr not found\n");
+		return nullptr;
+	}
+	return it->second;
+}
+refCond BuildVisitor::get_cond(const refCond cond) {
+	auto it = cond_map.find(cond);
+	if(it == cond_map.end()) {
+		err("cond not found\n");
+		return nullptr;
+	}
+	return it->second;
+}
+int BuildVisitor::pre_visit(symx::refBytVec vec) {
+	if(expr_map.find(vec) != expr_map.end()) {
+		return 0;
+	}
+	return 1;
+}
+int BuildVisitor::pre_visit(symx::refBytMem mem) {
+	if(expr_map.find(mem) != expr_map.end()) {
+		return 0;
+	}
+	return 1;
+}
+int BuildVisitor::pre_visit(symx::refOperator oper) {
+	if(expr_map.find(oper) != expr_map.end()) {
+		return 0;
+	}
+	return 1;
+}
+int BuildVisitor::pre_visit(symx::refCond cond) {
+	if(cond_map.find(cond) != cond_map.end()) {
+		return 0;
+	}
+	return 1;
+}
+int BuildVisitor::visit(symx::refBytVec vec) {
+	expr_map[vec] = ref<BytVec>(vec);
+	return 1;
+}
+int BuildVisitor::visit(symx::refBytMem mem) {
+	expr_map[mem] = ref<BytMem>(mem);
+	return 1;
+}
+int BuildVisitor::visit(symx::refOperator oper) {
+	switch(oper->type) {
+	case ExprOpSelect:
+		expr_map[oper] = expr_select(
+			expr_map[oper->operand[0]],
+			expr_map[oper->operand[1]],
+			oper->size);
+		break;
+	case ExprOpExtract:
+		expr_map[oper] = expr_extract(
+			expr_map[oper->operand[0]],
+			oper->start,
+			oper->start + oper->size);
+		break;
+	default:
+		if(oper->op_count == 1) {
+			expr_map[oper] = ref<Operator>(
+				oper->type,
+				oper->size,
+				expr_map[oper->operand[0]]);
+		} else if(oper->op_count == 2) {
+			expr_map[oper] = ref<Operator>(
+				oper->type,
+				oper->size,
+				expr_map[oper->operand[0]],
+				expr_map[oper->operand[1]]);
+		} else if(oper->op_count == 3) {
+			expr_map[oper] = ref<Operator>(
+				expr_map[oper->operand[0]],
+				expr_map[oper->operand[1]],
+				expr_map[oper->operand[2]]);
+		}
+		break;
+	}
+	return 1;
+}
+int BuildVisitor::visit(symx::refCond cond) {
+	switch(cond->type) {
+	case CondDangle:
+		cond_map[cond] = Cond::create_dangle(cond->index);
+		break;
+	default:
+		if(cond->cond_count == 0 && cond->expr_count == 2) {
+			cond_map[cond] = ref<Cond>(
+				cond->type,
+				expr_map[cond->expr[0]],
+				expr_map[cond->expr[1]]);
+		} else if(cond->cond_count == 1 && cond->expr_count == 0) {
+			cond_map[cond] = ref<Cond>(
+				cond->type,
+				cond_map[cond->cond[0]]);
+
+		} else if(cond->cond_count == 2 && cond->expr_count == 0) {
+			cond_map[cond] = ref<Cond>(
+				cond->type,
+				cond_map[cond->cond[0]],
+				cond_map[cond->cond[1]]);
+
+		}
+		break;
+	}
+	return 1;
+}
 
 refBlock state_create_block(Context *ctx) {
 	unsigned int i;

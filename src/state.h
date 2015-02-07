@@ -44,6 +44,24 @@ class TransVisitor : public symx::ExprVisitor {
 		virtual refSolvExpr get_solver_expr(const refExpr expr) = 0;
 		virtual refSolvCond get_solver_cond(const refCond cond) = 0;
 };
+class BuildVisitor : public ExprVisitor {
+	public:
+		BuildVisitor(const refState _state) : state(_state) {}
+		refExpr get_expr(const refExpr expr);
+		refCond get_cond(const refCond cond);
+		int pre_visit(symx::refBytVec vec);
+		int pre_visit(symx::refBytMem mem);
+		int pre_visit(symx::refOperator oper);
+		int pre_visit(symx::refCond cond);
+		int visit(symx::refBytVec vec);
+		int visit(symx::refBytMem mem);
+		int visit(symx::refOperator oper);
+		int visit(symx::refCond cond);
+	private:
+		const refState state;
+		std::unordered_map<refExpr,refExpr> expr_map;
+		std::unordered_map<refCond,refCond> cond_map;
+};
 
 refBlock state_create_block(Context *ctx);
 int state_executor(Context *ctx,refProbe probe,uint64_t pc);
