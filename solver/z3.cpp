@@ -204,56 +204,73 @@ namespace z3_solver {
 			break;
 		}
 		case ExprOpExtract:
-			res_ast = Z3_mk_extract(solver->context,
-					(oper->start + oper->size) * 8 - 1,
-					oper->start * 8,
-					expr_to_ast(oper->operand[0]));
+			res_ast = Z3_mk_extract(
+				solver->context,
+				(oper->start + oper->size) * 8 - 1,
+				oper->start * 8,
+				expr_to_ast(oper->operand[0]));
+			INCREF(res_ast);
+			break;
+		case ExprOpIte:
+			res_ast = Z3_mk_ite(
+				solver->context,
+				cond_to_ast(oper->cond),
+				expr_to_ast(oper->operand[0]),
+				expr_to_ast(oper->operand[1]));
 			INCREF(res_ast);
 			break;
 		case ExprOpAdd:
-			res_ast = Z3_mk_bvadd(solver->context,
-					expr_to_ast(oper->operand[0]),
-					expr_to_ast(oper->operand[1]));
+			res_ast = Z3_mk_bvadd(
+				solver->context,
+				expr_to_ast(oper->operand[0]),
+				expr_to_ast(oper->operand[1]));
 			INCREF(res_ast);
 			break;
 		case ExprOpSub:
-			res_ast = Z3_mk_bvsub(solver->context,
-					expr_to_ast(oper->operand[0]),
-					expr_to_ast(oper->operand[1]));
+			res_ast = Z3_mk_bvsub(
+				solver->context,
+				expr_to_ast(oper->operand[0]),
+				expr_to_ast(oper->operand[1]));
 			INCREF(res_ast);
 			break;
 		case ExprOpMul:
-			res_ast = Z3_mk_bvmul(solver->context,
-					expr_to_ast(oper->operand[0]),
-					expr_to_ast(oper->operand[1]));
+			res_ast = Z3_mk_bvmul(
+				solver->context,
+				expr_to_ast(oper->operand[0]),
+				expr_to_ast(oper->operand[1]));
 			INCREF(res_ast);
 			break;
 		case ExprOpUdiv:
-			res_ast = Z3_mk_bvudiv(solver->context,
-					expr_to_ast(oper->operand[0]),
-					expr_to_ast(oper->operand[1]));
+			res_ast = Z3_mk_bvudiv(
+				solver->context,
+				expr_to_ast(oper->operand[0]),
+				expr_to_ast(oper->operand[1]));
 			INCREF(res_ast);
 			break;
 		case ExprOpSdiv:
-			res_ast = Z3_mk_bvsdiv(solver->context,
-					expr_to_ast(oper->operand[0]),
-					expr_to_ast(oper->operand[1]));
+			res_ast = Z3_mk_bvsdiv(
+				solver->context,
+				expr_to_ast(oper->operand[0]),
+				expr_to_ast(oper->operand[1]));
 			INCREF(res_ast);
 			break;
 		case ExprOpNeg:
-			res_ast = Z3_mk_bvneg(solver->context,
-					expr_to_ast(oper->operand[0]));
+			res_ast = Z3_mk_bvneg(
+				solver->context,
+				expr_to_ast(oper->operand[0]));
 			INCREF(res_ast);
 			break;
 		case ExprOpNot:
-			res_ast = Z3_mk_bvnot(solver->context,
-					expr_to_ast(oper->operand[0]));
+			res_ast = Z3_mk_bvnot(
+				solver->context,
+				expr_to_ast(oper->operand[0]));
 			INCREF(res_ast);
 			break;
 		case ExprOpConcat:
-			res_ast = Z3_mk_concat(solver->context,
-					expr_to_ast(oper->operand[0]),
-					expr_to_ast(oper->operand[1]));
+			res_ast = Z3_mk_concat(
+				solver->context,
+				expr_to_ast(oper->operand[0]),
+				expr_to_ast(oper->operand[1]));
 			INCREF(res_ast);
 			break;
 		default:

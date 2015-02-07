@@ -102,11 +102,43 @@ static refExpr get_op_expr(refBlock blk,cs_arm_op *op,uint64_t pc) {
 	return ret;
 }
 static refExpr get_cc_expr(refExpr expr,cs_arm *det) {
-	if(det->cc == ARM_CC_INVALID || det->cc == ARM_CC_AL) {
-		return expr;
+	refExpr ret_expr;
+
+	switch(det->cc) {
+	case ARM_CC_INVALID:
+	case ARM_CC_AL:
+		ret_expr = expr;
+		break;
+	case ARM_CC_EQ:
+		break;
+	case ARM_CC_NE:
+		break;
+	case ARM_CC_HS:
+		break;
+	case ARM_CC_LO:
+		break;
+	case ARM_CC_MI:
+		break;
+	case ARM_CC_PL:
+		break;
+	case ARM_CC_VS:
+		break;
+	case ARM_CC_VC:
+		break;
+	case ARM_CC_HI:
+		break;
+	case ARM_CC_LS:
+		break;
+	case ARM_CC_GE:
+		break;
+	case ARM_CC_LT:
+		break;
+	case ARM_CC_GT:
+		break;
+	case ARM_CC_LE:
+		break;
 	}
-	err("TODO: get_cc_expr\n");
-	return expr;
+	return ret_expr;
 }
 static refExpr get_cc_mem(refExpr mem,cs_arm *det) {
 	if(det->cc == ARM_CC_INVALID || det->cc == ARM_CC_AL) {
@@ -114,6 +146,13 @@ static refExpr get_cc_mem(refExpr mem,cs_arm *det) {
 	}
 	err("TODO: get_cc_mem\n");
 	return mem;
+}
+static refCond get_cc_cond(refCond cond,cs_arm *det) {
+	if(det->cc == ARM_CC_INVALID || det->cc == ARM_CC_AL) {
+		return cond;
+	}
+	err("TODO: get_cc_cond\n");
+	return cond;
 }
 refBlock ARMContext::interpret(
 	refProbe _probe,
@@ -131,10 +170,15 @@ refBlock ARMContext::interpret(
 
 	refExpr nr[ARM_REG_ENDING];
 	refExpr nm,xrd,xrs,xrt;
+	refCond nf[4];
+	refCond cdt;
 	
 	nm = blk->mem;
 	for(i = 0;i < ARM_REG_ENDING;i++){
 		nr[i] = blk->reg[i];
+	}
+	for(i = 0;i < ARM_FLAG_NUM;i++) {
+		nf[i] = blk->flag[i];
 	}
         
         count = cs_disasm(cs,probe->bin + probe->off + pc,64,pc,0,&insn);
@@ -216,6 +260,18 @@ refBlock ARMContext::interpret(
 			xrs = get_op_expr(blk,&ops[1],pc);
 			nr[ops[0].reg] = expr_select(blk->mem,xrs,4);
 			break;
+		case ARM_INS_CMP:
+			xrd = get_op_expr(blk,&ops[0],pc);
+			xrs = get_op_expr(blk,&ops[1],pc);
+			xrt = expr_sub(xrd,xrs);
+			cdt = cond_sl(xrt,imm40);
+			nf[ARM_SR_N] = cdt;
+			nf[ARM_SR_Z] = cond_eq(xrt,imm40);
+			nf[ARM_SR_C] = cond_uge(xrd,xrs);
+			nf[ARM_SR_V] = cond_and(
+				cond_xor(cond_sl(xrd,imm40),cdt),
+				cond_xor(cond_sl(expr_neg(xrs),imm40),cdt));
+			break;
 		case ARM_INS_BL:
 		case ARM_INS_BLX:
 			nr[ARM_REG_LR] = BytVec::create_imm(4,pc + ins->size);
@@ -236,6 +292,12 @@ refBlock ARMContext::interpret(
 			if(nr[i] != blk->reg[i]) {
 				blk->reg[i] = get_cc_expr(nr[i],det);
 				nr[i] = blk->reg[i];
+			}
+		}
+		for(i = 0;i < ARM_FLAG_NUM;i++){
+			if(nf[i] != blk->flag[i]) {
+				blk->flag[i] = get_cc_cond(nf[i],det);
+				nf[i] = blk->flag[i];
 			}
 		}
                 ins += 1;

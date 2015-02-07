@@ -53,6 +53,7 @@ enum ExprType {
 	ExprOpStore,
 	ExprOpSelect,
 	ExprOpExtract,
+	ExprOpIte,
 
 	ExprOpAdd,
 	ExprOpSub,
@@ -149,6 +150,7 @@ class BytMem : public Expr {
 class Operator : public Expr {
 	public:
 		refExpr operand[3];
+		refCond cond;
 		unsigned int start;
 		const unsigned int op_count;
 
@@ -191,6 +193,15 @@ class Operator : public Expr {
 			const unsigned int _start
 		) : Expr(ExprOpExtract,_size),start(_start),op_count(1) {
 			operand[0] = op1;
+		}
+		Operator(
+			const unsigned int _size,
+			const refCond _cond,
+			const refExpr op1,
+			const refExpr op2
+		) : Expr(ExprOpIte,_size),cond(_cond),op_count(2) {
+			operand[0] = op1;
+			operand[1] = op1;
 		}
 		int pre_accept(ExprVisitor *visitor) {
 			return visitor->pre_visit(
@@ -291,6 +302,7 @@ refExpr expr_select(
 	const refExpr mem,
 	const refExpr idx,
 	const unsigned int size);
+refExpr expr_ite(const refCond cond,const refExpr op1,const refExpr op2);
 refExpr expr_add(const refExpr op1,const refExpr op2);
 refExpr expr_sub(const refExpr op1,const refExpr op2);
 refExpr expr_mul(const refExpr op1,const refExpr op2);

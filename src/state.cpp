@@ -62,6 +62,11 @@ class PrintVisitor : public ExprVisitor {
 					expr_map[oper->operand[0]] + "," +
 					std::to_string(oper->start);
 				break;
+			case ExprOpIte:
+				params = "ite " +
+					expr_map[oper->operand[0]] + "," +
+					expr_map[oper->operand[1]];
+				break;
 			default:
 				params = expr_map[oper->operand[0]];
 				for(i = 1; i < oper->op_count; i++) {
@@ -149,6 +154,11 @@ int BuildVisitor::visit(symx::refOperator oper) {
 			oper->start,
 			oper->start + oper->size);
 		break;
+	case ExprOpIte:
+		expr_map[oper] = expr_ite(
+			cond_map[oper->cond],
+			expr_map[oper->operand[0]],
+			expr_map[oper->operand[1]]);
 	default:
 		if(oper->op_count == 1) {
 			expr_map[oper] = ref<Operator>(

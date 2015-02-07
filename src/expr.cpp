@@ -27,10 +27,12 @@ int expr_walk(ExprVisitor *visitor,refExpr expr) {
 	case ExprVar:
 	case ExprMem:
 		break;
-	case ExprOpExtract:
+	case ExprOpIte:
 	{
 		auto oper = std::static_pointer_cast<Operator>(expr);
+		expr_walk(visitor,oper->cond);
 		expr_walk(visitor,oper->operand[0]);
+		expr_walk(visitor,oper->operand[1]);
 		break;
 	}
 	default:
@@ -85,6 +87,11 @@ refExpr expr_select(
 ) {
 	return ref<Operator>(size,mem,idx);
 }
+refExpr expr_ite(const refCond cond,const refExpr op1,const refExpr op2) {
+	assert(op1->size == op2->size);
+	return ref<Operator>(op1->size,cond,op1,op2);
+}
+
 refExpr expr_add(const refExpr op1,const refExpr op2) {
 	assert(op1->size == op2->size);
 	return ref<Operator>(ExprOpAdd,op1->size,op1,op2);
