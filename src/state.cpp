@@ -174,7 +174,7 @@ int BuildVisitor::visit(symx::refOperator oper) {
 int BuildVisitor::visit(symx::refCond cond) {
 	switch(cond->type) {
 	case CondDangle:
-		cond_map[cond] = Cond::create_dangle(cond->index);
+		cond_map[cond] = state->flag[cond->index];
 		break;
 	default:
 		if(cond->cond_count == 0 && cond->expr_count == 2) {
@@ -290,15 +290,15 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		*/
 
 		auto trans_vis = solver->create_translator();
-		expr_walk(trans_vis,cblk->mem);
+		expr_walk(trans_vis,nstate->mem);
 		for(i = 0;i < ctx->num_reg;i++) {
-			expr_walk(trans_vis,cblk->reg[i]);
+			expr_walk(trans_vis,nstate->reg[i]);
 		}
 		for(i = 0;i < ctx->num_flag;i++) {
-			expr_walk(trans_vis,cblk->flag[i]);
+			expr_walk(trans_vis,nstate->flag[i]);
 		}
 
-		auto solexpr_pc = cblk->reg[ctx->REGIDX_PC]->solver_expr;
+		auto solexpr_pc = nstate->reg[ctx->REGIDX_PC]->solver_expr;
 		cons.clear();
 		var.clear();
 		var[solexpr_pc] = 0;
@@ -312,7 +312,7 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 
 			auto exclude_cond = cond_not(
 				cond_eq(
-					cblk->reg[ctx->REGIDX_PC],
+					nstate->reg[ctx->REGIDX_PC],
 					BytVec::create_imm(4,next_pc)));
 			expr_walk(trans_vis,exclude_cond);
 			cons.push_back(exclude_cond->solver_cond);

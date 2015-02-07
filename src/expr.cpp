@@ -45,7 +45,7 @@ int expr_walk(ExprVisitor *visitor,refExpr expr) {
 int expr_walk(ExprVisitor *visitor,refCond cond) {
 	unsigned int i;
 
-	if(cond->post_accept(visitor) == 0){
+	if(cond->pre_accept(visitor) == 0){
 		return 0;
 	}
 	if(visitor->cond_set.find(cond) != visitor->cond_set.end()) {
