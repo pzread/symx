@@ -159,6 +159,7 @@ int BuildVisitor::visit(symx::refOperator oper) {
 			cond_map[oper->cond],
 			expr_map[oper->operand[0]],
 			expr_map[oper->operand[1]]);
+		break;
 	default:
 		if(oper->op_count == 1) {
 			expr_map[oper] = ref<Operator>(
@@ -274,6 +275,7 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		auto blk_it = ctx->block.find(cstate->pc);
 		if(blk_it == ctx->block.end()) {
 			cblk = ctx->interpret(probe,cstate->pc);
+			ctx->block[cstate->pc] = cblk;
 		} else {
 			cblk = blk_it->second;
 		}

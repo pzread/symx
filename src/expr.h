@@ -201,7 +201,7 @@ class Operator : public Expr {
 			const refExpr op2
 		) : Expr(ExprOpIte,_size),cond(_cond),op_count(2) {
 			operand[0] = op1;
-			operand[1] = op1;
+			operand[1] = op2;
 		}
 		int pre_accept(ExprVisitor *visitor) {
 			return visitor->pre_visit(

@@ -355,9 +355,17 @@ refBlock ARMContext::interpret(
 			nr[ops[0].reg] = expr_concat(expr_extract(xrd,0,2),xrs);
 			break;
 		case ARM_INS_STR:
+		case ARM_INS_STRB:
 			xrs = get_op_expr(blk,&ops[0],pc);
 			xrd = get_op_expr(blk,&ops[1],pc);
-			nm = expr_store(blk->mem,xrd,xrs);
+			if(ins->id == ARM_INS_STR) {
+				nm = expr_store(blk->mem,xrd,xrs);
+			} else {
+				nm = expr_store(
+					blk->mem,
+					xrd,
+					expr_extract(xrs,0,1));
+			}
 			break;
 		case ARM_INS_LDR:
 			xrs = get_op_expr(blk,&ops[1],pc);
@@ -391,13 +399,23 @@ refBlock ARMContext::interpret(
 			blk->mem = get_cc_expr(blk->mem,nm,blk->flag,det);
 			nm = blk->mem;
 		}
+
 		for(i = 0;i < ARM_REG_ENDING;i++){
 			if(nr[i] != blk->reg[i]) {
-				blk->reg[i] = get_cc_expr(
-					blk->reg[i],
-					nr[i],
-					blk->flag,
-					det);
+				if(i == ARM_REG_PC) {
+					blk->reg[i] = get_cc_expr(
+						BytVec::create_imm(
+							4,pc + ins->size),
+						nr[i],
+						blk->flag,
+						det);
+				} else {
+					blk->reg[i] = get_cc_expr(
+						blk->reg[i],
+						nr[i],
+						blk->flag,
+						det);
+				}
 				nr[i] = blk->reg[i];
 			}
 		}
