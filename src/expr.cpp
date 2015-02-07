@@ -14,6 +14,10 @@ namespace symx {
 
 int expr_walk(ExprVisitor *visitor,refExpr expr) {
 	unsigned int i;
+
+	if(expr->pre_accept(visitor) == 0) {
+		return 0;
+	}
 	if(visitor->expr_set.find(expr) != visitor->expr_set.end()) {
 		return 0;
 	}
@@ -36,10 +40,14 @@ int expr_walk(ExprVisitor *visitor,refExpr expr) {
 		}
 		break;
 	}
-	return expr->accept(visitor);
+	return expr->post_accept(visitor);
 }
 int expr_walk(ExprVisitor *visitor,refCond cond) {
 	unsigned int i;
+
+	if(cond->post_accept(visitor) == 0){
+		return 0;
+	}
 	if(visitor->cond_set.find(cond) != visitor->cond_set.end()) {
 		return 0;
 	}
@@ -55,7 +63,7 @@ int expr_walk(ExprVisitor *visitor,refCond cond) {
 		}
 		break;
 	}
-	return cond->accept(visitor);
+	return cond->post_accept(visitor);
 }
 
 static uint64_t get_next_varid(Context *ctx) {

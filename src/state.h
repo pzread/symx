@@ -26,9 +26,9 @@ class State : public BaseState {
 	public:
 		uint64_t pc;
 		refProbe probe;
-		refSolverExpr solver_mem;
-		refSolverExpr solver_reg[256];
-		refSolverCond solver_flag[64];
+		refSolvExpr solver_mem;
+		refSolvExpr solver_reg[256];
+		refSolvCond solver_flag[64];
 		std::vector<refCond> constraint;
 		State(const uint64_t _pc,refProbe _probe)
 			: pc(_pc),probe(_probe) {}
@@ -41,8 +41,8 @@ class Block : public BaseState {
 };
 class TransVisitor : public symx::ExprVisitor {
 	public:
-		virtual refSolverExpr get_solver_expr(const refExpr expr) = 0;
-		virtual refSolverCond get_solver_cond(const refCond cond) = 0;
+		virtual refSolvExpr get_solver_expr(const refExpr expr) = 0;
+		virtual refSolvCond get_solver_cond(const refCond cond) = 0;
 };
 
 refBlock state_create_block(Context *ctx);

@@ -13,26 +13,26 @@ namespace symx {
 	class State;
 	class Block;
 	class Probe;
-	class SolverExpr;
-	class SolverCond;
+	class SolvExpr;
+	class SolvCond;
 	class TransVisitor;
-	typedef std::shared_ptr<SolverExpr> refSolverExpr;
-	typedef std::shared_ptr<SolverCond> refSolverCond;
+	typedef std::shared_ptr<SolvExpr> refSolvExpr;
+	typedef std::shared_ptr<SolvCond> refSolvCond;
 	typedef std::shared_ptr<Probe> refProbe;
 
 	class Solver {
 		public:
 			virtual TransVisitor* create_translator() = 0;
 			virtual TransVisitor* create_translator(
-				const refSolverExpr mem,
+				const refSolvExpr mem,
 				const std::unordered_map
-					<unsigned int,refSolverExpr> &reg,
+					<unsigned int,refSolvExpr> &reg,
 				const std::unordered_map
-					<unsigned int,refSolverCond> &flag
+					<unsigned int,refSolvCond> &flag
 			) = 0;
 			virtual bool solve(
-				const std::vector<refSolverCond> &cons,
-				std::unordered_map<refSolverExpr,uint64_t> *var
+				const std::vector<refSolvCond> &cons,
+				std::unordered_map<refSolvExpr,uint64_t> *var
 			) = 0;
 	};
 	class Probe {

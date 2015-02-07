@@ -12,25 +12,25 @@ using namespace symx;
 #define DECREF(x) Z3_dec_ref(solver->context,(x))
 
 namespace z3_solver {
-	Z3SolverExpr::Z3SolverExpr(Z3_context _context,Z3_ast _ast)
+	Z3SolvExpr::Z3SolvExpr(Z3_context _context,Z3_ast _ast)
 		: context(_context),ast(_ast) {
 		Z3_inc_ref(context,ast);
 	}
-	Z3SolverExpr::~Z3SolverExpr() {
+	Z3SolvExpr::~Z3SolvExpr() {
 		Z3_dec_ref(context,ast);
 	}
-	Z3SolverCond::Z3SolverCond(Z3_context _context,Z3_ast _ast)
+	Z3SolvCond::Z3SolvCond(Z3_context _context,Z3_ast _ast)
 		: context(_context),ast(_ast) {
 		Z3_inc_ref(context,ast);
 	}
-	Z3SolverCond::~Z3SolverCond() {
+	Z3SolvCond::~Z3SolvCond() {
 		Z3_dec_ref(context,ast);
 	}
 	Z3TransVisitor::Z3TransVisitor(
 		const Z3Solver *_solver,
-		const refSolverExpr mem,
-		const std::unordered_map <unsigned int,refSolverExpr> &reg,
-		const std::unordered_map <unsigned int,refSolverCond> &flag
+		const refSolvExpr mem,
+		const std::unordered_map <unsigned int,refSolvExpr> &reg,
+		const std::unordered_map <unsigned int,refSolvCond> &flag
 	) :
 		solver(_solver),
 		dangle_mem(mem),
@@ -54,13 +54,13 @@ namespace z3_solver {
 			DECREF(it->second);
 		}
 	}
-	symx::refSolverExpr Z3TransVisitor::get_solver_expr(
+	symx::refSolvExpr Z3TransVisitor::get_solver_expr(
 			const symx::refExpr expr) {
-		return ref<Z3SolverExpr>(solver->context,expr_ast[expr]);
+		return ref<Z3SolvExpr>(solver->context,expr_ast[expr]);
 	}
-	symx::refSolverCond Z3TransVisitor::get_solver_cond(
+	symx::refSolvCond Z3TransVisitor::get_solver_cond(
 			const symx::refCond cond) {
-		return ref<Z3SolverCond>(solver->context,cond_ast[cond]);
+		return ref<Z3SolvCond>(solver->context,cond_ast[cond]);
 	}
 	Z3_ast Z3TransVisitor::expr_to_ast(const symx::refExpr expr) {
 		auto it = expr_ast.find(expr);
@@ -76,6 +76,18 @@ namespace z3_solver {
 		}
 		return it->second;
 	}
+	int Z3TransVisitor::pre_visit(symx::refBytVec vec) {
+		return 1;
+	}
+	int Z3TransVisitor::pre_visit(symx::refBytMem mem) {
+		return 1;
+	}
+	int Z3TransVisitor::pre_visit(symx::refOperator oper) {
+		return 1;
+	}
+	int Z3TransVisitor::pre_visit(symx::refCond cond) {
+		return 1;
+	}
 	int Z3TransVisitor::visit(const refBytVec vec) {
 		Z3_ast res_ast;
 		switch(vec->type) {
@@ -85,7 +97,7 @@ namespace z3_solver {
 			if(expr_it == dangle_reg.end()) {
 				err("undefined dangle bytvec\n");
 			}
-			auto expr = std::static_pointer_cast<Z3SolverExpr>(
+			auto expr = std::static_pointer_cast<Z3SolvExpr>(
 					expr_it->second);
 			res_ast = expr->ast;
 			break;
@@ -119,7 +131,7 @@ namespace z3_solver {
 		if(dangle_mem == nullptr) {
 			err("undefined dangle bytmem\n");
 		} else {
-			auto expr = std::static_pointer_cast<Z3SolverExpr>(
+			auto expr = std::static_pointer_cast<Z3SolvExpr>(
 					dangle_mem);
 			res_ast = expr->ast;
 			break;
@@ -294,7 +306,7 @@ namespace z3_solver {
 			if(cond_it == dangle_flag.end()) {
 				err("undefined dangle bytvec\n");
 			}
-			auto cond = std::static_pointer_cast<Z3SolverCond>(
+			auto cond = std::static_pointer_cast<Z3SolvCond>(
 					cond_it->second);
 			res_ast = cond->ast;
 			break;
@@ -409,31 +421,31 @@ namespace z3_solver {
 				nullptr,
 				std::unordered_map
 				<unsigned int,
-				symx::refSolverExpr>{},
+				symx::refSolvExpr>{},
 				std::unordered_map
 				<unsigned int,
-				symx::refSolverCond>{});
+				symx::refSolvCond>{});
 	}
 	symx::TransVisitor* Z3Solver::create_translator(
-			const symx::refSolverExpr mem,
+			const symx::refSolvExpr mem,
 			const std::unordered_map
-				<unsigned int,symx::refSolverExpr> &reg,
+				<unsigned int,symx::refSolvExpr> &reg,
 			const std::unordered_map
-				<unsigned int,symx::refSolverCond> &flag
+				<unsigned int,symx::refSolvCond> &flag
 	) {
 		return new Z3TransVisitor(this,mem,reg,flag);
 	}
 	bool Z3Solver::solve(
-			const std::vector<symx::refSolverCond> &cons,
-			std::unordered_map<refSolverExpr,uint64_t> *var
+			const std::vector<symx::refSolvCond> &cons,
+			std::unordered_map<refSolvExpr,uint64_t> *var
 	) {
-		refZ3SolverExpr expr;
+		refZ3SolvExpr expr;
 		Z3_model model;
 		Z3_ast res_ast;
 
 		Z3_solver_reset(context,solver);
 		for(auto it = cons.begin();it != cons.end();it++) {
-			auto cond = std::static_pointer_cast<Z3SolverCond>(*it);
+			auto cond = std::static_pointer_cast<Z3SolvCond>(*it);
 			Z3_solver_assert(context,solver,cond->ast);
 		}
 		if(Z3_solver_check(context,solver) != Z3_TRUE) {
@@ -445,7 +457,7 @@ namespace z3_solver {
 		
 		for(auto it = var->begin();it != var->end();it++) {
 			expr = std::static_pointer_cast
-				<Z3SolverExpr>(it->first);
+				<Z3SolvExpr>(it->first);
 			if(Z3_model_eval(
 				context,
 				model,

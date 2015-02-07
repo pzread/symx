@@ -16,11 +16,15 @@ class BytVec;
 class Operator;
 class Cond;
 class ExprVisitor;
+class SolvExpr;
+class SolvCond;
 typedef std::shared_ptr<Expr> refExpr;
 typedef std::shared_ptr<BytVec> refBytVec;
 typedef std::shared_ptr<BytMem> refBytMem;
 typedef std::shared_ptr<Operator> refOperator;
 typedef std::shared_ptr<Cond> refCond;
+typedef std::shared_ptr<SolvExpr> refSolvExpr;
+typedef std::shared_ptr<SolvCond> refSolvCond;
 
 class ExprVisitor {
 	public:
@@ -28,11 +32,17 @@ class ExprVisitor {
 		std::unordered_set<refCond> cond_set;
 
 		virtual ~ExprVisitor() {};
+		virtual int pre_visit(refBytVec vec) = 0;
+		virtual int pre_visit(refBytMem mem) = 0;
+		virtual int pre_visit(refOperator oper) = 0;
+		virtual int pre_visit(refCond cond) = 0;
 		virtual int visit(refBytVec vec) = 0;
 		virtual int visit(refBytMem mem) = 0;
 		virtual int visit(refOperator oper) = 0;
 		virtual int visit(refCond cond) = 0;
 };
+class SolvExpr {};
+class SolvCond {};
 
 enum ExprType {
 	ExprDangle,
@@ -57,9 +67,11 @@ class Expr : public std::enable_shared_from_this<Expr> {
 	public:
 		const enum ExprType type;
 		const unsigned int size;
+		refSolvExpr solver_expr = nullptr;
 		Expr(const enum ExprType _type,const unsigned int _size)
 			:type(_type),size(_size) {}
-		virtual int accept(ExprVisitor *visitor) = 0;
+		virtual int pre_accept(ExprVisitor *visitor) = 0;
+		virtual int post_accept(ExprVisitor *visitor) = 0;
 };
 class BytVec : public Expr {
 	public:
@@ -68,7 +80,12 @@ class BytVec : public Expr {
 			const unsigned int index;
 			const uint64_t data;
 		};
-		int accept(ExprVisitor *visitor) {
+		int pre_accept(ExprVisitor *visitor) {
+			return visitor->pre_visit(
+					std::static_pointer_cast<BytVec>(
+						shared_from_this()));
+		}
+		int post_accept(ExprVisitor *visitor) {
 			return visitor->visit(
 					std::static_pointer_cast<BytVec>(
 						shared_from_this()));
@@ -104,7 +121,12 @@ class BytMem : public Expr {
 			const unsigned int id;
 			const unsigned int index;
 		};
-		int accept(ExprVisitor *visitor) {
+		int pre_accept(ExprVisitor *visitor) {
+			return visitor->pre_visit(
+					std::static_pointer_cast<BytMem>(
+						shared_from_this()));
+		}
+		int post_accept(ExprVisitor *visitor) {
 			return visitor->visit(
 					std::static_pointer_cast<BytMem>(
 						shared_from_this()));
@@ -166,7 +188,12 @@ class Operator : public Expr {
 		) : Expr(ExprOpExtract,_size),start(_start),op_count(1) {
 			operand[0] = op1;
 		}
-		int accept(ExprVisitor *visitor) {
+		int pre_accept(ExprVisitor *visitor) {
+			return visitor->pre_visit(
+					std::static_pointer_cast<Operator>(
+						shared_from_this()));
+		}
+		int post_accept(ExprVisitor *visitor) {
 			return visitor->visit(
 					std::static_pointer_cast<Operator>(
 						shared_from_this()));
@@ -199,6 +226,7 @@ class Cond : public std::enable_shared_from_this<Cond> {
 		unsigned int index;
 		refCond cond[2];
 		refExpr expr[2];
+		refSolvCond solver_cond = nullptr;
 
 		Cond(
 			const enum CondType _type,
@@ -222,7 +250,12 @@ class Cond : public std::enable_shared_from_this<Cond> {
 			expr[0] = op1;
 			expr[1] = op2;
 		}
-		int accept(ExprVisitor *visitor) {
+		int pre_accept(ExprVisitor *visitor) {
+			return visitor->pre_visit(
+					std::static_pointer_cast<Cond>(
+						shared_from_this()));
+		}
+		int post_accept(ExprVisitor *visitor) {
 			return visitor->visit(
 					std::static_pointer_cast<Cond>(
 						shared_from_this()));
@@ -278,11 +311,6 @@ refCond cond_and(const refCond op1,const refCond op2);
 refCond cond_or(const refCond op1,const refCond op2);
 refCond cond_xor(const refCond op1,const refCond op2);
 refCond cond_not(const refCond op1);
-
-class SolverExpr{};
-class SolverCond{};
-typedef std::shared_ptr<SolverExpr> refSolverExpr;
-typedef std::shared_ptr<SolverCond> refSolverCond;
 
 };
 

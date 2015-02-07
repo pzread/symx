@@ -108,6 +108,7 @@ static refState create_static_state(Context *ctx,refProbe probe,uint64_t pc) {
 			probe->read_reg(i));
 		expr_walk(vis,nstate->reg[i]);
 		nstate->solver_reg[i] = vis->get_solver_expr(nstate->reg[i]);
+		nstate->reg[i]->solver_expr = nstate->solver_reg[i];
 	}
 	for(i = 0; i < ctx->num_flag; i++) {
 		if(probe->read_flag(i)) {
@@ -117,6 +118,7 @@ static refState create_static_state(Context *ctx,refProbe probe,uint64_t pc) {
 		}
 		expr_walk(vis,nstate->flag[i]);
 		nstate->solver_flag[i] = vis->get_solver_cond(nstate->flag[i]);
+		nstate->flag[i]->solver_cond = nstate->solver_flag[i];
 	}
 
 	delete vis;
@@ -128,10 +130,10 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 	Solver *solver = ctx->solver;
 	refState nstate,cstate;
 	refBlock cblk;
-	std::unordered_map<unsigned int,refSolverExpr> solver_reg;
-	std::unordered_map<unsigned int,refSolverCond> solver_flag;
-	std::vector<refSolverCond> cons;
-	std::unordered_map<refSolverExpr,uint64_t> var;
+	std::unordered_map<unsigned int,refSolvExpr> solver_reg;
+	std::unordered_map<unsigned int,refSolvCond> solver_flag;
+	std::vector<refSolvCond> cons;
+	std::unordered_map<refSolvExpr,uint64_t> var;
 
 	nstate = create_static_state(ctx,probe,pc);
 	ctx->state.push(nstate);

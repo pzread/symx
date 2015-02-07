@@ -15,37 +15,41 @@
 
 namespace z3_solver {
 	class Z3Solver;
-	class Z3SolverExpr;
-	class Z3SolverCond;
-	typedef std::shared_ptr<Z3SolverExpr> refZ3SolverExpr;
-	typedef std::shared_ptr<Z3SolverCond> refZ3SolverCond;
+	class Z3SolvExpr;
+	class Z3SolvCond;
+	typedef std::shared_ptr<Z3SolvExpr> refZ3SolvExpr;
+	typedef std::shared_ptr<Z3SolvCond> refZ3SolvCond;
 
 	class Z3TransVisitor : public symx::TransVisitor {
 		public:
 			Z3TransVisitor(
 				const Z3Solver *_solver,
-				const symx::refSolverExpr mem,
+				const symx::refSolvExpr mem,
 				const std::unordered_map
-					<unsigned int,symx::refSolverExpr> &reg,
+					<unsigned int,symx::refSolvExpr> &reg,
 				const std::unordered_map
-					<unsigned int,symx::refSolverCond> &flag
+					<unsigned int,symx::refSolvCond> &flag
 			);
 			~Z3TransVisitor();
-			symx::refSolverExpr get_solver_expr(
+			symx::refSolvExpr get_solver_expr(
 					const symx::refExpr expr);
-			symx::refSolverCond get_solver_cond(
+			symx::refSolvCond get_solver_cond(
 					const symx::refCond cond);
+			int pre_visit(symx::refBytVec vec);
+			int pre_visit(symx::refBytMem mem);
+			int pre_visit(symx::refOperator oper);
+			int pre_visit(symx::refCond cond);
 			int visit(symx::refBytVec vec);
 			int visit(symx::refBytMem mem);
 			int visit(symx::refOperator oper);
 			int visit(symx::refCond cond);
 		private:
 			const Z3Solver *solver;
-			const symx::refSolverExpr dangle_mem;
+			const symx::refSolvExpr dangle_mem;
 			const std::unordered_map
-				<unsigned int,symx::refSolverExpr> &dangle_reg;
+				<unsigned int,symx::refSolvExpr> &dangle_reg;
 			const std::unordered_map
-				<unsigned int,symx::refSolverCond> &dangle_flag;
+				<unsigned int,symx::refSolvCond> &dangle_flag;
 			Z3_sort bvsort1;
 			Z3_sort bvsort4;
 			Z3_ast bvimm41;
@@ -62,16 +66,16 @@ namespace z3_solver {
 			Z3Solver();
 			symx::TransVisitor* create_translator();
 			symx::TransVisitor* create_translator(
-				const symx::refSolverExpr mem,
+				const symx::refSolvExpr mem,
 				const std::unordered_map
-					<unsigned int,symx::refSolverExpr> &reg,
+					<unsigned int,symx::refSolvExpr> &reg,
 				const std::unordered_map
-					<unsigned int,symx::refSolverCond> &flag
+					<unsigned int,symx::refSolvCond> &flag
 			);
 			bool solve(
-				const std::vector<symx::refSolverCond> &cons,
+				const std::vector<symx::refSolvCond> &cons,
 				std::unordered_map
-					<symx::refSolverExpr,uint64_t> *var
+					<symx::refSolvExpr,uint64_t> *var
 			);
 
 		private:
@@ -83,19 +87,19 @@ namespace z3_solver {
 					Z3_get_error_msg_ex(ctx,error));
 			}
 	};
-	class Z3SolverExpr : public symx::SolverExpr {
+	class Z3SolvExpr : public symx::SolvExpr {
 		public:
 			Z3_context context;
 			Z3_ast ast;
-			Z3SolverExpr(Z3_context _context,Z3_ast _ast);
-			~Z3SolverExpr();
+			Z3SolvExpr(Z3_context _context,Z3_ast _ast);
+			~Z3SolvExpr();
 	};
-	class Z3SolverCond : public symx::SolverCond {
+	class Z3SolvCond : public symx::SolvCond {
 		public:
 			Z3_context context;
 			Z3_ast ast;
-			Z3SolverCond(Z3_context _context,Z3_ast _ast);
-			~Z3SolverCond();
+			Z3SolvCond(Z3_context _context,Z3_ast _ast);
+			~Z3SolvCond();
 	};
 };
 
