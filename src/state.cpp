@@ -82,7 +82,7 @@ class PrintVisitor : public ExprVisitor {
 refExpr BuildVisitor::get_expr(const refExpr expr) {
 	auto it = expr_map.find(expr);
 	if(it == expr_map.end()) {
-		err("expr not found\n");
+		err("expr not exist\n");
 		return nullptr;
 	}
 	return it->second;
@@ -90,7 +90,7 @@ refExpr BuildVisitor::get_expr(const refExpr expr) {
 refCond BuildVisitor::get_cond(const refCond cond) {
 	auto it = cond_map.find(cond);
 	if(it == cond_map.end()) {
-		err("cond not found\n");
+		err("cond not exist\n");
 		return nullptr;
 	}
 	return it->second;
@@ -219,15 +219,11 @@ static refState create_static_state(Context *ctx,refProbe probe,uint64_t pc) {
 
 	nstate->mem = BytMem::create_var(ctx);
 	expr_walk(vis,nstate->mem);
-	nstate->solver_mem = vis->get_solver_expr(nstate->mem);
-
 	for(i = 0; i < ctx->num_reg; i++) {
 		nstate->reg[i] = BytVec::create_imm(
 			ctx->reg_size,
 			probe->read_reg(i));
 		expr_walk(vis,nstate->reg[i]);
-		nstate->solver_reg[i] = vis->get_solver_expr(nstate->reg[i]);
-		nstate->reg[i]->solver_expr = nstate->solver_reg[i];
 	}
 	for(i = 0; i < ctx->num_flag; i++) {
 		if(probe->read_flag(i)) {
@@ -236,12 +232,9 @@ static refState create_static_state(Context *ctx,refProbe probe,uint64_t pc) {
 			nstate->flag[i] = Cond::create_false();
 		}
 		expr_walk(vis,nstate->flag[i]);
-		nstate->solver_flag[i] = vis->get_solver_cond(nstate->flag[i]);
-		nstate->flag[i]->solver_cond = nstate->solver_flag[i];
 	}
 
 	delete vis;
-
 	return nstate;
 }
 int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
@@ -270,18 +263,18 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 
 		nstate = ref<State>(cstate->pc,cstate->probe);
 
-		auto bldvis = new BuildVisitor(cstate);
-		expr_walk(bldvis,cblk->mem);
-		nstate->mem = bldvis->get_expr(cblk->mem);
+		auto build_vis = new BuildVisitor(cstate);
+		expr_walk(build_vis,cblk->mem);
+		nstate->mem = build_vis->get_expr(cblk->mem);
 		for(i = 0; i < ctx->num_reg; i++) {
-			expr_walk(bldvis,cblk->reg[i]);
-			nstate->reg[i] = bldvis->get_expr(cblk->reg[i]);
+			expr_walk(build_vis,cblk->reg[i]);
+			nstate->reg[i] = build_vis->get_expr(cblk->reg[i]);
 		}
 		for(i = 0; i < ctx->num_flag; i++) {
-			expr_walk(bldvis,cblk->flag[i]);
-			nstate->flag[i] = bldvis->get_cond(cblk->flag[i]);
+			expr_walk(build_vis,cblk->flag[i]);
+			nstate->flag[i] = build_vis->get_cond(cblk->flag[i]);
 		}
-		delete bldvis;
+		delete build_vis;
 
 		/*
 		auto vis = new PrintVisitor();
@@ -296,27 +289,16 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		}
 		*/
 
-		solver_reg.clear();
-		solver_flag.clear();
+		auto trans_vis = solver->create_translator();
+		expr_walk(trans_vis,cblk->mem);
 		for(i = 0;i < ctx->num_reg;i++) {
-			solver_reg[i] = cstate->solver_reg[i];
+			expr_walk(trans_vis,cblk->reg[i]);
 		}
 		for(i = 0;i < ctx->num_flag;i++) {
-			solver_flag[i] = cstate->solver_flag[i];
+			expr_walk(trans_vis,cblk->flag[i]);
 		}
 
-		auto vis = solver->create_translator(
-				cstate->solver_mem,solver_reg,solver_flag);
-		expr_walk(vis,cblk->mem);
-		for(i = 0;i < ctx->num_reg;i++) {
-			expr_walk(vis,cblk->reg[i]);
-		}
-		for(i = 0;i < ctx->num_flag;i++) {
-			expr_walk(vis,cblk->flag[i]);
-		}
-
-		auto solexpr_pc = vis->get_solver_expr(
-				cblk->reg[ctx->REGIDX_PC]);
+		auto solexpr_pc = cblk->reg[ctx->REGIDX_PC]->solver_expr;
 		cons.clear();
 		var.clear();
 		var[solexpr_pc] = 0;
@@ -332,12 +314,11 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 				cond_eq(
 					cblk->reg[ctx->REGIDX_PC],
 					BytVec::create_imm(4,next_pc)));
-			expr_walk(vis,exclude_cond);
-			cons.push_back(vis->get_solver_cond(exclude_cond));
+			expr_walk(trans_vis,exclude_cond);
+			cons.push_back(exclude_cond->solver_cond);
 		}
 
-		delete vis;
-
+		delete trans_vis;
 		break;
 	}
 	return 0;

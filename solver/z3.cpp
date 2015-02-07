@@ -26,87 +26,60 @@ namespace z3_solver {
 	Z3SolvCond::~Z3SolvCond() {
 		Z3_dec_ref(context,ast);
 	}
-	Z3TransVisitor::Z3TransVisitor(
-		const Z3Solver *_solver,
-		const refSolvExpr mem,
-		const std::unordered_map <unsigned int,refSolvExpr> &reg,
-		const std::unordered_map <unsigned int,refSolvCond> &flag
-	) :
-		solver(_solver),
-		dangle_mem(mem),
-		dangle_reg(reg),
-		dangle_flag(flag) 
-	{
+	Z3TransVisitor::Z3TransVisitor(const Z3Solver *_solver)
+		: solver(_solver) {
 		bvsort1 = Z3_mk_bv_sort(solver->context,8);
 		bvsort4 = Z3_mk_bv_sort(solver->context,32);
 		bvimm41 = Z3_mk_unsigned_int64(solver->context,1,bvsort4);
 		INCREF(bvimm41);
 	}
-	Z3TransVisitor::~Z3TransVisitor() {
-		for(auto it = expr_ast.begin();
-				it != expr_ast.end();
-				it++){
-			DECREF(it->second);
-		}
-		for(auto it = cond_ast.begin();
-				it != cond_ast.end();
-				it++){
-			DECREF(it->second);
-		}
-	}
-	symx::refSolvExpr Z3TransVisitor::get_solver_expr(
-			const symx::refExpr expr) {
-		return ref<Z3SolvExpr>(solver->context,expr_ast[expr]);
-	}
-	symx::refSolvCond Z3TransVisitor::get_solver_cond(
-			const symx::refCond cond) {
-		return ref<Z3SolvCond>(solver->context,cond_ast[cond]);
-	}
 	Z3_ast Z3TransVisitor::expr_to_ast(const symx::refExpr expr) {
-		auto it = expr_ast.find(expr);
-		if(it == expr_ast.end()) {
-			err("expr not exist\n");
+		if(expr->solver_expr == nullptr) {
+			err("expr hasn't been translated\n");
 		}
-		return it->second;
+		return std::static_pointer_cast<Z3SolvExpr>
+			(expr->solver_expr)->ast;
 	}
 	Z3_ast Z3TransVisitor::cond_to_ast(const symx::refCond cond) {
-		auto it = cond_ast.find(cond);
-		if(it == cond_ast.end()) {
-			err("cond not exist\n");
+		if(cond->solver_cond == nullptr) {
+			err("cond hasn't been translated\n");
 		}
-		return it->second;
+		return std::static_pointer_cast<Z3SolvCond>
+			(cond->solver_cond)->ast;
 	}
 	int Z3TransVisitor::pre_visit(symx::refBytVec vec) {
+		if(vec->solver_expr != nullptr) {
+			return 0;
+		}
 		return 1;
 	}
 	int Z3TransVisitor::pre_visit(symx::refBytMem mem) {
+		if(mem->solver_expr != nullptr) {
+			return 0;
+		}
 		return 1;
 	}
 	int Z3TransVisitor::pre_visit(symx::refOperator oper) {
+		if(oper->solver_expr != nullptr) {
+			return 0;
+		}
 		return 1;
 	}
 	int Z3TransVisitor::pre_visit(symx::refCond cond) {
+		if(cond->solver_cond != nullptr) {
+			return 0;
+		}
 		return 1;
 	}
 	int Z3TransVisitor::visit(const refBytVec vec) {
 		Z3_ast res_ast;
 		switch(vec->type) {
-		case ExprDangle:
-		{
-			auto expr_it = dangle_reg.find(vec->index);
-			if(expr_it == dangle_reg.end()) {
-				err("undefined dangle bytvec\n");
-			}
-			auto expr = std::static_pointer_cast<Z3SolvExpr>(
-					expr_it->second);
-			res_ast = expr->ast;
-			break;
-		}
 		case ExprImm:
 			res_ast = Z3_mk_unsigned_int64(
 				solver->context,
 				vec->data,
 				Z3_mk_bv_sort(solver->context,vec->size * 8));
+			INCREF(res_ast);
 			break;
 		case ExprVar:
 			res_ast = Z3_mk_const(
@@ -115,27 +88,19 @@ namespace z3_solver {
 					solver->context,
 					vec->id),
 				Z3_mk_bv_sort(solver->context,vec->size * 8));
+			INCREF(res_ast);
 			break;
 		default:
 			err("illegal case\n");
 			return -1;
 		}
-		INCREF(res_ast);
-		expr_ast[vec] = res_ast;
+		vec->solver_expr = ref<Z3SolvExpr>(solver->context,res_ast);
+		DECREF(res_ast);
 		return 0;
 	}
 	int Z3TransVisitor::visit(const refBytMem mem) {
 		Z3_ast res_ast;
 		switch(mem->type) {
-		case ExprDangle:
-		if(dangle_mem == nullptr) {
-			err("undefined dangle bytmem\n");
-		} else {
-			auto expr = std::static_pointer_cast<Z3SolvExpr>(
-					dangle_mem);
-			res_ast = expr->ast;
-			break;
-		}
 		case ExprMem:
 			res_ast = Z3_mk_const(
 					solver->context,
@@ -146,13 +111,14 @@ namespace z3_solver {
 						solver->context,
 						bvsort4,
 						bvsort1));
+			INCREF(res_ast);
 			break;
 		default:
 			err("illegal case\n");
 			return -1;
 		}
-		INCREF(res_ast);
-		expr_ast[mem] = res_ast;
+		mem->solver_expr = ref<Z3SolvExpr>(solver->context,res_ast);
+		DECREF(res_ast);
 		return 0;
 	}
 	int Z3TransVisitor::visit(const refOperator oper) {
@@ -294,82 +260,83 @@ namespace z3_solver {
 			err("illegal case\n");
 			return -1;
 		}
-		expr_ast[oper] = res_ast;
+		oper->solver_expr = ref<Z3SolvExpr>(solver->context,res_ast);
+		DECREF(res_ast);
 		return 0;
 	}
 	int Z3TransVisitor::visit(const refCond cond) {
 		Z3_ast res_ast;
 		switch(cond->type) {
-		case CondDangle:
-		{
-			auto cond_it = dangle_flag.find(cond->index);
-			if(cond_it == dangle_flag.end()) {
-				err("undefined dangle bytvec\n");
-			}
-			auto cond = std::static_pointer_cast<Z3SolvCond>(
-					cond_it->second);
-			res_ast = cond->ast;
-			break;
-		}
 		case CondFalse:
 			res_ast = Z3_mk_false(solver->context);
+			INCREF(res_ast);
 			break;
 		case CondTrue:
 			res_ast = Z3_mk_true(solver->context);
+			INCREF(res_ast);
 			break;
 		case CondEq:
 			res_ast = Z3_mk_eq(
 					solver->context,
 					expr_to_ast(cond->expr[0]),
 					expr_to_ast(cond->expr[1]));
+			INCREF(res_ast);
 			break;
 		case CondSl:
 			res_ast = Z3_mk_bvslt(
 					solver->context,
 					expr_to_ast(cond->expr[0]),
 					expr_to_ast(cond->expr[1]));
+			INCREF(res_ast);
 			break;
 		case CondSle:
 			res_ast = Z3_mk_bvsle(
 					solver->context,
 					expr_to_ast(cond->expr[0]),
 					expr_to_ast(cond->expr[1]));
+			INCREF(res_ast);
 			break;
 		case CondUl:
 			res_ast = Z3_mk_bvult(
 					solver->context,
 					expr_to_ast(cond->expr[0]),
 					expr_to_ast(cond->expr[1]));
+			INCREF(res_ast);
 			break;
 		case CondUle:
 			res_ast = Z3_mk_bvule(
 					solver->context,
 					expr_to_ast(cond->expr[0]),
 					expr_to_ast(cond->expr[1]));
+			INCREF(res_ast);
 			break;
 		case CondSg:
 			res_ast = Z3_mk_bvsgt(
 					solver->context,
 					expr_to_ast(cond->expr[0]),
 					expr_to_ast(cond->expr[1]));
+			INCREF(res_ast);
 			break;
 		case CondSge:
 			res_ast = Z3_mk_bvsge(
 					solver->context,
 					expr_to_ast(cond->expr[0]),
 					expr_to_ast(cond->expr[1]));
+			INCREF(res_ast);
 			break;
 		case CondUg:
 			res_ast = Z3_mk_bvugt(
 					solver->context,
 					expr_to_ast(cond->expr[0]),
 					expr_to_ast(cond->expr[1]));
+			INCREF(res_ast);
 			break;
 		case CondUge:
 			res_ast = Z3_mk_bvuge(
 					solver->context,
 					expr_to_ast(cond->expr[0]),
 					expr_to_ast(cond->expr[1]));
+			INCREF(res_ast);
 			break;
 		case CondAnd:
 		{
@@ -377,6 +344,7 @@ namespace z3_solver {
 				cond_to_ast(cond->cond[0]),
 				cond_to_ast(cond->cond[1])};
 			res_ast = Z3_mk_and(solver->context,2,conds);
+			INCREF(res_ast);
 			break;
 		}
 		case CondOr:
@@ -385,6 +353,7 @@ namespace z3_solver {
 				cond_to_ast(cond->cond[0]),
 				cond_to_ast(cond->cond[1])};
 			res_ast = Z3_mk_or(solver->context,2,conds);
+			INCREF(res_ast);
 			break;
 		}
 		case CondXor:
@@ -392,18 +361,20 @@ namespace z3_solver {
 					solver->context,
 					cond_to_ast(cond->cond[0]),
 					cond_to_ast(cond->cond[1]));
+			INCREF(res_ast);
 			break;
 		case CondNot:
 			res_ast = Z3_mk_not(
 					solver->context,
 					cond_to_ast(cond->cond[0]));
+			INCREF(res_ast);
 			break;
 		default:
 			err("illegal case\n");
 			return -1;
 		}
-		INCREF(res_ast);
-		cond_ast[cond] = res_ast;
+		cond->solver_cond = ref<Z3SolvCond>(solver->context,res_ast);
+		DECREF(res_ast);
 		return 0;
 	}
 	Z3Solver::Z3Solver() {
@@ -416,24 +387,7 @@ namespace z3_solver {
 		Z3_solver_inc_ref(context,solver);
 	}
 	symx::TransVisitor* Z3Solver::create_translator() {
-		return new Z3TransVisitor(
-				this,
-				nullptr,
-				std::unordered_map
-				<unsigned int,
-				symx::refSolvExpr>{},
-				std::unordered_map
-				<unsigned int,
-				symx::refSolvCond>{});
-	}
-	symx::TransVisitor* Z3Solver::create_translator(
-			const symx::refSolvExpr mem,
-			const std::unordered_map
-				<unsigned int,symx::refSolvExpr> &reg,
-			const std::unordered_map
-				<unsigned int,symx::refSolvCond> &flag
-	) {
-		return new Z3TransVisitor(this,mem,reg,flag);
+		return new Z3TransVisitor(this);
 	}
 	bool Z3Solver::solve(
 			const std::vector<symx::refSolvCond> &cons,

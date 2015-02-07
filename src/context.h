@@ -23,13 +23,6 @@ namespace symx {
 	class Solver {
 		public:
 			virtual TransVisitor* create_translator() = 0;
-			virtual TransVisitor* create_translator(
-				const refSolvExpr mem,
-				const std::unordered_map
-					<unsigned int,refSolvExpr> &reg,
-				const std::unordered_map
-					<unsigned int,refSolvCond> &flag
-			) = 0;
 			virtual bool solve(
 				const std::vector<refSolvCond> &cons,
 				std::unordered_map<refSolvExpr,uint64_t> *var

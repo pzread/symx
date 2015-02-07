@@ -22,19 +22,7 @@ namespace z3_solver {
 
 	class Z3TransVisitor : public symx::TransVisitor {
 		public:
-			Z3TransVisitor(
-				const Z3Solver *_solver,
-				const symx::refSolvExpr mem,
-				const std::unordered_map
-					<unsigned int,symx::refSolvExpr> &reg,
-				const std::unordered_map
-					<unsigned int,symx::refSolvCond> &flag
-			);
-			~Z3TransVisitor();
-			symx::refSolvExpr get_solver_expr(
-					const symx::refExpr expr);
-			symx::refSolvCond get_solver_cond(
-					const symx::refCond cond);
+			Z3TransVisitor(const Z3Solver *_solver);
 			int pre_visit(symx::refBytVec vec);
 			int pre_visit(symx::refBytMem mem);
 			int pre_visit(symx::refOperator oper);
@@ -45,16 +33,9 @@ namespace z3_solver {
 			int visit(symx::refCond cond);
 		private:
 			const Z3Solver *solver;
-			const symx::refSolvExpr dangle_mem;
-			const std::unordered_map
-				<unsigned int,symx::refSolvExpr> &dangle_reg;
-			const std::unordered_map
-				<unsigned int,symx::refSolvCond> &dangle_flag;
 			Z3_sort bvsort1;
 			Z3_sort bvsort4;
 			Z3_ast bvimm41;
-			std::unordered_map<symx::refExpr,Z3_ast> expr_ast;
-			std::unordered_map<symx::refCond,Z3_ast> cond_ast;
 			Z3_ast expr_to_ast(const symx::refExpr expr);
 			Z3_ast cond_to_ast(const symx::refCond cond);
 	};
@@ -65,13 +46,6 @@ namespace z3_solver {
 
 			Z3Solver();
 			symx::TransVisitor* create_translator();
-			symx::TransVisitor* create_translator(
-				const symx::refSolvExpr mem,
-				const std::unordered_map
-					<unsigned int,symx::refSolvExpr> &reg,
-				const std::unordered_map
-					<unsigned int,symx::refSolvCond> &flag
-			);
 			bool solve(
 				const std::vector<symx::refSolvCond> &cons,
 				std::unordered_map
