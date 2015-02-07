@@ -197,7 +197,6 @@ namespace z3_solver {
 			if((size = oper->size) == 0){
 				err("illegal size\n");
 			}
-			info("%s\n",Z3_ast_to_string(solver->context,idx_ast));
 			res_ast = Z3_mk_select(solver->context,mem_ast,idx_ast);
 			INCREF(res_ast);
 			INCREF(idx_ast);
@@ -437,7 +436,7 @@ namespace z3_solver {
 			auto cond = std::static_pointer_cast<Z3SolverCond>(*it);
 			Z3_solver_assert(context,solver,cond->ast);
 		}
-		if(Z3_solver_check(context,solver) == Z3_FALSE) {
+		if(Z3_solver_check(context,solver) != Z3_TRUE) {
 			return false;
 		}
 
@@ -468,6 +467,6 @@ namespace z3_solver {
 		}
 
 		Z3_model_dec_ref(context,model);
-		return false;
+		return true;
 	}
 };

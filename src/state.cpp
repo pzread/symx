@@ -184,9 +184,21 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		cons.clear();
 		var.clear();
 		var[solexpr_pc] = 0;
-		solver->solve(cons,&var);
+		while(true) {
+			if(!solver->solve(cons,&var)) {
+				break;	
+			}
 
-		info("next pc %lx\n",var[solexpr_pc]);
+			uint64_t next_pc = var[solexpr_pc];
+			info("next pc %lx\n",next_pc);
+
+			auto exclude_cond = cond_not(
+				cond_eq(
+					cblk->reg[ctx->REGIDX_PC],
+					BytVec::create_imm(4,next_pc)));
+			expr_walk(vis,exclude_cond);
+			cons.push_back(vis->get_solver_cond(exclude_cond));
+		}
 
 		delete vis;
 
