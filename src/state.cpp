@@ -246,6 +246,9 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 	std::unordered_map<unsigned int,refSolvCond> solver_flag;
 	std::vector<refSolvCond> cons;
 	std::unordered_map<refSolvExpr,uint64_t> var;
+	refExpr next_mem;
+	refExpr next_reg[256];
+	refCond next_flag[64];
 
 	nstate = create_static_state(ctx,probe,pc);
 	ctx->state.push(nstate);
@@ -253,26 +256,25 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 	while(!ctx->state.empty()) {
 		cstate = ctx->state.front();
 		ctx->state.pop();
+		info("run state %x\n",cstate->pc);
 
-		auto blk_it = ctx->block.find(pc);
+		auto blk_it = ctx->block.find(cstate->pc);
 		if(blk_it == ctx->block.end()) {
-			cblk = ctx->interpret(probe,pc);
+			cblk = ctx->interpret(probe,cstate->pc);
 		} else {
 			cblk = blk_it->second;
 		}
 
-		nstate = ref<State>(cstate->pc,cstate->probe);
-
 		auto build_vis = new BuildVisitor(cstate);
 		expr_walk(build_vis,cblk->mem);
-		nstate->mem = build_vis->get_expr(cblk->mem);
+		next_mem = build_vis->get_expr(cblk->mem);
 		for(i = 0; i < ctx->num_reg; i++) {
 			expr_walk(build_vis,cblk->reg[i]);
-			nstate->reg[i] = build_vis->get_expr(cblk->reg[i]);
+			next_reg[i] = build_vis->get_expr(cblk->reg[i]);
 		}
 		for(i = 0; i < ctx->num_flag; i++) {
 			expr_walk(build_vis,cblk->flag[i]);
-			nstate->flag[i] = build_vis->get_cond(cblk->flag[i]);
+			next_flag[i] = build_vis->get_cond(cblk->flag[i]);
 		}
 		delete build_vis;
 
@@ -290,15 +292,15 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		*/
 
 		auto trans_vis = solver->create_translator();
-		expr_walk(trans_vis,nstate->mem);
+		expr_walk(trans_vis,next_mem);
 		for(i = 0;i < ctx->num_reg;i++) {
-			expr_walk(trans_vis,nstate->reg[i]);
+			expr_walk(trans_vis,next_reg[i]);
 		}
 		for(i = 0;i < ctx->num_flag;i++) {
-			expr_walk(trans_vis,nstate->flag[i]);
+			expr_walk(trans_vis,next_flag[i]);
 		}
 
-		auto solexpr_pc = nstate->reg[ctx->REGIDX_PC]->solver_expr;
+		auto solexpr_pc = next_reg[ctx->REGIDX_PC]->solver_expr;
 		cons.clear();
 		var.clear();
 		var[solexpr_pc] = 0;
@@ -310,16 +312,25 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			uint64_t next_pc = var[solexpr_pc];
 			info("next pc %lx\n",next_pc);
 
+			nstate = ref<State>(next_pc,cstate->probe);
+			nstate->mem = next_mem;
+			for(i = 0; i < ctx->num_reg; i++) {
+				nstate->reg[i] = next_reg[i];
+			}
+			for(i = 0; i < ctx->num_flag; i++) {
+				nstate->flag[i] = next_flag[i];
+			}
+			ctx->state.push(nstate);
+
 			auto exclude_cond = cond_not(
 				cond_eq(
-					nstate->reg[ctx->REGIDX_PC],
+					next_reg[ctx->REGIDX_PC],
 					BytVec::create_imm(4,next_pc)));
 			expr_walk(trans_vis,exclude_cond);
 			cons.push_back(exclude_cond->solver_cond);
 		}
 
 		delete trans_vis;
-		break;
 	}
 	return 0;
 }
