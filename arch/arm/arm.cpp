@@ -37,14 +37,52 @@ ARMProbe::ARMProbe(const int fd,const uint64_t _off) : off(_off) {
 uint64_t ARMProbe::read_reg(const unsigned int regid) {
 	//Temp fixed data
 	switch(regid) {
+	case ARM_REG_R0:
+		return 0x1;
+	case ARM_REG_R1:
+		return 0xBEFFFD94;
+	case ARM_REG_R2:
+		return 0xBEFFFD9C;
+	case ARM_REG_R3:
+		return 0x1034D;
+	case ARM_REG_R4:
+		return 0x0;
+	case ARM_REG_R5:
+		return 0xB6FD3000;
+	case ARM_REG_R6:
+		return 0xDC;
+	case ARM_REG_R7:
+		return 0x0;
+	case ARM_REG_R8:
+		return 0x0;
+	case ARM_REG_R9:
+		return 0x0;
+	case ARM_REG_R10:
+		return 0xB6FFF000;
+	case ARM_REG_R11:
+		return 0x0;
+	case ARM_REG_R12:
+		return 0xB6FFFCC0;
 	case ARM_REG_PC:
-		return 0x8558;
+		return 0x1034C;
 	case ARM_REG_SP:
-		return 0x7FFFFFF0;
+		return 0xBEFFFC40;
+	case ARM_REG_LR:
+		return 0xB6F00631;
 	}
 	return 0;
 }
 bool ARMProbe::read_flag(const unsigned int flagid) {
+	switch(flagid) {
+	case ARM_SR_N:
+		return false;
+	case ARM_SR_Z:
+		return true;
+	case ARM_SR_C:
+		return true;
+	case ARM_SR_V:
+		return false;
+	}
 	return false;
 }
 ssize_t ARMProbe::read_mem(
@@ -387,6 +425,7 @@ refBlock ARMContext::interpret(
 		case ARM_INS_BLX:
 			nr[ARM_REG_LR] = BytVec::create_imm(4,pc + ins->size);
 		case ARM_INS_B:
+		case ARM_INS_BX:
 			nr[ARM_REG_PC] = get_op_expr(blk,&ops[0],pc);
 			end_flag = true;
 			break;

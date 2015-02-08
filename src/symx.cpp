@@ -25,12 +25,12 @@ int main() {
 	auto *solver = new z3_solver::Z3Solver();
 	auto *ctx = new arm::ARMContext(solver);
 
-	binfd = open("./demo",O_RDONLY);
+	binfd = open("./test",O_RDONLY);
 	
 	//<main> block emit test
 	arm::initialize();
-	auto probe = ref<arm::ARMProbe>(binfd,-0x8000);
-	state_executor(ctx,probe,0x84C4);
+	auto probe = ref<arm::ARMProbe>(binfd,-0x10000);
+	state_executor(ctx,probe,0x1034C);
 
 	return 0;
 }
