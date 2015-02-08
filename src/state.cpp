@@ -124,7 +124,7 @@ int BuildVisitor::pre_visit(symx::refCond cond) {
 	}
 	return 1;
 }
-int BuildVisitor::visit(symx::refBytVec vec) {
+int BuildVisitor::post_visit(symx::refBytVec vec) {
 	if(vec->type == ExprDangle) {
 		expr_map[vec] = state->reg[vec->index];
 	} else {
@@ -132,7 +132,7 @@ int BuildVisitor::visit(symx::refBytVec vec) {
 	}
 	return 1;
 }
-int BuildVisitor::visit(symx::refBytMem mem) {
+int BuildVisitor::post_visit(symx::refBytMem mem) {
 	if(mem->type == ExprDangle) {
 		expr_map[mem] = state->mem;
 	} else {
@@ -140,7 +140,7 @@ int BuildVisitor::visit(symx::refBytMem mem) {
 	}
 	return 1;
 }
-int BuildVisitor::visit(symx::refOperator oper) {
+int BuildVisitor::post_visit(symx::refOperator oper) {
 	switch(oper->type) {
 	case ExprOpSelect:
 		expr_map[oper] = expr_select(
@@ -182,7 +182,7 @@ int BuildVisitor::visit(symx::refOperator oper) {
 	}
 	return 1;
 }
-int BuildVisitor::visit(symx::refCond cond) {
+int BuildVisitor::post_visit(symx::refCond cond) {
 	switch(cond->type) {
 	case CondDangle:
 		cond_map[cond] = state->flag[cond->index];

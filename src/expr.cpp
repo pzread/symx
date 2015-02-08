@@ -18,9 +18,6 @@ int expr_walk(ExprVisitor *visitor,refExpr expr) {
 	if(expr->pre_accept(visitor) == 0) {
 		return 0;
 	}
-	if(visitor->expr_set.find(expr) != visitor->expr_set.end()) {
-		return 0;
-	}
 	switch(expr->type) {
 	case ExprDangle:
 	case ExprImm:
@@ -48,9 +45,6 @@ int expr_walk(ExprVisitor *visitor,refCond cond) {
 	unsigned int i;
 
 	if(cond->pre_accept(visitor) == 0){
-		return 0;
-	}
-	if(visitor->cond_set.find(cond) != visitor->cond_set.end()) {
 		return 0;
 	}
 	switch(cond->type) {

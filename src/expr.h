@@ -28,18 +28,15 @@ typedef std::shared_ptr<SolvCond> refSolvCond;
 
 class ExprVisitor {
 	public:
-		std::unordered_set<refExpr> expr_set;
-		std::unordered_set<refCond> cond_set;
-
 		virtual ~ExprVisitor() {};
 		virtual int pre_visit(refBytVec vec) = 0;
 		virtual int pre_visit(refBytMem mem) = 0;
 		virtual int pre_visit(refOperator oper) = 0;
 		virtual int pre_visit(refCond cond) = 0;
-		virtual int visit(refBytVec vec) = 0;
-		virtual int visit(refBytMem mem) = 0;
-		virtual int visit(refOperator oper) = 0;
-		virtual int visit(refCond cond) = 0;
+		virtual int post_visit(refBytVec vec) = 0;
+		virtual int post_visit(refBytMem mem) = 0;
+		virtual int post_visit(refOperator oper) = 0;
+		virtual int post_visit(refCond cond) = 0;
 };
 class SolvExpr {};
 class SolvCond {};
@@ -85,13 +82,13 @@ class BytVec : public Expr {
 			: Expr(old->type,old->size),data(old->data) {}
 		int pre_accept(ExprVisitor *visitor) {
 			return visitor->pre_visit(
-					std::static_pointer_cast<BytVec>(
-						shared_from_this()));
+				std::static_pointer_cast<BytVec>(
+					shared_from_this()));
 		}
 		int post_accept(ExprVisitor *visitor) {
-			return visitor->visit(
-					std::static_pointer_cast<BytVec>(
-						shared_from_this()));
+			return visitor->post_visit(
+				std::static_pointer_cast<BytVec>(
+					shared_from_this()));
 		}
 		static refBytVec create_dangle(
 			const unsigned int size,
@@ -128,13 +125,13 @@ class BytMem : public Expr {
 			: Expr(old->type,old->size),index(old->index) {}
 		int pre_accept(ExprVisitor *visitor) {
 			return visitor->pre_visit(
-					std::static_pointer_cast<BytMem>(
-						shared_from_this()));
+				std::static_pointer_cast<BytMem>(
+					shared_from_this()));
 		}
 		int post_accept(ExprVisitor *visitor) {
-			return visitor->visit(
-					std::static_pointer_cast<BytMem>(
-						shared_from_this()));
+			return visitor->post_visit(
+				std::static_pointer_cast<BytMem>(
+					shared_from_this()));
 		}
 		static refBytMem create_dangle(const unsigned int index) {
 			return refBytMem(new BytMem(index));
@@ -209,9 +206,9 @@ class Operator : public Expr {
 						shared_from_this()));
 		}
 		int post_accept(ExprVisitor *visitor) {
-			return visitor->visit(
-					std::static_pointer_cast<Operator>(
-						shared_from_this()));
+			return visitor->post_visit(
+				std::static_pointer_cast<Operator>(
+					shared_from_this()));
 		}
 };
 
@@ -281,9 +278,9 @@ class Cond : public std::enable_shared_from_this<Cond> {
 						shared_from_this()));
 		}
 		int post_accept(ExprVisitor *visitor) {
-			return visitor->visit(
-					std::static_pointer_cast<Cond>(
-						shared_from_this()));
+			return visitor->post_visit(
+				std::static_pointer_cast<Cond>(
+					shared_from_this()));
 		}
 		static refCond create_dangle(const unsigned int index) {
 			return refCond(new Cond(index));

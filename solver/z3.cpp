@@ -71,7 +71,7 @@ namespace z3_solver {
 		}
 		return 1;
 	}
-	int Z3TransVisitor::visit(const refBytVec vec) {
+	int Z3TransVisitor::post_visit(const refBytVec vec) {
 		Z3_ast res_ast;
 		switch(vec->type) {
 		case ExprImm:
@@ -98,7 +98,7 @@ namespace z3_solver {
 		DECREF(res_ast);
 		return 0;
 	}
-	int Z3TransVisitor::visit(const refBytMem mem) {
+	int Z3TransVisitor::post_visit(const refBytMem mem) {
 		Z3_ast res_ast;
 		switch(mem->type) {
 		case ExprMem:
@@ -121,7 +121,7 @@ namespace z3_solver {
 		DECREF(res_ast);
 		return 0;
 	}
-	int Z3TransVisitor::visit(const refOperator oper) {
+	int Z3TransVisitor::post_visit(const refOperator oper) {
 		Z3_ast res_ast;
 		switch(oper->type) {
 		case ExprOpStore:
@@ -281,7 +281,7 @@ namespace z3_solver {
 		DECREF(res_ast);
 		return 0;
 	}
-	int Z3TransVisitor::visit(const refCond cond) {
+	int Z3TransVisitor::post_visit(const refCond cond) {
 		Z3_ast res_ast;
 		switch(cond->type) {
 		case CondFalse:

@@ -27,10 +27,10 @@ namespace z3_solver {
 			int pre_visit(symx::refBytMem mem);
 			int pre_visit(symx::refOperator oper);
 			int pre_visit(symx::refCond cond);
-			int visit(symx::refBytVec vec);
-			int visit(symx::refBytMem mem);
-			int visit(symx::refOperator oper);
-			int visit(symx::refCond cond);
+			int post_visit(symx::refBytVec vec);
+			int post_visit(symx::refBytMem mem);
+			int post_visit(symx::refOperator oper);
+			int post_visit(symx::refCond cond);
 		private:
 			const Z3Solver *solver;
 			Z3_sort bvsort1;
