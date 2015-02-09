@@ -412,14 +412,9 @@ refBlock ARMContext::interpret(
 		case ARM_INS_LDRB:
 			xrs = get_op_expr(blk,&ops[1],pc);
 			if(ins->id == ARM_INS_LDR) {
-				nr[ops[0].reg] = expr_select(
-					blk->mem,
-					xrs,
-					REGSIZE);
+				nr[ops[0].reg] = expr_select(blk->mem,xrs,ctx->REGSIZE);
 			} else {
-				nr[ops[0].reg] = expr_zext(
-					expr_select(blk->mem,xrs,1),
-					REGSIZE);
+				nr[ops[0].reg] = expr_zeroext(expr_select(blk->mem,xrs,1),4);
 			}
 			break;
 		case ARM_INS_CMP:

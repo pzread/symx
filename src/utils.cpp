@@ -8,7 +8,7 @@ void internal_err(std::string prefix,std::string fmt,...) {
 	va_list args;
 	std::string cfmt;
 
-	cfmt = "[" + std::to_string(getpid()) + "][" + prefix + "] " + fmt;
+	cfmt = "[" + std::to_string(getpid()) + "][" + prefix + "]\t" + fmt;
 	va_start(args,fmt);
 	vfprintf(stderr,cfmt.c_str(),args);
 	va_end(args);
@@ -18,7 +18,7 @@ void internal_info(std::string prefix,std::string fmt,...) {
 	va_list args;
 	std::string cfmt;
 
-	cfmt = "[" + std::to_string(getpid()) + "][" + prefix + "] " + fmt;
+	cfmt = "[" + std::to_string(getpid()) + "][" + prefix + "]\t" + fmt;
 	va_start(args,fmt);
 	vfprintf(stderr,cfmt.c_str(),args);
 	va_end(args);

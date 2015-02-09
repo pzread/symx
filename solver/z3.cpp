@@ -273,6 +273,20 @@ namespace z3_solver {
 				expr_to_ast(oper->operand[1]));
 			INCREF(res_ast);
 			break;
+		case ExprOpSext:
+			res_ast = Z3_mk_sign_ext(
+				solver->context,
+				(oper->size - oper->operand[0]->size) * 8,
+				expr_to_ast(oper->operand[0]));
+			INCREF(res_ast);
+			break;
+		case ExprOpZext:
+			res_ast = Z3_mk_zero_ext(
+				solver->context,
+				(oper->size - oper->operand[0]->size) * 8,
+				expr_to_ast(oper->operand[0]));
+			INCREF(res_ast);
+			break;
 		default:
 			err("illegal case\n");
 			return -1;

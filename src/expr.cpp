@@ -81,6 +81,13 @@ refExpr expr_select(
 ) {
 	return ref<Operator>(size,mem,idx);
 }
+refExpr expr_extract(
+	const refExpr op1,
+	const unsigned int start,
+	const unsigned int end
+) {
+	return ref<Operator>(end - start,op1,start);
+}
 refExpr expr_ite(const refCond cond,const refExpr op1,const refExpr op2) {
 	assert(op1->size == op2->size);
 	return ref<Operator>(op1->size,cond,op1,op2);
@@ -104,15 +111,16 @@ refExpr expr_neg(const refExpr op1) {
 refExpr expr_not(const refExpr op1) {
 	return ref<Operator>(ExprOpNot,op1->size,op1);
 }
-refExpr expr_extract(
-	const refExpr op1,
-	const unsigned int start,
-	const unsigned int end
-) {
-	return ref<Operator>(end - start,op1,start);
-}
 refExpr expr_concat(const refExpr op1,const refExpr op2) {
 	return ref<Operator>(ExprOpConcat,op1->size + op2->size,op1,op2);
+}
+refExpr expr_sext(const refExpr op1,const unsigned int size) {
+	assert(op1->size <= size);
+	return ref<Operator>(ExprOpSext,size,op1);
+}
+refExpr expr_zext(const refExpr op1,const unsigned int size) {
+	assert(op1->size <= size);
+	return ref<Operator>(ExprOpZext,size,op1);
 }
 
 refCond cond_eq(const refExpr op1,const refExpr op2) {
