@@ -107,16 +107,28 @@ ARMContext::ARMContext(Solver *_solver) : Context(
 	cs_open(CS_ARCH_ARM,CS_MODE_THUMB,&cs);
 	cs_option(cs,CS_OPT_DETAIL,CS_OPT_ON);
 }
+static refExpr get_relative_pc(uint64_t pc) {
+	//for thumb
+	return BytVec::create_imm(4,pc + 4);
+}
 static refExpr get_op_expr(refBlock blk,cs_arm_op *op,uint64_t pc) {
 	refExpr ret;
 	if(op->type == ARM_OP_IMM) {
 		ret = BytVec::create_imm(4,op->imm);
 	} else if(op->type == ARM_OP_REG) {
-		ret = blk->reg[op->reg];
+		if(op->reg == ARM_REG_PC) {
+			ret = get_relative_pc(pc);
+		} else {
+			ret = blk->reg[op->reg];
+		}
 	} else if(op->type == ARM_OP_MEM) {
 		refExpr index;
 		if(op->mem.base != ARM_REG_INVALID) {
-			ret = blk->reg[op->mem.base];
+			if(op->mem.base == ARM_REG_PC) {
+				ret = get_relative_pc(pc);
+			} else {
+				ret = blk->reg[op->mem.base];
+			}
 		} else {
 			ret = BytVec::create_imm(4,0);
 		}
@@ -433,6 +445,12 @@ refBlock ARMContext::interpret(
 			nf[ARM_SR_V] = cond_and(
 				cond_xor(cond_sl(xrd,imm40),cdt),
 				cond_xor(cond_sl(expr_neg(xrs),imm40),cdt));
+			break;
+		case ARM_INS_TBB:
+			xrs = get_op_expr(blk,&ops[0],pc);
+			xrt = expr_zext(expr_select(blk->mem,xrs,1),4);
+			nr[ARM_REG_PC] = expr_add(get_relative_pc(pc),xrt);
+			end_flag = true;
 			break;
 		case ARM_INS_BL:
 		case ARM_INS_BLX:
