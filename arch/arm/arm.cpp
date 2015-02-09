@@ -34,11 +34,14 @@ ARMProbe::ARMProbe(const int fd,const uint64_t _off) : off(_off) {
 	fstat(fd,&st);
 	bin = (uint8_t*)mmap(NULL,st.st_size,PROT_READ,MAP_PRIVATE,fd,0);
 }
-uint64_t ARMProbe::read_reg(const unsigned int regid) {
+uint64_t ARMProbe::read_reg(const unsigned int regid,bool *symbol) {
 	//Temp fixed data
+	*symbol = false;
 	switch(regid) {
 	case ARM_REG_R0:
-		return 0x1;
+		*symbol = true;
+		return 0x0;
+		//return 0x1;
 	case ARM_REG_R1:
 		return 0xBEFFFD94;
 	case ARM_REG_R2:

@@ -30,7 +30,9 @@ namespace symx {
 	};
 	class Probe {
 		public:
-			virtual uint64_t read_reg(const unsigned int regid) = 0;
+			virtual uint64_t read_reg(
+				const unsigned int regid,
+				bool *symbol) = 0;
 			virtual bool read_flag(const unsigned int flagid) = 0;
 			virtual ssize_t read_mem(
 				const uint64_t addr,
@@ -42,7 +44,7 @@ namespace symx {
 		public:
 			csh cs;
 			Solver *solver;
-			const unsigned int reg_size;
+			const unsigned int REGSIZE;
 			const unsigned int num_reg;
 			const unsigned int num_flag;
 			const unsigned int REGIDX_PC;
@@ -53,13 +55,13 @@ namespace symx {
 
 			Context(
 				Solver *_solver,
-				const unsigned int _reg_size,
+				const unsigned int _REGSIZE,
 				const unsigned int _num_reg,
 				const unsigned int _num_flag,
 				const unsigned int _REGIDX_PC
 			) :
 				solver(_solver),
-				reg_size(_reg_size),
+				REGSIZE(_REGSIZE),
 				num_reg(_num_reg),
 				num_flag(_num_flag),
 				REGIDX_PC(_REGIDX_PC),

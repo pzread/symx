@@ -25,7 +25,7 @@ class ARMProbe : public symx::Probe {
 		uint8_t *bin;
 		uint64_t off;
 		ARMProbe(const int fd,const uint64_t _off);
-		uint64_t read_reg(const unsigned int regid);
+		uint64_t read_reg(const unsigned int regid,bool *symbol);
 		bool read_flag(const unsigned int flagid);
 		ssize_t read_mem(
 			const uint64_t addr,

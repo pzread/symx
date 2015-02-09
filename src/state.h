@@ -26,6 +26,7 @@ class State : public BaseState {
 	public:
 		uint64_t pc;
 		refProbe probe;
+		std::vector<refBytVec> symbol;
 		std::vector<refCond> constraint;
 		State(const uint64_t _pc,refProbe _probe)
 			: pc(_pc),probe(_probe) {}

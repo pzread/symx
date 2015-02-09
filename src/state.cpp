@@ -219,7 +219,7 @@ refBlock state_create_block(Context *ctx) {
 
 	blk->mem = BytMem::create_dangle(-1);
 	for(i = 0; i < ctx->num_reg; i++) {
-		blk->reg[i] = BytVec::create_dangle(ctx->reg_size,i);
+		blk->reg[i] = BytVec::create_dangle(ctx->REGSIZE,i);
 	}
 	for(i = 0;i < ctx->num_flag; i++) {
 		blk->flag[i] = Cond::create_dangle(i);
@@ -228,15 +228,24 @@ refBlock state_create_block(Context *ctx) {
 }
 static refState create_static_state(Context *ctx,refProbe probe,uint64_t pc) {
 	unsigned int i;
+	uint64_t value;
+	bool symbol;
 	auto nstate = ref<State>(pc,probe);
 	auto vis = ctx->solver->create_translator();
 
 	nstate->mem = BytMem::create_var(ctx);
 	expr_walk(vis,nstate->mem);
 	for(i = 0; i < ctx->num_reg; i++) {
-		nstate->reg[i] = BytVec::create_imm(
-			ctx->reg_size,
-			probe->read_reg(i));
+		value = probe->read_reg(i,&symbol);
+		if(symbol) {
+			auto vec = BytVec::create_var(ctx->REGSIZE,ctx);
+			nstate->reg[i] = vec;
+			nstate->symbol.push_back(vec);
+		} else {
+			nstate->reg[i] = BytVec::create_imm(
+				ctx->REGSIZE,
+				value);
+		}
 		expr_walk(vis,nstate->reg[i]);
 	}
 	for(i = 0; i < ctx->num_flag; i++) {
@@ -327,6 +336,19 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			uint64_t next_pc = var[solexpr_pc];
 			info("next pc %lx\n",next_pc);
 
+			auto exclude_cond = cond_not(
+				cond_eq(
+					next_reg[ctx->REGIDX_PC],
+					BytVec::create_imm(4,next_pc)));
+			expr_walk(trans_vis,exclude_cond);
+			cons.push_back(exclude_cond->solver_cond);
+
+			//for "test" bound
+			if(next_pc < 0x10000 || next_pc >= 0x20000) {
+				info("touch bound, ignore\n");
+				continue;
+			}
+
 			nstate = ref<State>(next_pc,cstate->probe);
 			nstate->mem = next_mem;
 			for(i = 0; i < ctx->num_reg; i++) {
@@ -336,13 +358,6 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 				nstate->flag[i] = next_flag[i];
 			}
 			ctx->state.push(nstate);
-
-			auto exclude_cond = cond_not(
-				cond_eq(
-					next_reg[ctx->REGIDX_PC],
-					BytVec::create_imm(4,next_pc)));
-			expr_walk(trans_vis,exclude_cond);
-			cons.push_back(exclude_cond->solver_cond);
 		}
 
 		delete trans_vis;
