@@ -9,7 +9,6 @@
 #include"context.h"
 #include"expr.h"
 #include"state.h"
-#include"solver.h"
 
 using namespace symx;
 
