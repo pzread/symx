@@ -297,6 +297,10 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			cblk = blk_it->second;
 		}
 
+		cons.clear();
+		var.clear();
+		selrec.clear();
+
 		auto build_vis = new BuildVisitor(cstate);
 		expr_walk(build_vis,cblk->mem);
 		next_mem = build_vis->get_expr(cblk->mem);
@@ -308,7 +312,6 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			expr_walk(build_vis,cblk->flag[i]);
 			next_flag[i] = build_vis->get_cond(cblk->flag[i]);
 		}
-		selrec.clear();
 		selrec.insert(
 			cstate->select_record.begin(),
 			cstate->select_record.end());
@@ -325,16 +328,18 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		}
 
 		auto solexpr_pc = next_reg[ctx->REGIDX_PC]->solver_expr;
-		cons.clear();
 		for(i = 0;i < cstate->constraint.size();i++) {
 			expr_walk(trans_vis,cstate->constraint[i]);
 			cons.push_back(cstate->constraint[i]->solver_cond);
 		}
-		var.clear();
 		var[solexpr_pc] = 0;
 		for(i = 0;i < cstate->symbol.size();i++) {
 			expr_walk(trans_vis,cstate->symbol[i]);
 			var[cstate->symbol[i]->solver_expr] = 0;
+		}
+		for(auto it = selrec.begin();it != selrec.end();it++) {
+			auto rec = it->get();
+			var[rec->idx->solver_expr] = 0;
 		}
 		while(true) {
 			if(!solver->solve(cons,&var)) {
@@ -347,6 +352,11 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 				info("  sym\t%d: 0x%lx\n",
 					cstate->symbol[i]->id,
 					var[cstate->symbol[i]->solver_expr]);
+			}
+			for(auto it = selrec.begin();it != selrec.end();it++) {
+				auto rec = it->get();
+				dbg("  selidx: 0x%lx\n",
+					var[rec->idx->solver_expr]);
 			}
 			auto exclude_cond = cond_not(
 				cond_eq(
@@ -379,6 +389,9 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			nstate->symbol.assign(
 				cstate->symbol.begin(),
 				cstate->symbol.end());
+			nstate->select_record.insert(
+				selrec.begin(),
+				selrec.end());
 
 			ctx->state.push(nstate);
 		}
