@@ -25,6 +25,37 @@ AddrSpace::AddrSpace(Context *_ctx,refProbe _probe) : ctx(_ctx),probe(_probe) {
 refExpr AddrSpace::get_mem() const {
 	return mem;
 }
+int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
+	int ret = 0;
+	unsigned int i;
+	uint64_t cur;
+	unsigned int off;
+	uint8_t buf[1];
+
+	cur = idx;
+	while(cur < idx + size) {
+		auto page_it = page_map.find(cur & ~(PAGE_SIZE - 1));
+		if(page_it == page_map.end()) {
+			err("page out bound\n");
+		}
+		auto bitmap = page_it->second;
+		off = cur & (PAGE_SIZE - 1);
+		cur = (cur & ~(PAGE_SIZE - 1)); 
+		for(i = off; i < PAGE_SIZE && (cur + i) < (idx + size); i++) {
+			if(bitmap.test(i)) {
+				continue;
+			}
+			if(probe->read_mem(
+				cur + i,buf,sizeof(*buf)) != 1) {
+				err("read page out bound\n");
+			}
+			bitmap.set(i);
+			ret = 1;
+		}
+		cur = cur + PAGE_SIZE;
+	}
+	return ret;
+}
 
 class PrintVisitor : public ExprVisitor {
 	public:
@@ -377,8 +408,9 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 				it++
 			) {
 				auto rec = it->get();
-				dbg("  selidx: 0x%lx\n",
-					var[rec->idx->solver_expr]);
+				auto selidx = var[rec->idx->solver_expr];
+				dbg("  selidx: 0x%lx\n",selidx);
+				addrsp.handle_select(selidx,rec->size);
 			}
 			auto exclude_cond = cond_not(
 				cond_eq(

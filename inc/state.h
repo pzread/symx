@@ -44,6 +44,7 @@ class AddrSpace {
 	public:
 		AddrSpace(Context *ctx,refProbe _probe);
 		refExpr get_mem() const;
+		int handle_select(const uint64_t idx,const unsigned int size);
 	private:
 		Context *ctx;
 		refProbe probe;
