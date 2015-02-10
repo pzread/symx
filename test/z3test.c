@@ -10,6 +10,7 @@ int main(){
 	Z3_solver solver;
 	Z3_sort bvsort1;
 	Z3_sort bvsort4;
+	Z3_sort memsort;
 	Z3_ast x_ast,y_ast,z_ast,u_ast,v_ast,w_ast,test_ast;
 	Z3_model model;
 
@@ -24,27 +25,31 @@ int main(){
 	bvsort1 = Z3_mk_bv_sort(context,8);
 	bvsort4 = Z3_mk_bv_sort(context,32);
 
-	x_ast = Z3_mk_const(context,Z3_mk_int_symbol(context,1),bvsort4);
-	Z3_inc_ref(context,x_ast);
-	y_ast = Z3_mk_unsigned_int64(context,67,bvsort4);
+	memsort = Z3_mk_array_sort(context,bvsort4,bvsort1);
+	y_ast = Z3_mk_const(context,Z3_mk_string_symbol(context,"mem"),memsort);
 	Z3_inc_ref(context,y_ast);
-	z_ast = Z3_mk_unsigned_int64(context,289,bvsort4);
-	Z3_inc_ref(context,z_ast);
 
-	u_ast = Z3_mk_const(context,Z3_mk_int_symbol(context,2),bvsort4);
+	u_ast = Z3_mk_unsigned_int64(context,13,bvsort4);
 	Z3_inc_ref(context,u_ast);
-	v_ast = Z3_mk_unsigned_int64(context,2501,bvsort4);
+	v_ast = Z3_mk_select(context,y_ast,u_ast);
 	Z3_inc_ref(context,v_ast);
-	w_ast = Z3_mk_eq(context,u_ast,v_ast);
-	Z3_inc_ref(context,w_ast);
 
-	Z3_dec_ref(context,u_ast);
-	Z3_dec_ref(context,v_ast);
+	z_ast = Z3_mk_unsigned_int64(context,7,bvsort1);
+	Z3_inc_ref(context,z_ast);
+	test_ast = Z3_mk_eq(context,v_ast,z_ast);
+	Z3_inc_ref(context,test_ast);
+	Z3_solver_assert(context,solver,test_ast);
 
-	u_ast = Z3_mk_ite(context,w_ast,y_ast,z_ast);
-	Z3_inc_ref(context,u_ast);
+	w_ast = Z3_mk_const(context,Z3_mk_string_symbol(context,"w"),bvsort1);
+	y_ast = Z3_mk_store(context,y_ast,u_ast,w_ast);
+	Z3_inc_ref(context,y_ast);
 
-	test_ast = Z3_mk_eq(context,x_ast,u_ast);
+	v_ast = Z3_mk_select(context,y_ast,u_ast);
+	Z3_inc_ref(context,v_ast);
+
+	z_ast = Z3_mk_unsigned_int64(context,2,bvsort1);
+	Z3_inc_ref(context,z_ast);
+	test_ast = Z3_mk_eq(context,v_ast,z_ast);
 	Z3_inc_ref(context,test_ast);
 	Z3_solver_assert(context,solver,test_ast);
 
