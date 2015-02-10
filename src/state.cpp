@@ -4,6 +4,7 @@
 #include<string>
 #include<unordered_map>
 #include<vector>
+#include<bitset>
 
 #include"utils.h"
 #include"context.h"
@@ -13,6 +14,17 @@
 using namespace symx;
 
 namespace symx {
+
+AddrSpace::AddrSpace(Context *_ctx,refProbe _probe) : ctx(_ctx),probe(_probe) {
+	mem = BytMem::create_var(ctx);
+	auto mem_map = probe->get_mem_map();
+	for(auto it = mem_map.begin(); it != mem_map.end(); it++) {
+		page_map[it->start] = std::bitset<PAGE_SIZE>();
+	}
+}
+refExpr AddrSpace::get_mem() const {
+	return mem;
+}
 
 class PrintVisitor : public ExprVisitor {
 	public:
@@ -220,9 +232,9 @@ int BuildVisitor::post_visit(symx::refCond cond) {
 	return 1;
 }
 
-refBlock state_create_block(Context *ctx) {
+refBlock state_create_block(Context *ctx,const uint64_t pc) {
 	unsigned int i;
-	refBlock blk =  ref<Block>();
+	refBlock blk = ref<Block>(pc);
 
 	blk->mem = BytMem::create_dangle(-1);
 	for(i = 0; i < ctx->num_reg; i++) {
@@ -233,14 +245,19 @@ refBlock state_create_block(Context *ctx) {
 	}
 	return blk;
 }
-static refState create_static_state(Context *ctx,refProbe probe,uint64_t pc) {
+static refState create_static_state(
+	Context *ctx,
+	refProbe probe,
+	const AddrSpace &addrsp,
+	uint64_t pc
+) {
 	unsigned int i;
 	uint64_t value;
 	bool symbol;
 	auto nstate = ref<State>(pc,probe);
 	auto vis = ctx->solver->create_translator();
 
-	nstate->mem = BytMem::create_var(ctx);
+	nstate->mem = addrsp.get_mem();
 	expr_walk(vis,nstate->mem);
 	for(i = 0; i < ctx->num_reg; i++) {
 		value = probe->read_reg(i,&symbol);
@@ -270,6 +287,7 @@ static refState create_static_state(Context *ctx,refProbe probe,uint64_t pc) {
 int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 	unsigned int i;
 	Solver *solver = ctx->solver;
+	AddrSpace addrsp(ctx,probe);
 	refState nstate,cstate;
 	refBlock cblk;
 	std::unordered_map<unsigned int,refSolvExpr> solver_reg;
@@ -281,7 +299,7 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 	refCond next_flag[64];
 	std::unordered_set<refMemRecord> selrec;
 
-	nstate = create_static_state(ctx,probe,pc);
+	nstate = create_static_state(ctx,probe,addrsp,pc);
 	ctx->state.push(nstate);
 
 	while(!ctx->state.empty()) {
@@ -320,24 +338,24 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 
 		auto trans_vis = solver->create_translator();
 		expr_walk(trans_vis,next_mem);
-		for(i = 0;i < ctx->num_reg;i++) {
+		for(i = 0; i < ctx->num_reg; i++) {
 			expr_walk(trans_vis,next_reg[i]);
 		}
-		for(i = 0;i < ctx->num_flag;i++) {
+		for(i = 0; i < ctx->num_flag; i++) {
 			expr_walk(trans_vis,next_flag[i]);
 		}
 
 		auto solexpr_pc = next_reg[ctx->REGIDX_PC]->solver_expr;
-		for(i = 0;i < cstate->constraint.size();i++) {
+		for(i = 0; i < cstate->constraint.size(); i++) {
 			expr_walk(trans_vis,cstate->constraint[i]);
 			cons.push_back(cstate->constraint[i]->solver_cond);
 		}
 		var[solexpr_pc] = 0;
-		for(i = 0;i < cstate->symbol.size();i++) {
+		for(i = 0; i < cstate->symbol.size(); i++) {
 			expr_walk(trans_vis,cstate->symbol[i]);
 			var[cstate->symbol[i]->solver_expr] = 0;
 		}
-		for(auto it = selrec.begin();it != selrec.end();it++) {
+		for(auto it = selrec.begin(); it != selrec.end(); it++) {
 			auto rec = it->get();
 			var[rec->idx->solver_expr] = 0;
 		}
@@ -353,7 +371,11 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 					cstate->symbol[i]->id,
 					var[cstate->symbol[i]->solver_expr]);
 			}
-			for(auto it = selrec.begin();it != selrec.end();it++) {
+			for(
+				auto it = selrec.begin();
+				it != selrec.end();
+				it++
+			) {
 				auto rec = it->get();
 				dbg("  selidx: 0x%lx\n",
 					var[rec->idx->solver_expr]);

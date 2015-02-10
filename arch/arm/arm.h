@@ -1,4 +1,6 @@
 #include<stdint.h>
+#include<unistd.h>
+#include<vector>
 
 #include"context.h"
 #include"state.h"
@@ -22,16 +24,18 @@ typedef std::shared_ptr<ARMProbe> refARMProbe;
 
 class ARMProbe : public symx::Probe {
 	public:
+		pid_t pid;
 		uint8_t *bin;
 		uint64_t off;
-		ARMProbe(const int fd,const uint64_t _off);
+
+		ARMProbe(pid_t _pid,int fd,uint64_t _off);
 		uint64_t read_reg(const unsigned int regid,bool *symbol);
 		bool read_flag(const unsigned int flagid);
 		ssize_t read_mem(
 			const uint64_t addr,
 			const uint8_t *buf,
-			const size_t len
-		);
+			const size_t len);
+		std::vector<symx::MemPage> get_mem_map();
 };
 class ARMContext : public symx::Context {
 	public:

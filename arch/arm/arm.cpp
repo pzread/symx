@@ -8,6 +8,7 @@
 #include<sys/mman.h>
 #include<capstone/arm.h>
 #include<memory>
+#include<vector>
 
 #include"utils.h"
 #include"context.h"
@@ -29,7 +30,7 @@ int initialize() {
         return 0;
 }
 
-ARMProbe::ARMProbe(const int fd,const uint64_t _off) : off(_off) {
+ARMProbe::ARMProbe(pid_t _pid,int fd,uint64_t _off) : pid(_pid),off(_off) {
 	struct stat st;
 	fstat(fd,&st);
 	bin = (uint8_t*)mmap(NULL,st.st_size,PROT_READ,MAP_PRIVATE,fd,0);
@@ -95,6 +96,11 @@ ssize_t ARMProbe::read_mem(
 ) {
 	memcpy((void*)buf,(void*)(bin + off + addr),len);
 	return len;
+}
+std::vector<MemPage> ARMProbe::get_mem_map() {
+	std::vector<MemPage> mem_map;
+	mem_map.push_back(MemPage(0x10000,PAGE_READ | PAGE_EXEC));
+	return mem_map;
 }
 
 ARMContext::ARMContext(Solver *_solver) : Context(
@@ -310,13 +316,10 @@ static refCond get_cc_cond(
 	}
 	return ret_cond;
 }
-refBlock ARMContext::interpret(
-	refProbe _probe,
-	uint64_t pc
-) {
+refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 	int i;
 	refARMProbe probe = std::dynamic_pointer_cast<ARMProbe>(_probe);
-        refBlock blk = state_create_block(this);
+        refBlock blk = state_create_block(this,pc);
 	cs_insn *insn,*ins;
         size_t count;
         size_t idx;
@@ -447,6 +450,7 @@ refBlock ARMContext::interpret(
 				cond_xor(cond_sl(expr_neg(xrs),imm40),cdt));
 			break;
 		case ARM_INS_TBB:
+			err("hang");
 			xrs = get_op_expr(blk,&ops[0],pc);
 			xrt = expr_zext(expr_select(blk->mem,xrs,1),4);
 			nr[ARM_REG_PC] = expr_add(get_relative_pc(pc),xrt);

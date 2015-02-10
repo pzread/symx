@@ -2,14 +2,21 @@
 #include<capstone/capstone.h>
 #include<memory>
 #include<queue>
+#include<vector>
 #include<unordered_map>
 
 #ifndef _CONTEXT_H_
 #define _CONTEXT_H_
 
+#define PAGE_READ	0x1
+#define PAGE_WRITE	0x2
+#define PAGE_EXEC	0x4
+#define PAGE_SIZE 	0x1000
+
 namespace symx {
 	using namespace symx;
 
+	class MemPage;
 	class State;
 	class Block;
 	class Probe;
@@ -39,6 +46,7 @@ namespace symx {
 				const uint8_t *buf,
 				const size_t len
 			) = 0;
+			virtual std::vector<MemPage> get_mem_map() = 0;
 	};
 	class Context {
 		public:

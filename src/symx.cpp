@@ -29,7 +29,7 @@ int main() {
 	
 	//<main> block emit test
 	arm::initialize();
-	auto probe = ref<arm::ARMProbe>(binfd,-0x10000);
+	auto probe = ref<arm::ARMProbe>(-1,binfd,-0x10000);
 	state_executor(ctx,probe,0x1034C);
 
 	return 0;
