@@ -99,6 +99,12 @@ refCond BuildVisitor::get_cond(const refCond cond) {
 	}
 	return it->second;
 }
+int BuildVisitor::get_mem_record(
+	std::unordered_set<refMemRecord> *selrec
+) {
+	selrec->insert(select_record.begin(),select_record.end());
+	return 0;
+}
 int BuildVisitor::pre_visit(symx::refBytVec vec) {
 	if(expr_map.find(vec) != expr_map.end()) {
 		return 0;
@@ -273,6 +279,7 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 	refExpr next_mem;
 	refExpr next_reg[256];
 	refCond next_flag[64];
+	std::unordered_set<refMemRecord> selrec;
 
 	nstate = create_static_state(ctx,probe,pc);
 	ctx->state.push(nstate);
@@ -301,7 +308,11 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			expr_walk(build_vis,cblk->flag[i]);
 			next_flag[i] = build_vis->get_cond(cblk->flag[i]);
 		}
-		dbg("%d\n",build_vis->select_record.size());
+		selrec.clear();
+		selrec.insert(
+			cstate->select_record.begin(),
+			cstate->select_record.end());
+		build_vis->get_mem_record(&selrec);
 		delete build_vis;
 
 		auto trans_vis = solver->create_translator();

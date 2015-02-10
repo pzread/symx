@@ -43,6 +43,7 @@ class State : public BaseState {
 		refProbe probe;
 		std::vector<refBytVec> symbol;
 		std::vector<refCond> constraint;
+		std::unordered_set<refMemRecord> select_record;
 		State(const uint64_t _pc,refProbe _probe)
 			: pc(_pc),probe(_probe) {}
 };
@@ -55,10 +56,11 @@ class Block : public BaseState {
 class TransVisitor : public symx::ExprVisitor {};
 class BuildVisitor : public ExprVisitor {
 	public:
-		std::unordered_set<refMemRecord> select_record;
 		BuildVisitor(const refState _state) : state(_state) {}
 		refExpr get_expr(const refExpr expr);
 		refCond get_cond(const refCond cond);
+		int get_mem_record(
+			std::unordered_set<refMemRecord> *selrec);
 		int pre_visit(symx::refBytVec vec);
 		int pre_visit(symx::refBytMem mem);
 		int pre_visit(symx::refOperator oper);
@@ -71,6 +73,7 @@ class BuildVisitor : public ExprVisitor {
 		const refState state;
 		std::unordered_map<refExpr,refExpr> expr_map;
 		std::unordered_map<refCond,refCond> cond_map;
+		std::unordered_set<refMemRecord> select_record;
 };
 
 refBlock state_create_block(Context *ctx);
