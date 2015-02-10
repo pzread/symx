@@ -142,11 +142,13 @@ int BuildVisitor::post_visit(symx::refBytMem mem) {
 int BuildVisitor::post_visit(symx::refOperator oper) {
 	switch(oper->type) {
 	case ExprOpSelect:
-		expr_map[oper] = expr_select(
-			expr_map[oper->operand[0]],
-			expr_map[oper->operand[1]],
-			oper->size);
+	{
+		auto mem = expr_map[oper->operand[0]];
+		auto idx = expr_map[oper->operand[1]];
+		expr_map[oper] = expr_select(mem,idx,oper->size);
+		select_record.insert(ref<MemRecord>(mem,idx,oper->size));
 		break;
+	}
 	case ExprOpExtract:
 		expr_map[oper] = expr_extract(
 			expr_map[oper->operand[0]],
@@ -278,7 +280,7 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 	while(!ctx->state.empty()) {
 		cstate = ctx->state.front();
 		ctx->state.pop();
-		info("run state %x\n",cstate->pc);
+		info("\e[1;32mrun state 0x%x\e[m\n",cstate->pc);
 
 		auto blk_it = ctx->block.find(cstate->pc);
 		if(blk_it == ctx->block.end()) {
@@ -299,6 +301,7 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			expr_walk(build_vis,cblk->flag[i]);
 			next_flag[i] = build_vis->get_cond(cblk->flag[i]);
 		}
+		dbg("%d\n",build_vis->select_record.size());
 		delete build_vis;
 
 		auto trans_vis = solver->create_translator();

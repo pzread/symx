@@ -1,4 +1,6 @@
 #include<memory>
+#include<unordered_map>
+#include<unordered_set>
 
 #include"utils.h"
 #include"expr.h"
@@ -11,11 +13,24 @@ namespace symx {
 
 using namespace symx;
 
+class MemRecord;
 class Block;
 class State;
+typedef std::shared_ptr<MemRecord> refMemRecord;
 typedef std::shared_ptr<Block> refBlock;
 typedef std::shared_ptr<State> refState;
 
+class MemRecord {
+	public:
+		const refExpr mem;
+		const refExpr idx;
+		const unsigned int size;
+		MemRecord(
+			const refExpr _mem,
+			const refExpr _idx,
+			const unsigned int _size
+		) : mem(_mem),idx(_idx),size(_size) {}
+};
 class BaseState {
 	public:
 		refExpr mem;
@@ -40,6 +55,7 @@ class Block : public BaseState {
 class TransVisitor : public symx::ExprVisitor {};
 class BuildVisitor : public ExprVisitor {
 	public:
+		std::unordered_set<refMemRecord> select_record;
 		BuildVisitor(const refState _state) : state(_state) {}
 		refExpr get_expr(const refExpr expr);
 		refCond get_cond(const refCond cond);
