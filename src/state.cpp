@@ -32,19 +32,27 @@ int AddrSpace::update_constraint(std::unordered_set<refCond> *cons) {
 }
 int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 	int ret = 0;
-	uint64_t pos;
+	uint64_t pos,base;
 	unsigned int off;
 	uint8_t buf[1];
 	refExpr val;
+	std::map<uint64_t,std::bitset<PAGE_SIZE>>::iterator page_it;
 
 	pos = idx;
 	while(pos < (idx + size)) {
-		auto page_it = page_map.find(pos & ~(PAGE_SIZE - 1));
-		if(page_it == page_map.end()) {
-			err("page out bound\n");
-		}
-		auto bitmap = page_it->second;
+		base = pos & ~(PAGE_SIZE - 1);
 		off = pos & (PAGE_SIZE - 1);
+
+		page_it = page_map.find(base);
+		if(page_it == page_map.end()) {
+			//err("page out bound\n");
+			//for test
+			page_it = page_map.insert(
+				std::make_pair(
+					base,std::bitset<PAGE_SIZE>())).first;
+		}
+
+		auto bitmap = page_it->second;
 		for(; off < PAGE_SIZE && pos < (idx + size); off++,pos++) {
 			if(bitmap.test(off)) {
 				continue;
@@ -337,7 +345,9 @@ static void exclude_pc(
 	const uint64_t pc
 ) {
 	cons->insert(cond_not(
-		cond_eq(regs[ctx->REGIDX_PC],BytVec::create_imm(4,pc))));
+		cond_eq(
+			regs[ctx->REGIDX_PC],
+			BytVec::create_imm(ctx->REGSIZE,pc))));
 }
 int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 	unsigned int i;
@@ -371,6 +381,7 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		}
 
 		cons.clear();
+		solvcons.clear();
 		var.clear();
 		selrec.clear();
 

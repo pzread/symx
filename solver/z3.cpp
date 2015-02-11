@@ -442,7 +442,6 @@ namespace z3_solver {
 		for(auto it = cons.begin(); it != cons.end(); it++) {
 			auto cond = std::static_pointer_cast<Z3SolvCond>(*it);
 			Z3_solver_assert(context,solver,cond->ast);
-			dbg("%s\n",Z3_ast_to_string(context,cond->ast));
 		}
 		if(Z3_solver_check(context,solver) != Z3_TRUE) {
 			return false;
