@@ -1,6 +1,7 @@
 #include<z3.h>
 #include<memory>
 #include<unordered_map>
+#include<unordered_set>
 #include"utils.h"
 #include"context.h"
 #include"expr.h"
@@ -47,7 +48,8 @@ namespace z3_solver {
 			Z3Solver();
 			symx::TransVisitor* create_translator();
 			bool solve(
-				const std::vector<symx::refSolvCond> &cons,
+				const std::unordered_set
+					<symx::refSolvCond> &cons,
 				std::unordered_map
 					<symx::refSolvExpr,uint64_t> *var
 			);

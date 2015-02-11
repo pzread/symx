@@ -44,12 +44,15 @@ class AddrSpace {
 	public:
 		AddrSpace(Context *ctx,refProbe _probe);
 		refExpr get_mem() const;
+		int update_constraint(std::unordered_set<refCond> *cons);
 		int handle_select(const uint64_t idx,const unsigned int size);
 	private:
 		Context *ctx;
 		refProbe probe;
 		refExpr mem;
 		std::map<uint64_t,std::bitset<PAGE_SIZE>> page_map;
+		std::vector<refExpr> mem_symbol;
+		std::unordered_set<refCond> mem_constraint;
 };
 class BaseState {
 	public:
@@ -62,7 +65,7 @@ class State : public BaseState {
 		uint64_t pc;
 		refProbe probe;
 		std::vector<refBytVec> symbol;
-		std::vector<refCond> constraint;
+		std::unordered_set<refCond> constraint;
 		std::unordered_set<refMemRecord> select_record;
 		State(const uint64_t _pc,refProbe _probe)
 			: pc(_pc),probe(_probe) {}

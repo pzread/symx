@@ -4,6 +4,7 @@
 #include<queue>
 #include<vector>
 #include<unordered_map>
+#include<unordered_set>
 
 #ifndef _CONTEXT_H_
 #define _CONTEXT_H_
@@ -31,7 +32,7 @@ namespace symx {
 		public:
 			virtual TransVisitor* create_translator() = 0;
 			virtual bool solve(
-				const std::vector<refSolvCond> &cons,
+				const std::unordered_set<refSolvCond> &cons,
 				std::unordered_map<refSolvExpr,uint64_t> *var
 			) = 0;
 	};

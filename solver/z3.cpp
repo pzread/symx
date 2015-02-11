@@ -431,17 +431,18 @@ namespace z3_solver {
 		return new Z3TransVisitor(this);
 	}
 	bool Z3Solver::solve(
-			const std::vector<symx::refSolvCond> &cons,
-			std::unordered_map<refSolvExpr,uint64_t> *var
+		const std::unordered_set<refSolvCond> &cons,
+		std::unordered_map<refSolvExpr,uint64_t> *var
 	) {
 		refZ3SolvExpr expr;
 		Z3_model model;
 		Z3_ast res_ast;
 
 		Z3_solver_reset(context,solver);
-		for(auto it = cons.begin();it != cons.end();it++) {
+		for(auto it = cons.begin(); it != cons.end(); it++) {
 			auto cond = std::static_pointer_cast<Z3SolvCond>(*it);
 			Z3_solver_assert(context,solver,cond->ast);
+			dbg("%s\n",Z3_ast_to_string(context,cond->ast));
 		}
 		if(Z3_solver_check(context,solver) != Z3_TRUE) {
 			return false;
@@ -450,7 +451,7 @@ namespace z3_solver {
 		model = Z3_solver_get_model(context,solver);
 		Z3_model_inc_ref(context,model);
 		
-		for(auto it = var->begin();it != var->end();it++) {
+		for(auto it = var->begin(); it != var->end(); it++) {
 			expr = std::static_pointer_cast
 				<Z3SolvExpr>(it->first);
 			if(Z3_model_eval(

@@ -5,6 +5,7 @@
 #include<unordered_map>
 #include<vector>
 #include<bitset>
+#include<iterator>
 
 #include"utils.h"
 #include"context.h"
@@ -25,35 +26,49 @@ AddrSpace::AddrSpace(Context *_ctx,refProbe _probe) : ctx(_ctx),probe(_probe) {
 refExpr AddrSpace::get_mem() const {
 	return mem;
 }
+int AddrSpace::update_constraint(std::unordered_set<refCond> *cons) {
+	cons->insert(mem_constraint.begin(),mem_constraint.end());
+	return 0;
+}
 int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 	int ret = 0;
-	unsigned int i;
-	uint64_t cur;
+	uint64_t pos;
 	unsigned int off;
 	uint8_t buf[1];
+	refExpr val;
 
-	cur = idx;
-	while(cur < idx + size) {
-		auto page_it = page_map.find(cur & ~(PAGE_SIZE - 1));
+	pos = idx;
+	while(pos < (idx + size)) {
+		auto page_it = page_map.find(pos & ~(PAGE_SIZE - 1));
 		if(page_it == page_map.end()) {
 			err("page out bound\n");
 		}
 		auto bitmap = page_it->second;
-		off = cur & (PAGE_SIZE - 1);
-		cur = (cur & ~(PAGE_SIZE - 1)); 
-		for(i = off; i < PAGE_SIZE && (cur + i) < (idx + size); i++) {
-			if(bitmap.test(i)) {
+		off = pos & (PAGE_SIZE - 1);
+		for(; off < PAGE_SIZE && pos < (idx + size); off++,pos++) {
+			if(bitmap.test(off)) {
 				continue;
 			}
-			if(probe->read_mem(
-				cur + i,buf,sizeof(*buf)) != 1) {
-				err("read page out bound\n");
+
+			if(probe->read_mem(pos,buf,sizeof(*buf)) != 1) {
+				//err("read page out bound\n");
+				//for test
+				val = BytVec::create_var(1,ctx);
+				mem_symbol.push_back(val);
+			} else {
+				val = BytVec::create_imm(1,buf[0]);
 			}
-			bitmap.set(i);
+			auto byte = expr_select(
+				mem,
+				BytVec::create_imm(ctx->REGSIZE,pos),
+				1);
+			mem_constraint.insert(cond_eq(byte,val));
+
+			bitmap.set(off);
 			ret = 1;
 		}
-		cur = cur + PAGE_SIZE;
 	}
+
 	return ret;
 }
 
@@ -315,19 +330,28 @@ static refState create_static_state(
 	delete vis;
 	return nstate;
 }
+static void exclude_pc(
+	const Context *ctx,
+	std::unordered_set<refCond> *cons,
+	const refExpr regs[],
+	const uint64_t pc
+) {
+	cons->insert(cond_not(
+		cond_eq(regs[ctx->REGIDX_PC],BytVec::create_imm(4,pc))));
+}
 int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 	unsigned int i;
 	Solver *solver = ctx->solver;
 	AddrSpace addrsp(ctx,probe);
 	refState nstate,cstate;
 	refBlock cblk;
-	std::unordered_map<unsigned int,refSolvExpr> solver_reg;
-	std::unordered_map<unsigned int,refSolvCond> solver_flag;
-	std::vector<refSolvCond> cons;
+	std::unordered_set<refCond> cons;
+	std::unordered_set<refSolvCond> solvcons;
 	std::unordered_map<refSolvExpr,uint64_t> var;
 	refExpr next_mem;
 	refExpr next_reg[256];
 	refCond next_flag[64];
+	uint64_t next_pc;
 	std::unordered_set<refMemRecord> selrec;
 
 	nstate = create_static_state(ctx,probe,addrsp,pc);
@@ -368,63 +392,72 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		delete build_vis;
 
 		auto trans_vis = solver->create_translator();
+		//initialize reg, flag, constraint
 		expr_walk(trans_vis,next_mem);
-		for(i = 0; i < ctx->num_reg; i++) {
-			expr_walk(trans_vis,next_reg[i]);
-		}
-		for(i = 0; i < ctx->num_flag; i++) {
-			expr_walk(trans_vis,next_flag[i]);
-		}
+		expr_iter_walk(trans_vis,next_reg,next_reg + ctx->num_reg);
+		expr_iter_walk(trans_vis,next_flag,next_flag + ctx->num_flag);
+		cons.insert(
+			cstate->constraint.begin(),
+			cstate->constraint.end());
+		addrsp.update_constraint(&cons);
 
-		auto solexpr_pc = next_reg[ctx->REGIDX_PC]->solver_expr;
-		for(i = 0; i < cstate->constraint.size(); i++) {
-			expr_walk(trans_vis,cstate->constraint[i]);
-			cons.push_back(cstate->constraint[i]->solver_cond);
-		}
-		var[solexpr_pc] = 0;
+		//initialize solver variable
+		auto solvexpr_pc = next_reg[ctx->REGIDX_PC]->solver_expr;
+		var[solvexpr_pc] = 0;
 		for(i = 0; i < cstate->symbol.size(); i++) {
 			expr_walk(trans_vis,cstate->symbol[i]);
 			var[cstate->symbol[i]->solver_expr] = 0;
 		}
 		for(auto it = selrec.begin(); it != selrec.end(); it++) {
-			auto rec = it->get();
-			var[rec->idx->solver_expr] = 0;
+			var[(*it)->idx->solver_expr] = 0;
 		}
+
 		while(true) {
-			if(!solver->solve(cons,&var)) {
+			//Translate constraint
+			expr_iter_walk(trans_vis,cons.begin(),cons.end());
+			for(auto it = cons.begin(); it != cons.end(); it++) {
+				solvcons.insert((*it)->solver_cond);
+			}
+			if(!solver->solve(solvcons,&var)) {
 				break;	
 			}
-
-			uint64_t next_pc = var[solexpr_pc];
-			info("next pc 0x%lx\n",next_pc);
-			for(i = 0;i < cstate->symbol.size();i++) {
-				info("  sym\t%d: 0x%lx\n",
-					cstate->symbol[i]->id,
-					var[cstate->symbol[i]->solver_expr]);
-			}
-			for(
-				auto it = selrec.begin();
-				it != selrec.end();
-				it++
-			) {
-				auto rec = it->get();
-				auto selidx = var[rec->idx->solver_expr];
-				dbg("  selidx: 0x%lx\n",selidx);
-				addrsp.handle_select(selidx,rec->size);
-			}
-			auto exclude_cond = cond_not(
-				cond_eq(
-					next_reg[ctx->REGIDX_PC],
-					BytVec::create_imm(4,next_pc)));
-			expr_walk(trans_vis,exclude_cond);
-			cons.push_back(exclude_cond->solver_cond);
+			next_pc = var[solvexpr_pc];
 
 			//for "test" bound
 			if(next_pc < 0x10000 || next_pc >= 0x20000) {
 				info("touch bound, ignore\n");
+				exclude_pc(ctx,&cons,next_reg,next_pc);
 				continue;
 			}
 
+			//update address space
+			bool addrsp_update = false;
+			for(auto it = selrec.begin();
+				it != selrec.end();
+				it++
+			) {
+				auto selidx = var[(*it)->idx->solver_expr];
+				dbg("  selidx: 0x%lx\n",selidx);
+				if(addrsp.handle_select(
+					selidx,(*it)->size) == 1
+				) {
+					addrsp_update = true;	
+				}
+			}
+			if(addrsp_update) {
+				addrsp.update_constraint(&cons);
+				continue;
+			}
+
+			//show message
+			info("next pc 0x%lx\n",next_pc);
+			for(i = 0; i < cstate->symbol.size(); i++) {
+				info("  sym\t%d: 0x%lx\n",
+					cstate->symbol[i]->id,
+					var[cstate->symbol[i]->solver_expr]);
+			}
+
+			//create next state
 			nstate = ref<State>(next_pc,cstate->probe);
 			nstate->mem = next_mem;
 			for(i = 0; i < ctx->num_reg; i++) {
@@ -433,13 +466,13 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			for(i = 0; i < ctx->num_flag; i++) {
 				nstate->flag[i] = next_flag[i];
 			}
-			nstate->constraint.assign(
+			nstate->constraint.insert(
 				cstate->constraint.begin(),
 				cstate->constraint.end());
 			auto pc_cond = cond_eq(
 				nstate->reg[ctx->REGIDX_PC],
 				BytVec::create_imm(4,next_pc));
-			nstate->constraint.push_back(pc_cond);
+			nstate->constraint.insert(pc_cond);
 			nstate->symbol.assign(
 				cstate->symbol.begin(),
 				cstate->symbol.end());
@@ -448,6 +481,8 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 				selrec.end());
 
 			ctx->state.push(nstate);
+
+			exclude_pc(ctx,&cons,next_reg,next_pc);
 		}
 
 		delete trans_vis;

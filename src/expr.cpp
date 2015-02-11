@@ -61,7 +61,6 @@ int expr_walk(ExprVisitor *visitor,refCond cond) {
 	}
 	return cond->post_accept(visitor);
 }
-
 static uint64_t get_next_varid(Context *ctx) {
 	ctx->last_var_id += 1;
 	return ctx->last_var_id;

@@ -305,6 +305,13 @@ class Cond : public std::enable_shared_from_this<Cond> {
 
 int expr_walk(ExprVisitor *visitor,refExpr expr);
 int expr_walk(ExprVisitor *visitor,refCond cond);
+template<class refIt>
+int expr_iter_walk(ExprVisitor *vis,refIt begin,refIt end) {
+	for(auto it = begin; it != end; it++) {
+		expr_walk(vis,*it);
+	}
+	return 0;
+}
 
 refExpr expr_store(const refExpr mem,const refExpr idx,const refExpr val);
 refExpr expr_select(
