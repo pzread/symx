@@ -12,6 +12,7 @@
 #define PAGE_READ	0x1
 #define PAGE_WRITE	0x2
 #define PAGE_EXEC	0x4
+#define PAGE_PROBE	0x8
 #define PAGE_SIZE 	0x1000
 
 namespace symx {

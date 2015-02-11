@@ -99,7 +99,7 @@ ssize_t ARMProbe::read_mem(
 }
 std::vector<MemPage> ARMProbe::get_mem_map() {
 	std::vector<MemPage> mem_map;
-	mem_map.push_back(MemPage(0x10000,PAGE_READ | PAGE_EXEC));
+	mem_map.push_back(MemPage(0x10000,PAGE_READ | PAGE_EXEC | PAGE_PROBE));
 	return mem_map;
 }
 

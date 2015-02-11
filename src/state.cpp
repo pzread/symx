@@ -20,7 +20,8 @@ AddrSpace::AddrSpace(Context *_ctx,refProbe _probe) : ctx(_ctx),probe(_probe) {
 	mem = BytMem::create_var(ctx);
 	auto mem_map = probe->get_mem_map();
 	for(auto it = mem_map.begin(); it != mem_map.end(); it++) {
-		page_map[it->start] = std::bitset<PAGE_SIZE>();
+		page_map.insert(
+			std::make_pair(it->start,MemPage(it->start,it->prot)));
 	}
 }
 refExpr AddrSpace::get_mem() const {
@@ -36,7 +37,7 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 	unsigned int off;
 	uint8_t buf[1];
 	refExpr val;
-	std::map<uint64_t,std::bitset<PAGE_SIZE>>::iterator page_it;
+	std::map<uint64_t,MemPage>::iterator page_it;
 
 	pos = idx;
 	while(pos < (idx + size)) {
@@ -47,32 +48,35 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 		if(page_it == page_map.end()) {
 			//err("page out bound\n");
 			//for test
+			auto page = MemPage(base,PAGE_READ | PAGE_WRITE);
 			page_it = page_map.insert(
-				std::make_pair(
-					base,std::bitset<PAGE_SIZE>())).first;
+				std::make_pair(base,page)).first;
 		}
 
-		auto bitmap = page_it->second;
+		auto &page = page_it->second;
 		for(; off < PAGE_SIZE && pos < (idx + size); off++,pos++) {
-			if(bitmap.test(off)) {
+			if(page.dirty.test(off)) {
 				continue;
 			}
-
-			if(probe->read_mem(pos,buf,sizeof(*buf)) != 1) {
-				//err("read page out bound\n");
+			
+			if(page.prot & PAGE_PROBE) {
+				if(probe->read_mem(pos,buf,sizeof(*buf)) != 1) {
+					err("read page failed\n");
+				}
+				val = BytVec::create_imm(1,buf[0]);
+			} else {
 				//for test
 				val = BytVec::create_var(1,ctx);
 				mem_symbol.push_back(val);
-			} else {
-				val = BytVec::create_imm(1,buf[0]);
 			}
+
 			auto byte = expr_select(
 				mem,
 				BytVec::create_imm(ctx->REGSIZE,pos),
 				1);
 			mem_constraint.insert(cond_eq(byte,val));
 
-			bitmap.set(off);
+			page.dirty.set(off);
 			ret = 1;
 		}
 	}

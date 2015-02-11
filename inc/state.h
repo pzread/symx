@@ -26,6 +26,7 @@ class MemPage {
 	public:
 		const uint64_t start;
 		const unsigned int prot;
+		std::bitset<PAGE_SIZE> dirty;
 		MemPage(const uint64_t _start,const unsigned int _prot)
 			: start(_start),prot(_prot) {}
 };
@@ -50,7 +51,7 @@ class AddrSpace {
 		Context *ctx;
 		refProbe probe;
 		refExpr mem;
-		std::map<uint64_t,std::bitset<PAGE_SIZE>> page_map;
+		std::map<uint64_t,MemPage> page_map;
 		std::vector<refExpr> mem_symbol;
 		std::unordered_set<refCond> mem_constraint;
 };
