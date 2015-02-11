@@ -450,7 +450,7 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 				cond_xor(cond_sl(expr_neg(xrs),imm40),cdt));
 			break;
 		case ARM_INS_TBB:
-			err("hang");
+			//err("hang");
 			xrs = get_op_expr(blk,&ops[0],pc);
 			xrt = expr_zext(expr_select(blk->mem,xrs,1),4);
 			nr[ARM_REG_PC] = expr_add(get_relative_pc(pc),xrt);

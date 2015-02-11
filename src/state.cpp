@@ -27,16 +27,12 @@ AddrSpace::AddrSpace(Context *_ctx,refProbe _probe) : ctx(_ctx),probe(_probe) {
 refExpr AddrSpace::get_mem() const {
 	return mem;
 }
-int AddrSpace::update_constraint(std::unordered_set<refCond> *cons) {
-	cons->insert(mem_constraint.begin(),mem_constraint.end());
-	return 0;
-}
 int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 	int ret = 0;
 	uint64_t pos,base;
 	unsigned int off;
 	uint8_t buf[1];
-	refExpr val;
+	refBytVec val;
 	std::map<uint64_t,MemPage>::iterator page_it;
 
 	pos = idx;
@@ -414,7 +410,9 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		cons.insert(
 			cstate->constraint.begin(),
 			cstate->constraint.end());
-		addrsp.update_constraint(&cons);
+		cons.insert(
+			addrsp.mem_constraint.begin(),
+			addrsp.mem_constraint.end());
 
 		//initialize solver variable
 		auto solvexpr_pc = next_reg[ctx->REGIDX_PC]->solver_expr;
@@ -422,6 +420,10 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 		for(i = 0; i < cstate->symbol.size(); i++) {
 			expr_walk(trans_vis,cstate->symbol[i]);
 			var[cstate->symbol[i]->solver_expr] = 0;
+		}
+		for(i = 0; i < addrsp.mem_symbol.size(); i++) {
+			expr_walk(trans_vis,addrsp.mem_symbol[i]);
+			var[addrsp.mem_symbol[i]->solver_expr] = 0;
 		}
 		for(auto it = selrec.begin(); it != selrec.end(); it++) {
 			var[(*it)->idx->solver_expr] = 0;
@@ -460,7 +462,9 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 				}
 			}
 			if(addrsp_update) {
-				addrsp.update_constraint(&cons);
+				cons.insert(
+					addrsp.mem_constraint.begin(),
+					addrsp.mem_constraint.end());
 				continue;
 			}
 
@@ -470,6 +474,11 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 				info("  sym\t%d: 0x%lx\n",
 					cstate->symbol[i]->id,
 					var[cstate->symbol[i]->solver_expr]);
+			}
+			for(i = 0; i < addrsp.mem_symbol.size(); i++) {
+				info("  sym\t%d: 0x%lx\n",
+					addrsp.mem_symbol[i]->id,
+					var[addrsp.mem_symbol[i]->solver_expr]);
 			}
 
 			//create next state

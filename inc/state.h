@@ -43,17 +43,16 @@ class MemRecord {
 };
 class AddrSpace {
 	public:
+		std::vector<refBytVec> mem_symbol;
+		std::unordered_set<refCond> mem_constraint;
 		AddrSpace(Context *ctx,refProbe _probe);
 		refExpr get_mem() const;
-		int update_constraint(std::unordered_set<refCond> *cons);
 		int handle_select(const uint64_t idx,const unsigned int size);
 	private:
 		Context *ctx;
 		refProbe probe;
 		refExpr mem;
 		std::map<uint64_t,MemPage> page_map;
-		std::vector<refExpr> mem_symbol;
-		std::unordered_set<refCond> mem_constraint;
 };
 class BaseState {
 	public:
