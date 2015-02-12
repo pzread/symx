@@ -349,6 +349,7 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
         cs_arm_op *ops;
 	bool end_flag;
 
+	bool branch_flag;
 	refExpr nr[ARM_REG_ENDING];
 	refExpr nm,xrd,xrs,xrt;
 	refCond nf[4];
@@ -383,6 +384,7 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
                 ops = det->operands;
 		blk->reg[ARM_REG_PC] = BytVec::create_imm(4,pc.rawpc);
 		nr[ARM_REG_PC] = blk->reg[ARM_REG_PC];
+		branch_flag = false;
 
                 switch(ins->id) {
                 case ARM_INS_PUSH:
@@ -497,6 +499,7 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			nr[ARM_REG_PC] = expr_add(
 				get_relative_pc(pc),
 				expr_shl(xrt,imm41));
+			branch_flag = true;
 			break;
 		case ARM_INS_BL:
 		case ARM_INS_BLX:
@@ -513,18 +516,8 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 		case ARM_INS_B:
 		case ARM_INS_BX:
 			xrd = get_op_expr(meta,&ops[0]);
-			if(ins->id == ARM_INS_BX || ins->id == ARM_INS_BLX) {
-				//handle mode change
-				xrt = expr_ite(
-					cond_eq(expr_and(xrd,imm41),imm41),
-					insmod_thumb,
-					insmod_arm);
-				blk->next_insmd = get_cc_expr(
-					blk->next_insmd,
-					xrt,
-					blk->flag,
-					det);
-				xrd = expr_and(xrd,imm4FFFFFFFE);
+			if(ins->id == ARM_INS_B || ins->id == ARM_INS_BL) {
+				branch_flag = true;
 			}
 			nr[ARM_REG_PC] = xrd;
 			break;
@@ -538,24 +531,37 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			nm = blk->mem;
 		}
 		for(i = 0;i < ARM_REG_ENDING;i++){
-			if(nr[i] != blk->reg[i]) {
-				if(i == ARM_REG_PC) {
-					blk->reg[i] = get_cc_expr(
-						BytVec::create_imm(
-							4,pc.rawpc + ins->size),
-						nr[i],
-						blk->flag,
-						det);
-					end_flag = true;
-				} else {
-					blk->reg[i] = get_cc_expr(
-						blk->reg[i],
-						nr[i],
-						blk->flag,
-						det);
-				}
+			if(nr[i] != blk->reg[i] && i != ARM_REG_PC) {
+				blk->reg[i] = get_cc_expr(
+					blk->reg[i],
+					nr[i],
+					blk->flag,
+					det);
 				nr[i] = blk->reg[i];
 			}
+		}
+		if(nr[ARM_REG_PC] != blk->reg[ARM_REG_PC]) {
+			xrd = nr[ARM_REG_PC];
+			if(branch_flag == false) {
+				//handle mode change
+				xrt = expr_ite(
+					cond_eq(expr_and(xrd,imm41),imm41),
+					insmod_thumb,
+					insmod_arm);
+				blk->next_insmd = get_cc_expr(
+					blk->next_insmd,
+					xrt,
+					blk->flag,
+					det);
+				xrd = expr_and(xrd,imm4FFFFFFFE);
+			}
+			blk->reg[ARM_REG_PC] = get_cc_expr(
+				BytVec::create_imm(4,pc.rawpc + ins->size),
+				xrd,
+				blk->flag,
+				det);
+			nr[ARM_REG_PC] = blk->reg[ARM_REG_PC];
+			end_flag = true;
 		}
 		for(i = 0;i < ARM_FLAG_NUM;i++){
 			if(nf[i] != blk->flag[i]) {
