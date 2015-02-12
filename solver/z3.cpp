@@ -194,8 +194,8 @@ namespace z3_solver {
 				old_res_ast = res_ast;
 				res_ast = Z3_mk_concat(
 						solver->context,
-						res_ast,
-						tmp_ast);
+						tmp_ast,
+						res_ast);
 				INCREF(res_ast);
 				DECREF(tmp_ast);
 				DECREF(old_res_ast);
@@ -290,8 +290,8 @@ namespace z3_solver {
 		case ExprOpConcat:
 			res_ast = Z3_mk_concat(
 				solver->context,
-				expr_to_ast(oper->operand[0]),
-				expr_to_ast(oper->operand[1]));
+				expr_to_ast(oper->operand[1]),
+				expr_to_ast(oper->operand[0]));
 			INCREF(res_ast);
 			break;
 		case ExprOpSext:

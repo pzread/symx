@@ -406,10 +406,13 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 			nr[ops[0].reg] = get_op_expr(blk,&ops[1],pc);
 			break;
 		case ARM_INS_MOVW:
-			xrs = get_op_expr(blk,&ops[1],pc);
-			nr[ops[0].reg] = expr_and(xrs,imm4FFFF);
+			assert(ops[1].type == ARM_OP_IMM);
+			nr[ops[0].reg] = BytVec::create_imm(
+				4,
+				(ops[1].imm & 0xFFFF));
 			break;
 		case ARM_INS_MOVT:
+			assert(ops[1].type == ARM_OP_IMM);
 			xrd = get_op_expr(blk,&ops[0],pc);
 			xrs = BytVec::create_imm(2,ops[1].imm);
 			nr[ops[0].reg] = expr_concat(expr_extract(xrd,0,2),xrs);

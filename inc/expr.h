@@ -334,6 +334,7 @@ refExpr expr_extract(
 	const refExpr op1,
 	const unsigned int start,
 	const unsigned int end);
+//op1 low, op2 high
 refExpr expr_concat(const refExpr op1,const refExpr op2);
 refExpr expr_sext(const refExpr op1,const unsigned int size);
 refExpr expr_zext(const refExpr op1,const unsigned int size);
