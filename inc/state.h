@@ -32,14 +32,16 @@ class MemPage {
 };
 class MemRecord {
 	public:
+		const refOperator oper;
 		const refExpr mem;
 		const refExpr idx;
 		const unsigned int size;
 		MemRecord(
+			const refOperator _oper,
 			const refExpr _mem,
 			const refExpr _idx,
 			const unsigned int _size
-		) : mem(_mem),idx(_idx),size(_size) {}
+		) : oper(_oper),mem(_mem),idx(_idx),size(_size) {}
 };
 class AddrSpace {
 	public:

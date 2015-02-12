@@ -60,6 +60,9 @@ enum ExprType {
 	ExprOpAnd,
 	ExprOpOr,
 	ExprOpXor,
+	ExprOpShl,
+	ExprOpLshr,
+	ExprOpAshr,
 	ExprOpNeg,
 	ExprOpNot,
 	ExprOpConcat,
@@ -328,6 +331,9 @@ refExpr expr_mul(const refExpr op1,const refExpr op2);
 refExpr expr_and(const refExpr op1,const refExpr op2);
 refExpr expr_or(const refExpr op1,const refExpr op2);
 refExpr expr_xor(const refExpr op1,const refExpr op2);
+refExpr expr_shl(const refExpr op1,const refExpr op2);
+refExpr expr_lshr(const refExpr op1,const refExpr op2);
+refExpr expr_ashr(const refExpr op1,const refExpr op2);
 refExpr expr_neg(const refExpr op1);
 refExpr expr_not(const refExpr op1);
 refExpr expr_extract(

@@ -275,6 +275,27 @@ namespace z3_solver {
 				expr_to_ast(oper->operand[1]));
 			INCREF(res_ast);
 			break;
+		case ExprOpShl:
+			res_ast = Z3_mk_bvshl(
+				solver->context,
+				expr_to_ast(oper->operand[0]),
+				expr_to_ast(oper->operand[1]));
+			INCREF(res_ast);
+			break;
+		case ExprOpLshr:
+			res_ast = Z3_mk_bvlshr(
+				solver->context,
+				expr_to_ast(oper->operand[0]),
+				expr_to_ast(oper->operand[1]));
+			INCREF(res_ast);
+			break;
+		case ExprOpAshr:
+			res_ast = Z3_mk_bvashr(
+				solver->context,
+				expr_to_ast(oper->operand[0]),
+				expr_to_ast(oper->operand[1]));
+			INCREF(res_ast);
+			break;
 		case ExprOpNeg:
 			res_ast = Z3_mk_bvneg(
 				solver->context,

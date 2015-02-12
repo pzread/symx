@@ -165,9 +165,7 @@ refCond BuildVisitor::get_cond(const refCond cond) {
 	}
 	return it->second;
 }
-int BuildVisitor::get_mem_record(
-	std::unordered_set<refMemRecord> *selrec
-) {
+int BuildVisitor::get_mem_record(std::unordered_set<refMemRecord> *selrec) {
 	selrec->insert(select_record.begin(),select_record.end());
 	return 0;
 }
@@ -218,7 +216,10 @@ int BuildVisitor::post_visit(symx::refOperator oper) {
 		auto mem = expr_map[oper->operand[0]];
 		auto idx = expr_map[oper->operand[1]];
 		expr_map[oper] = expr_select(mem,idx,oper->size);
-		select_record.insert(ref<MemRecord>(mem,idx,oper->size));
+		select_record.insert(ref<MemRecord>(
+			std::static_pointer_cast<Operator>(expr_map[oper]),
+			mem,idx,
+			oper->size));
 		break;
 	}
 	case ExprOpExtract:
@@ -426,6 +427,7 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			var[addrsp.mem_symbol[i].second->solver_expr] = 0;
 		}
 		for(auto it = selrec.begin(); it != selrec.end(); it++) {
+			var[(*it)->oper->solver_expr] = 0;
 			var[(*it)->idx->solver_expr] = 0;
 		}
 
@@ -454,7 +456,8 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 				it++
 			) {
 				auto selidx = var[(*it)->idx->solver_expr];
-				dbg("  selidx: 0x%lx\n",selidx);
+				auto selval = var[(*it)->oper->solver_expr];
+				dbg("  sel: 0x%08lx\t0x%08lx\n",selidx,selval);
 				if(addrsp.handle_select(
 					selidx,(*it)->size) == 1
 				) {
