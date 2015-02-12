@@ -63,7 +63,7 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 			} else {
 				//for test
 				val = BytVec::create_var(1,ctx);
-				mem_symbol.push_back(val);
+				mem_symbol.push_back(std::make_pair(pos,val));
 			}
 
 			auto byte = expr_select(
@@ -422,8 +422,8 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			var[cstate->symbol[i]->solver_expr] = 0;
 		}
 		for(i = 0; i < addrsp.mem_symbol.size(); i++) {
-			expr_walk(trans_vis,addrsp.mem_symbol[i]);
-			var[addrsp.mem_symbol[i]->solver_expr] = 0;
+			expr_walk(trans_vis,addrsp.mem_symbol[i].second);
+			var[addrsp.mem_symbol[i].second->solver_expr] = 0;
 		}
 		for(auto it = selrec.begin(); it != selrec.end(); it++) {
 			var[(*it)->idx->solver_expr] = 0;
@@ -469,16 +469,17 @@ int state_executor(Context *ctx,refProbe probe,uint64_t pc) {
 			}
 
 			//show message
-			info("next pc 0x%lx\n",next_pc);
+			info("next pc 0x%08lx\n",next_pc);
 			for(i = 0; i < cstate->symbol.size(); i++) {
-				info("  sym\t%d: 0x%lx\n",
+				info("  sym\t%d: 0x%08lx\n",
 					cstate->symbol[i]->id,
 					var[cstate->symbol[i]->solver_expr]);
 			}
 			for(i = 0; i < addrsp.mem_symbol.size(); i++) {
-				info("  sym\t%d: 0x%lx\n",
-					addrsp.mem_symbol[i]->id,
-					var[addrsp.mem_symbol[i]->solver_expr]);
+				info("  addr\t%d\t0x%08lx: 0x%08lx\n",
+					addrsp.mem_symbol[i].second->id,
+					addrsp.mem_symbol[i].first,
+					var[addrsp.mem_symbol[i].second->solver_expr]);
 			}
 
 			//create next state

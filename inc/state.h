@@ -43,7 +43,7 @@ class MemRecord {
 };
 class AddrSpace {
 	public:
-		std::vector<refBytVec> mem_symbol;
+		std::vector<std::pair<uint64_t,refBytVec>> mem_symbol;
 		std::unordered_set<refCond> mem_constraint;
 		AddrSpace(Context *ctx,refProbe _probe);
 		refExpr get_mem() const;

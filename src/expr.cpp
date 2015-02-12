@@ -104,6 +104,18 @@ refExpr expr_mul(const refExpr op1,const refExpr op2) {
 	assert(op1->size == op2->size);
 	return ref<Operator>(ExprOpMul,op1->size,op1,op2);
 }
+refExpr expr_and(const refExpr op1,const refExpr op2) {
+	assert(op1->size == op2->size);
+	return ref<Operator>(ExprOpAnd,op1->size,op1,op2);
+}
+refExpr expr_or(const refExpr op1,const refExpr op2) {
+	assert(op1->size == op2->size);
+	return ref<Operator>(ExprOpOr,op1->size,op1,op2);
+}
+refExpr expr_xor(const refExpr op1,const refExpr op2) {
+	assert(op1->size == op2->size);
+	return ref<Operator>(ExprOpXor,op1->size,op1,op2);
+}
 refExpr expr_neg(const refExpr op1) {
 	return ref<Operator>(ExprOpNeg,op1->size,op1);
 }

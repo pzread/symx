@@ -21,12 +21,13 @@ using namespace arm;
 
 namespace arm {
 
-static refExpr imm40,imm41,imm44,imm48;
+static refExpr imm40,imm41,imm44,imm48,imm4FFFF;
 int initialize() {
-	imm40 = BytVec::create_imm(4,0);
-	imm41 = BytVec::create_imm(4,1);
-	imm44 = BytVec::create_imm(4,4);
-	imm48 = BytVec::create_imm(4,8);
+	imm40 = BytVec::create_imm(4,0x0);
+	imm41 = BytVec::create_imm(4,0x1);
+	imm44 = BytVec::create_imm(4,0x4);
+	imm48 = BytVec::create_imm(4,0x8);
+	imm4FFFF = BytVec::create_imm(4,0xFFFF);
         return 0;
 }
 
@@ -344,7 +345,7 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
         ins = insn;
 	end_flag = false;
 	for(idx = 0; idx < count && !end_flag; idx++) {
-		info("%s %s\n",ins->mnemonic,ins->op_str);
+		info("0x%08lx %s %s\n",ins->address,ins->mnemonic,ins->op_str);
 
 		pc = ins->address;
                 det = &ins->detail->arm;
@@ -402,8 +403,11 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 			*/
 			break;
 		case ARM_INS_MOV:
-		case ARM_INS_MOVW:
 			nr[ops[0].reg] = get_op_expr(blk,&ops[1],pc);
+			break;
+		case ARM_INS_MOVW:
+			xrs = get_op_expr(blk,&ops[1],pc);
+			nr[ops[0].reg] = expr_and(xrs,imm4FFFF);
 			break;
 		case ARM_INS_MOVT:
 			xrd = get_op_expr(blk,&ops[0],pc);
@@ -450,7 +454,7 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 				cond_xor(cond_sl(expr_neg(xrs),imm40),cdt));
 			break;
 		case ARM_INS_TBB:
-			//err("hang");
+			err("hang");
 			xrs = get_op_expr(blk,&ops[0],pc);
 			xrt = expr_zext(expr_select(blk->mem,xrs,1),4);
 			nr[ARM_REG_PC] = expr_add(get_relative_pc(pc),xrt);
