@@ -21,7 +21,7 @@ using namespace arm;
 
 namespace arm {
 
-static refBytVec imm40,imm41,imm44,imm48,imm4FFFF;
+static refBytVec imm40,imm41,imm44,imm48,imm4FFFF,imm4FFFFFFFE;
 static refBytVec insmod_arm,insmod_thumb ;
 int initialize() {
 	imm40 = BytVec::create_imm(4,0x0);
@@ -29,6 +29,7 @@ int initialize() {
 	imm44 = BytVec::create_imm(4,0x4);
 	imm48 = BytVec::create_imm(4,0x8);
 	imm4FFFF = BytVec::create_imm(4,0xFFFF);
+	imm4FFFFFFFE = BytVec::create_imm(4,0xFFFFFFFE);
 
 	insmod_arm = BytVec::create_imm(4,CS_MODE_ARM);
 	insmod_thumb = BytVec::create_imm(4,CS_MODE_THUMB);
@@ -492,17 +493,22 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			nr[ARM_REG_PC] = expr_add(
 				get_relative_pc(pc),
 				expr_shl(xrt,imm41));
-			end_flag = true;
 			break;
 		case ARM_INS_BL:
 		case ARM_INS_BLX:
-			nr[ARM_REG_LR] = BytVec::create_imm(
-				4,
-				(pc.rawpc + ins->size));
+			if(pc.insmd == CS_MODE_THUMB) {
+				xrt = BytVec::create_imm(
+					4,
+					((pc.rawpc + ins->size) | 1));
+			} else {
+				xrt = BytVec::create_imm(
+					4,
+					(pc.rawpc + ins->size));
+			}
+			nr[ARM_REG_LR] = xrt;
 		case ARM_INS_B:
 		case ARM_INS_BX:
 			xrd = get_op_expr(meta,&ops[0]);
-			nr[ARM_REG_PC] = xrd;
 			if(ins->id == ARM_INS_BX || ins->id == ARM_INS_BLX) {
 				//handle mode change
 				xrt = expr_ite(
@@ -514,8 +520,9 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 					xrt,
 					blk->flag,
 					det);
+				xrd = expr_and(xrd,imm4FFFFFFFE);
 			}
-			end_flag = true;
+			nr[ARM_REG_PC] = xrd;
 			break;
 		default:
 			err("TODO: inst\n");
@@ -535,6 +542,7 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 						nr[i],
 						blk->flag,
 						det);
+					end_flag = true;
 				} else {
 					blk->reg[i] = get_cc_expr(
 						blk->reg[i],

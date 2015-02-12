@@ -25,7 +25,7 @@ int main() {
 	auto *solver = new z3_solver::Z3Solver();
 	auto *ctx = new arm::ARMContext(solver);
 
-	binfd = open("./test",O_RDONLY);
+	binfd = open("./test-change",O_RDONLY);
 	
 	//<main> block emit test
 	arm::initialize();

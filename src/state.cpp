@@ -469,7 +469,7 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 
 			//for "test" bound
 			if(next_rawpc < 0x10000 || next_rawpc >= 0x20000) {
-				info("touch bound, ignore\n");
+				dbg("0x%08lx touch bound, ignore\n",next_rawpc);
 				exclude_pc(
 					ctx,
 					&cons,
