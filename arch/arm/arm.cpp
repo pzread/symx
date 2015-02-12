@@ -395,6 +395,13 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			}
 			nr[ARM_REG_SP] = xrt;
                         break;
+		case ARM_INS_POP:
+			xrt = blk->reg[ARM_REG_SP];
+			for(i = 0; i < det->op_count; i++) {
+				nr[ops[i].reg] = expr_select(blk->mem,xrt,4);
+				xrt = expr_add(xrt,imm44);
+			}
+			nr[ARM_REG_SP] = xrt;
 		case ARM_INS_ADD:
 			if(det->op_count == 2) {
 				xrd = get_op_expr(meta,&ops[0]);
@@ -465,14 +472,11 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 		case ARM_INS_LDRB:
 			xrs = get_op_expr(meta,&ops[1]);
 			if(ins->id == ARM_INS_LDR) {
-				nr[ops[0].reg] = expr_select(
-					blk->mem,
-					xrs,
-					REGSIZE);
+				nr[ops[0].reg] = expr_select(blk->mem,xrs,4);
 			} else {
 				nr[ops[0].reg] = expr_zext(
 					expr_select(blk->mem,xrs,1),
-					REGSIZE);
+					4);
 			}
 			break;
 		case ARM_INS_CMP:
