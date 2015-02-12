@@ -544,8 +544,6 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 				selrec.begin(),
 				selrec.end());
 
-			ctx->state.push(nstate);
-
 			exclude_pc(
 				ctx,
 				&cons,
@@ -553,6 +551,7 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 				next_exinsmd,
 				next_rawpc,
 				next_insmd);
+			ctx->state.push(nstate);
 		}
 
 		delete trans_vis;
