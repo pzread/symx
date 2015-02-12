@@ -16,6 +16,28 @@
 #define PAGE_SIZE 	0x1000
 
 namespace symx {
+	class ProgCtr {
+		public:
+			const uint64_t rawpc;
+			const int insmd;
+			ProgCtr(const uint64_t _rawpc,const int _insmd)
+				: rawpc(_rawpc),insmd(_insmd) {}
+			bool operator==(const ProgCtr &other) const {
+				return rawpc == other.rawpc && \
+					insmd == other.insmd;
+			}
+	};
+};
+namespace std {
+	template<>
+	struct hash<symx::ProgCtr> {
+
+		std::size_t operator()(const symx::ProgCtr &key) const {
+			return (key.rawpc << 8) | key.insmd; 
+		}
+	};
+};
+namespace symx {
 	using namespace symx;
 
 	class MemPage;
@@ -29,14 +51,7 @@ namespace symx {
 	typedef std::shared_ptr<SolvCond> refSolvCond;
 	typedef std::shared_ptr<Probe> refProbe;
 	typedef std::shared_ptr<Block> refBlock;
-
-	class ProgCtr {
-		public:
-			const uint64_t rawpc;
-			const int insmd;
-			ProgCtr(const uint64_t _rawpc,const int _insmd)
-				: rawpc(_rawpc),insmd(_insmd) {}
-	};
+	
 	class Solver {
 		public:
 			virtual TransVisitor* create_translator() = 0;
@@ -69,8 +84,7 @@ namespace symx {
 			const unsigned int REGIDX_PC;
 			uint64_t last_var_id;
 			std::queue<std::shared_ptr<State>> state;
-			std::unordered_map
-				<uint64_t,std::shared_ptr<Block>> block;
+			std::unordered_map<ProgCtr,refBlock> block;
 
 			Context(
 				Solver *_solver,
