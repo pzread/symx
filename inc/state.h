@@ -64,19 +64,19 @@ class BaseState {
 };
 class State : public BaseState {
 	public:
-		uint64_t pc;
+		const ProgCtr pc;
 		refProbe probe;
 		std::vector<refBytVec> symbol;
 		std::unordered_set<refCond> constraint;
 		std::unordered_set<refMemRecord> select_record;
-		State(const uint64_t _pc,refProbe _probe)
+		State(const ProgCtr _pc,refProbe _probe)
 			: pc(_pc),probe(_probe) {}
 };
 class Block : public BaseState {
 	public:
-		const uint64_t start;
-		refExpr next_pc;
-		Block(const uint64_t _start) : start(_start) {};
+		const ProgCtr pc;
+		refExpr next_insmd;
+		Block(const ProgCtr _pc) : pc(_pc) {};
 };
 class TransVisitor : public symx::ExprVisitor {};
 class BuildVisitor : public ExprVisitor {
@@ -101,8 +101,8 @@ class BuildVisitor : public ExprVisitor {
 		std::unordered_set<refMemRecord> select_record;
 };
 
-refBlock state_create_block(Context *ctx,const uint64_t pc);
-int state_executor(Context *ctx,refProbe probe,uint64_t pc);
+refBlock state_create_block(Context *ctx,const ProgCtr &pc);
+int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc);
 
 }
 

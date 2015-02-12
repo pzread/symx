@@ -21,13 +21,18 @@ using namespace arm;
 
 namespace arm {
 
-static refExpr imm40,imm41,imm44,imm48,imm4FFFF;
+static refBytVec imm40,imm41,imm44,imm48,imm4FFFF;
+static refBytVec insmod_arm,insmod_thumb ;
 int initialize() {
 	imm40 = BytVec::create_imm(4,0x0);
 	imm41 = BytVec::create_imm(4,0x1);
 	imm44 = BytVec::create_imm(4,0x4);
 	imm48 = BytVec::create_imm(4,0x8);
 	imm4FFFF = BytVec::create_imm(4,0xFFFF);
+
+	insmod_arm = BytVec::create_imm(4,CS_MODE_ARM);
+	insmod_thumb = BytVec::create_imm(4,CS_MODE_THUMB);
+
         return 0;
 }
 
@@ -97,6 +102,9 @@ ssize_t ARMProbe::read_mem(
 ) {
 	memcpy((void*)buf,(void*)(bin + off + addr),len);
 	return len;
+}
+int ARMProbe::get_insmd() {
+	return CS_MODE_THUMB;
 }
 std::vector<MemPage> ARMProbe::get_mem_map() {
 	std::vector<MemPage> mem_map;
@@ -317,7 +325,7 @@ static refCond get_cc_cond(
 	}
 	return ret_cond;
 }
-refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
+refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &pc) {
 	int i;
 	refARMProbe probe = std::dynamic_pointer_cast<ARMProbe>(_probe);
         refBlock blk = state_create_block(this,pc);
@@ -328,6 +336,7 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
         cs_arm_op *ops;
 	bool end_flag;
 
+	uint64_t rawpc;
 	refExpr nr[ARM_REG_ENDING];
 	refExpr nm,xrd,xrs,xrt;
 	refCond nf[4];
@@ -340,17 +349,26 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 	for(i = 0;i < ARM_FLAG_NUM;i++) {
 		nf[i] = blk->flag[i];
 	}
+	blk->next_insmd = BytVec::create_imm(4,pc.insmd);
         
-        count = cs_disasm(cs,probe->bin + probe->off + pc,64,pc,0,&insn);
+	cs_option(cs,CS_OPT_MODE,pc.insmd);
+        count = cs_disasm(
+		cs,
+		probe->bin + probe->off + pc.rawpc,
+		64,
+		pc.rawpc,
+		0,
+		&insn);
+
         ins = insn;
 	end_flag = false;
 	for(idx = 0; idx < count && !end_flag; idx++) {
 		info("0x%08lx %s %s\n",ins->address,ins->mnemonic,ins->op_str);
 
-		pc = ins->address;
+		rawpc = ins->address;
                 det = &ins->detail->arm;
                 ops = det->operands;
-		blk->reg[ARM_REG_PC] = BytVec::create_imm(4,pc);
+		blk->reg[ARM_REG_PC] = BytVec::create_imm(4,rawpc);
 		nr[ARM_REG_PC] = blk->reg[ARM_REG_PC];
 
                 switch(ins->id) {
@@ -359,18 +377,18 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 			nm = blk->mem;
 			for(i = det->op_count - 1; i >= 0; i--) {
 				xrt = expr_sub(xrt,imm44);
-				xrs = get_op_expr(blk,&ops[i],pc);
+				xrs = get_op_expr(blk,&ops[i],rawpc);
 				nm = expr_store(nm,xrt,xrs);
 			}
 			nr[ARM_REG_SP] = xrt;
                         break;
 		case ARM_INS_ADD:
 			if(det->op_count == 2) {
-				xrd = get_op_expr(blk,&ops[0],pc);
-				xrs = get_op_expr(blk,&ops[1],pc);
+				xrd = get_op_expr(blk,&ops[0],rawpc);
+				xrs = get_op_expr(blk,&ops[1],rawpc);
 			} else {
-				xrd = get_op_expr(blk,&ops[1],pc);
-				xrs = get_op_expr(blk,&ops[2],pc);
+				xrd = get_op_expr(blk,&ops[1],rawpc);
+				xrs = get_op_expr(blk,&ops[2],rawpc);
 			}
 			nr[ops[0].reg] = expr_add(xrd,xrs);
 			/*
@@ -385,8 +403,8 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 			*/
 			break;
 		case ARM_INS_SUB:
-			xrd = get_op_expr(blk,&ops[0],pc);
-			xrs = get_op_expr(blk,&ops[1],pc);
+			xrd = get_op_expr(blk,&ops[0],rawpc);
+			xrs = get_op_expr(blk,&ops[1],rawpc);
 			nr[ops[0].reg] = expr_sub(xrd,xrs);
 			/*
 			if(ins->id == ARM_INS_SUBS){
@@ -403,7 +421,7 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 			*/
 			break;
 		case ARM_INS_MOV:
-			nr[ops[0].reg] = get_op_expr(blk,&ops[1],pc);
+			nr[ops[0].reg] = get_op_expr(blk,&ops[1],rawpc);
 			break;
 		case ARM_INS_MOVW:
 			assert(ops[1].type == ARM_OP_IMM);
@@ -413,14 +431,14 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 			break;
 		case ARM_INS_MOVT:
 			assert(ops[1].type == ARM_OP_IMM);
-			xrd = get_op_expr(blk,&ops[0],pc);
+			xrd = get_op_expr(blk,&ops[0],rawpc);
 			xrs = BytVec::create_imm(2,ops[1].imm);
 			nr[ops[0].reg] = expr_concat(expr_extract(xrd,0,2),xrs);
 			break;
 		case ARM_INS_STR:
 		case ARM_INS_STRB:
-			xrs = get_op_expr(blk,&ops[0],pc);
-			xrd = get_op_expr(blk,&ops[1],pc);
+			xrs = get_op_expr(blk,&ops[0],rawpc);
+			xrd = get_op_expr(blk,&ops[1],rawpc);
 			if(ins->id == ARM_INS_STR) {
 				nm = expr_store(blk->mem,xrd,xrs);
 			} else {
@@ -432,7 +450,7 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 			break;
 		case ARM_INS_LDR:
 		case ARM_INS_LDRB:
-			xrs = get_op_expr(blk,&ops[1],pc);
+			xrs = get_op_expr(blk,&ops[1],rawpc);
 			if(ins->id == ARM_INS_LDR) {
 				nr[ops[0].reg] = expr_select(
 					blk->mem,
@@ -445,8 +463,8 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 			}
 			break;
 		case ARM_INS_CMP:
-			xrd = get_op_expr(blk,&ops[0],pc);
-			xrs = get_op_expr(blk,&ops[1],pc);
+			xrd = get_op_expr(blk,&ops[0],rawpc);
+			xrs = get_op_expr(blk,&ops[1],rawpc);
 			xrt = expr_sub(xrd,xrs);
 			cdt = cond_sl(xrt,imm40);
 			nf[ARM_SR_N] = cdt;
@@ -457,19 +475,34 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 				cond_xor(cond_sl(expr_neg(xrs),imm40),cdt));
 			break;
 		case ARM_INS_TBB:
-			xrs = get_op_expr(blk,&ops[0],pc);
+			xrs = get_op_expr(blk,&ops[0],rawpc);
 			xrt = expr_zext(expr_select(blk->mem,xrs,1),4);
 			nr[ARM_REG_PC] = expr_add(
-				get_relative_pc(pc),
-				 expr_shl(xrt,imm41));
+				get_relative_pc(rawpc),
+				expr_shl(xrt,imm41));
 			end_flag = true;
 			break;
 		case ARM_INS_BL:
 		case ARM_INS_BLX:
-			nr[ARM_REG_LR] = BytVec::create_imm(4,pc + ins->size);
+			nr[ARM_REG_LR] = BytVec::create_imm(
+				4,
+				(rawpc + ins->size));
 		case ARM_INS_B:
 		case ARM_INS_BX:
-			nr[ARM_REG_PC] = get_op_expr(blk,&ops[0],pc);
+			xrd = get_op_expr(blk,&ops[0],rawpc);
+			nr[ARM_REG_PC] = xrd;
+			if(ins->id == ARM_INS_BX || ins->id == ARM_INS_BLX) {
+				//handle mode change
+				xrt = expr_ite(
+					cond_eq(expr_and(xrd,imm41),imm41),
+					insmod_thumb,
+					insmod_arm);
+				blk->next_insmd = get_cc_expr(
+					blk->next_insmd,
+					xrt,
+					blk->flag,
+					det);
+			}
 			end_flag = true;
 			break;
 		default:
@@ -481,13 +514,12 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 			blk->mem = get_cc_expr(blk->mem,nm,blk->flag,det);
 			nm = blk->mem;
 		}
-
 		for(i = 0;i < ARM_REG_ENDING;i++){
 			if(nr[i] != blk->reg[i]) {
 				if(i == ARM_REG_PC) {
 					blk->reg[i] = get_cc_expr(
 						BytVec::create_imm(
-							4,pc + ins->size),
+							4,rawpc + ins->size),
 						nr[i],
 						blk->flag,
 						det);
@@ -510,9 +542,11 @@ refBlock ARMContext::interpret(refProbe _probe,uint64_t pc) {
 					det);
 			}
 		}
+		//flag are always update at last
 		for(i = 0;i < ARM_FLAG_NUM;i++){
 			blk->flag[i] = nf[i];
 		}
+
                 ins += 1;
 	}
 	cs_free(insn,count);

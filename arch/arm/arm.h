@@ -8,12 +8,12 @@
 #ifndef _ARM_H_
 #define _ARM_H_
 
-#define ARM_REG_SIZE 4
-#define ARM_FLAG_NUM 4
-#define ARM_SR_N 0
-#define ARM_SR_Z 1
-#define ARM_SR_C 2
-#define ARM_SR_V 3
+#define ARM_REG_SIZE	4
+#define ARM_FLAG_NUM	4
+#define ARM_SR_N	0
+#define ARM_SR_Z	1
+#define ARM_SR_C	2
+#define ARM_SR_V	3
 
 namespace arm {
 
@@ -35,6 +35,7 @@ class ARMProbe : public symx::Probe {
 			const uint64_t addr,
 			const uint8_t *buf,
 			const size_t len);
+		int get_insmd();
 		std::vector<symx::MemPage> get_mem_map();
 };
 class ARMContext : public symx::Context {
@@ -42,7 +43,7 @@ class ARMContext : public symx::Context {
 		ARMContext(symx::Solver *solver);
 		symx::refBlock interpret(
 			symx::refProbe _probe,
-			uint64_t pc);
+			const symx::ProgCtr &pc);
 };
 
 int initialize();
