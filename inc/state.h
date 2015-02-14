@@ -1,8 +1,10 @@
 #include<memory>
 #include<unordered_map>
 #include<unordered_set>
-#include<map>
 #include<bitset>
+#include<map>
+#include<vector>
+#include<string>
 
 #include"utils.h"
 #include"expr.h"
@@ -76,6 +78,7 @@ class Block : public BaseState {
 	public:
 		const ProgCtr pc;
 		refExpr next_insmd;
+		std::vector<std::string> discode;
 		Block(const ProgCtr _pc) : pc(_pc) {};
 };
 class TransVisitor : public symx::ExprVisitor {};

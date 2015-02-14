@@ -448,6 +448,8 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 	refExpr nm,xrd,xrs,xrt;
 	refCond nf[4];
 	refCond cdt;
+
+	char codeline[1024];
 	
 	nm = blk->mem;
 	for(i = 0;i < ARM_REG_ENDING;i++){
@@ -471,7 +473,15 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
         ins = insn;
 	end_flag = false;
 	for(idx = 0; idx < count && !end_flag; idx++) {
-		info("0x%08lx %s %s\n",ins->address,ins->mnemonic,ins->op_str);
+		snprintf(
+			codeline,
+			sizeof(codeline) - 1,
+			"0x%08lx\t%s %s",
+			ins->address,
+			ins->mnemonic,
+			ins->op_str);
+		info("%s\n",codeline);
+		blk->discode.push_back(codeline);
 
 		auto pc = ProgCtr(ins->address,entry_pc.insmd);
 		auto meta = std::make_pair(blk,pc);
@@ -480,10 +490,6 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 		blk->reg[ARM_REG_PC] = BytVec::create_imm(4,pc.rawpc);
 		nr[ARM_REG_PC] = blk->reg[ARM_REG_PC];
 		branch_flag = false;
-
-		if(pc.rawpc == 0x103d2) {
-			//err("hang\n");
-		}
 
                 switch(ins->id) {
                 case ARM_INS_PUSH:

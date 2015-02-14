@@ -5,11 +5,11 @@
 #include<unordered_map>
 #include<vector>
 #include<bitset>
-#include<iterator>
 
 #include"utils.h"
 #include"context.h"
 #include"expr.h"
+#include"draw.h"
 #include"state.h"
 
 using namespace symx;
@@ -383,6 +383,8 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 	int next_insmd;
 	std::unordered_set<refMemRecord> selrec;
 
+	auto draw = Draw();
+
 	nstate = create_static_state(ctx,probe,addrsp,entry_rawpc);
 	ctx->state.push(nstate);
 
@@ -395,6 +397,12 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 		if(blk_it == ctx->block.end()) {
 			cblk = ctx->interpret(probe,cstate->pc);
 			ctx->block[cstate->pc] = cblk;
+
+			std::string output;
+			for(i = 0;i < cblk->discode.size();i++) {
+				output += cblk->discode[i] + "\\l";
+			}
+			draw.update_block(cblk->pc.rawpc,(char*)output.c_str());
 		} else {
 			cblk = blk_it->second;
 		}
@@ -498,6 +506,8 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 				continue;
 			}
 
+			draw.update_link(cstate->pc.rawpc,next_rawpc);
+
 			//for "test" bound
 			if(next_rawpc < 0x10000 || next_rawpc >= 0x20000) {
 				dbg("0x%08lx touch bound, ignore\n",next_rawpc);
@@ -565,6 +575,9 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 
 		delete trans_vis;
 	}
+
+	draw.output("flow.dot");
+
 	return 0;
 }
 
