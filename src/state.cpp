@@ -12,8 +12,6 @@
 #include"expr.h"
 #include"state.h"
 
-#include<capstone/arm.h>
-
 using namespace symx;
 
 namespace symx {
