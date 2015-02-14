@@ -128,6 +128,10 @@ refExpr expr_ashr(const refExpr op1,const refExpr op2) {
 	assert(op1->size == op2->size);
 	return ref<Operator>(ExprOpAshr,op1->size,op1,op2);
 }
+refExpr expr_ror(const refExpr op1,const refExpr op2) {
+	assert(op1->size == op2->size);
+	return ref<Operator>(ExprOpRor,op1->size,op1,op2);
+}
 refExpr expr_neg(const refExpr op1) {
 	return ref<Operator>(ExprOpNeg,op1->size,op1);
 }

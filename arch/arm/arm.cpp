@@ -179,9 +179,57 @@ static refExpr get_op_expr(
 			if(op.mem.scale == 1) {
 				index = blk->reg[op.mem.index];
 			} else {
+				err("unhandled scale\n");
 				index = expr_mul(
 					blk->reg[op.mem.index],
 					BytVec::create_imm(4,op.mem.scale));
+			}
+			switch(op.shift.type) {
+			case ARM_SFT_INVALID:
+				break;
+			case ARM_SFT_ASR:
+				index = expr_ashr(
+					index,
+					BytVec::create_imm(4,op.shift.value));
+				break;
+			case ARM_SFT_LSL:
+				index = expr_shl(
+					index,
+					BytVec::create_imm(4,op.shift.value));
+				break;
+			case ARM_SFT_LSR:
+				index = expr_lshr(
+					index,
+					BytVec::create_imm(4,op.shift.value));
+				break;
+			case ARM_SFT_ROR:
+				index = expr_ror(
+					index,
+					BytVec::create_imm(4,op.shift.value));
+				break;
+			case ARM_SFT_ASR_REG:
+				index = expr_ashr(
+					index,
+					blk->reg[op.shift.value]);
+				break;
+			case ARM_SFT_LSL_REG:
+				index = expr_shl(
+					index,
+					blk->reg[op.shift.value]);
+				break;
+			case ARM_SFT_LSR_REG:
+				index = expr_lshr(
+					index,
+					blk->reg[op.shift.value]);
+				break;
+			case ARM_SFT_ROR_REG:
+				index = expr_ror(
+					index,
+					blk->reg[op.shift.value]);
+				break;
+			default:
+				err("TODO: shift\n");
+				break;
 			}
 			if(op.subtracted) {
 				ret = expr_sub(ret,index);
@@ -192,14 +240,6 @@ static refExpr get_op_expr(
 		if(op.mem.disp != 0) {
 			ret = expr_add(ret,BytVec::create_imm(4,op.mem.disp));
 		}
-	}
-
-	switch(op.shift.type) {
-	case ARM_SFT_INVALID:
-		break;
-	default:
-		err("TODO: shift\n");
-		break;
 	}
 
 	return ret;
@@ -419,6 +459,7 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 	blk->next_insmd = BytVec::create_imm(4,entry_pc.insmd);
         
 	cs_option(cs,CS_OPT_MODE,entry_pc.insmd);
+	cs_option(cs,CS_OPT_DETAIL,CS_OPT_ON);
         count = cs_disasm(
 		cs,
 		probe->bin + probe->off + entry_pc.rawpc,
@@ -439,6 +480,10 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 		blk->reg[ARM_REG_PC] = BytVec::create_imm(4,pc.rawpc);
 		nr[ARM_REG_PC] = blk->reg[ARM_REG_PC];
 		branch_flag = false;
+
+		if(pc.rawpc == 0x103d2) {
+			//err("hang\n");
+		}
 
                 switch(ins->id) {
                 case ARM_INS_PUSH:
@@ -531,6 +576,7 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			break;
 		case ARM_INS_LDR:
 		case ARM_INS_LDRB:
+			info("%d\n",ops[1].shift.value);
 			xrs = get_op_expr(meta,ops[1]);
 			if(ins->id == ARM_INS_LDR) {
 				nr[ops[0].reg] = expr_select(blk->mem,xrs,4);
@@ -590,6 +636,9 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 					xrd);
 			}
 			branch_flag = true;
+			break;
+		case ARM_INS_IT:
+			//just ignore
 			break;
 		case ARM_INS_BL:
 		case ARM_INS_BLX:
