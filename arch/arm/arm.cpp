@@ -43,25 +43,24 @@ ARMProbe::ARMProbe(pid_t _pid,int fd,uint64_t _off) : pid(_pid),off(_off) {
 	bin = (uint8_t*)mmap(NULL,st.st_size,PROT_READ,MAP_PRIVATE,fd,0);
 }
 uint64_t ARMProbe::read_reg(const unsigned int regid,bool *symbol) {
-	//Temp fixed data
+	//for test
 	*symbol = false;
 	switch(regid) {
 	case ARM_REG_R0:
 		*symbol = true;
 		return 0x0;
-		//return 0x1;
 	case ARM_REG_R1:
-		return 0xBEFFFD94;
+		return 0XBEAFF100;
 	case ARM_REG_R2:
-		return 0xBEFFFD9C;
+		return 0xBEAFF200;
 	case ARM_REG_R3:
-		return 0x1034D;
+		return 0x102E1;
 	case ARM_REG_R4:
 		return 0x0;
 	case ARM_REG_R5:
-		return 0xB6FD3000;
+		return 0x0;
 	case ARM_REG_R6:
-		return 0xDC;
+		return 0x0;
 	case ARM_REG_R7:
 		return 0x0;
 	case ARM_REG_R8:
@@ -69,21 +68,22 @@ uint64_t ARMProbe::read_reg(const unsigned int regid,bool *symbol) {
 	case ARM_REG_R9:
 		return 0x0;
 	case ARM_REG_R10:
-		return 0xB6FFF000;
+		return 0x0;
 	case ARM_REG_R11:
 		return 0x0;
 	case ARM_REG_R12:
-		return 0xB6FFFCC0;
+		return 0x0;
 	case ARM_REG_PC:
-		return 0x1034C;
+		return 0x102E0;
 	case ARM_REG_SP:
-		return 0xBEFFFC40;
+		return 0xBEAFF000;
 	case ARM_REG_LR:
-		return 0xB6F00631;
+		return 0xDEADEEF0;
 	}
 	return 0;
 }
 bool ARMProbe::read_flag(const unsigned int flagid) {
+	//for test
 	switch(flagid) {
 	case ARM_SR_N:
 		return false;
@@ -101,15 +101,31 @@ ssize_t ARMProbe::read_mem(
 	const uint8_t *buf,
 	const size_t len
 ) {
-	memcpy((void*)buf,(void*)(bin + off + addr),len);
+	//for test
+	if(addr >= 0xBEAFF000) {
+		if(len != 1) {
+			err("unhandled argv\n");
+		}
+		uint32_t val = 0xBEAFF000 + \
+			((addr & (~3)) - 0xBEAFF000 + 1) * 0x10000;
+		memcpy((void*)buf,(char*)(&val) + (addr & 3),1);
+	} else {
+		memcpy((void*)buf,(void*)(bin + off + addr),len);
+	}
 	return len;
 }
 int ARMProbe::get_insmd() {
+	//for test
 	return CS_MODE_THUMB;
 }
 std::vector<MemPage> ARMProbe::get_mem_map() {
 	std::vector<MemPage> mem_map;
+	//for test
 	mem_map.push_back(MemPage(0x10000,PAGE_READ | PAGE_EXEC | PAGE_PROBE));
+	mem_map.push_back(MemPage(
+		0xBEAFF000,
+		PAGE_READ | PAGE_EXEC | PAGE_PROBE));
+
 	return mem_map;
 }
 
@@ -499,6 +515,28 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			nr[ARM_REG_PC] = expr_add(
 				get_relative_pc(pc),
 				expr_shl(xrt,imm41));
+			branch_flag = true;
+			break;
+		case ARM_INS_CBZ:
+		case ARM_INS_CBNZ:
+			xrs = get_op_expr(meta,&ops[0]);
+			xrd = get_op_expr(meta,&ops[1]);
+			cdt = cond_eq(xrs,imm40);
+			if(ins->id == ARM_INS_CBZ) {
+				nr[ARM_REG_PC] = expr_ite(
+					cdt,
+					xrd,
+					BytVec::create_imm(
+						4,
+						pc.rawpc + ins->size));
+			} else {
+				nr[ARM_REG_PC] = expr_ite(
+					cdt,
+					BytVec::create_imm(
+						4,
+						pc.rawpc + ins->size),
+					xrd);
+			}
 			branch_flag = true;
 			break;
 		case ARM_INS_BL:

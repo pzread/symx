@@ -446,14 +446,12 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 			expr_walk(trans_vis,cstate->symbol[i]);
 			var[cstate->symbol[i]->solver_expr] = 0;
 		}
-		/*
 		for(i = 0; i < addrsp.mem_symbol.size(); i++) {
 			expr_walk(trans_vis,addrsp.mem_symbol[i].second);
 			var[addrsp.mem_symbol[i].second->solver_expr] = 0;
 		}
-		*/
 		for(auto it = selrec.begin(); it != selrec.end(); it++) {
-			//var[(*it)->oper->solver_expr] = 0;
+			var[(*it)->oper->solver_expr] = 0;
 			var[(*it)->idx->solver_expr] = 0;
 		}
 
@@ -489,8 +487,8 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 				it++
 			) {
 				auto selidx = var[(*it)->idx->solver_expr];
-				//auto selval = var[(*it)->oper->solver_expr];
-				//dbg("  sel: 0x%08lx\t0x%08lx\n",selidx,selval);
+				auto selval = var[(*it)->oper->solver_expr];
+				dbg("  sel: 0x%08lx\t0x%08lx\n",selidx,selval);
 				if(addrsp.handle_select(
 					selidx,(*it)->size) == 1
 				) {
@@ -501,6 +499,11 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 				cons.insert(
 					addrsp.mem_constraint.begin(),
 					addrsp.mem_constraint.end());
+				for(i = 0; i < addrsp.mem_symbol.size(); i++) {
+					auto sym = addrsp.mem_symbol[i].second;
+					expr_walk(trans_vis,sym);
+					var[sym->solver_expr] = 0;
+				}
 				continue;
 			}
 
@@ -511,7 +514,6 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 					cstate->symbol[i]->id,
 					var[cstate->symbol[i]->solver_expr]);
 			}
-			/*
 			for(i = 0; i < addrsp.mem_symbol.size(); i++) {
 				info("  addr\t%d\t0x%08lx: 0x%08lx\n",
 					addrsp.mem_symbol[i].second->id,
@@ -519,7 +521,6 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 					var[addrsp.mem_symbol[i].second-> \
 						solver_expr]);
 			}
-			*/
 
 			//create next state
 			nstate = ref<State>(
