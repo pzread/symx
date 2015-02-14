@@ -563,6 +563,18 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			err("TODO: inst\n");
 			break;
                 }
+		
+		//writeback
+		if(det->writeback) {
+			for(i = 0; i < det->op_count; i++) {
+				if(ops[i].type == ARM_OP_MEM) {
+					nr[ops[i].mem.base] = get_op_expr(
+						meta,
+						&ops[i]);
+					break;
+				}
+			}
+		}
 
 		if(nm != blk->mem) {
 			blk->mem = get_cc_expr(blk->mem,nm,blk->flag,det);
