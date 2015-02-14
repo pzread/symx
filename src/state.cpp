@@ -12,6 +12,8 @@
 #include"expr.h"
 #include"state.h"
 
+#include<capstone/arm.h>
+
 using namespace symx;
 
 namespace symx {
@@ -441,6 +443,10 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 		//initialize solver variable
 		next_expc = next_reg[ctx->REGIDX_PC];
 		var[next_expc->solver_expr] = 0;
+
+		var[next_reg[ARM_REG_R2]->solver_expr] = 0;
+		var[next_reg[ARM_REG_R3]->solver_expr] = 0;
+
 		var[next_exinsmd->solver_expr] = 0;
 		for(i = 0; i < cstate->symbol.size(); i++) {
 			expr_walk(trans_vis,cstate->symbol[i]);
@@ -467,19 +473,6 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 			next_rawpc = var[next_expc->solver_expr];
 			next_insmd = var[next_exinsmd->solver_expr];
 
-			//for "test" bound
-			if(next_rawpc < 0x10000 || next_rawpc >= 0x20000) {
-				dbg("0x%08lx touch bound, ignore\n",next_rawpc);
-				exclude_pc(
-					ctx,
-					&cons,
-					next_expc,
-					next_exinsmd,
-					next_rawpc,
-					next_insmd);
-				continue;
-			}
-
 			//update address space
 			bool addrsp_update = false;
 			for(auto it = selrec.begin();
@@ -504,6 +497,19 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 					expr_walk(trans_vis,sym);
 					var[sym->solver_expr] = 0;
 				}
+				continue;
+			}
+
+			//for "test" bound
+			if(next_rawpc < 0x10000 || next_rawpc >= 0x20000) {
+				dbg("0x%08lx touch bound, ignore\n",next_rawpc);
+				exclude_pc(
+					ctx,
+					&cons,
+					next_expc,
+					next_exinsmd,
+					next_rawpc,
+					next_insmd);
 				continue;
 			}
 
