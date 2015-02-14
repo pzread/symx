@@ -148,47 +148,53 @@ static refExpr get_relative_pc(const ProgCtr &pc) {
 }
 static refExpr get_op_expr(
 	const std::pair<refBlock,ProgCtr> &meta,
-	cs_arm_op *op
+	const cs_arm_op &op
 ) {
 	refExpr ret;
+	refExpr index;
 	
 	auto blk = meta.first;
 	auto &pc = meta.second;
 
-	if(op->type == ARM_OP_IMM) {
-		ret = BytVec::create_imm(4,op->imm);
-	} else if(op->type == ARM_OP_REG) {
-		if(op->reg == ARM_REG_PC) {
+	if(op.type == ARM_OP_IMM) {
+		ret = BytVec::create_imm(4,op.imm);
+	} else if(op.type == ARM_OP_REG) {
+		if(op.reg == ARM_REG_PC) {
 			ret = get_relative_pc(pc);
 		} else {
-			ret = blk->reg[op->reg];
+			ret = blk->reg[op.reg];
 		}
-	} else if(op->type == ARM_OP_MEM) {
+	} else if(op.type == ARM_OP_MEM) {
 		refExpr index;
-		if(op->mem.base != ARM_REG_INVALID) {
-			if(op->mem.base == ARM_REG_PC) {
+		if(op.mem.base != ARM_REG_INVALID) {
+			if(op.mem.base == ARM_REG_PC) {
 				ret = get_relative_pc(pc);
 			} else {
-				ret = blk->reg[op->mem.base];
+				ret = blk->reg[op.mem.base];
 			}
 		} else {
 			ret = BytVec::create_imm(4,0);
 		}
-		if(op->mem.index != ARM_REG_INVALID) {
-			if(op->mem.scale == 1) {
-				ret = expr_add(ret,blk->reg[op->mem.index]);
+		if(op.mem.index != ARM_REG_INVALID) {
+			if(op.mem.scale == 1) {
+				index = blk->reg[op.mem.index];
 			} else {
-				ret = expr_add(ret,expr_mul(
-					blk->reg[op->mem.index],
-					BytVec::create_imm(4,op->mem.scale)));
+				index = expr_mul(
+					blk->reg[op.mem.index],
+					BytVec::create_imm(4,op.mem.scale));
+			}
+			if(op.subtracted) {
+				ret = expr_sub(ret,index);
+			} else {
+				ret = expr_add(ret,index);
 			}
 		}
-		if(op->mem.disp != 0) {
-			ret = expr_add(ret,BytVec::create_imm(4,op->mem.disp));
+		if(op.mem.disp != 0) {
+			ret = expr_add(ret,BytVec::create_imm(4,op.mem.disp));
 		}
 	}
 
-	switch(op->shift.type) {
+	switch(op.shift.type) {
 	case ARM_SFT_INVALID:
 		break;
 	default:
@@ -197,6 +203,38 @@ static refExpr get_op_expr(
 	}
 
 	return ret;
+}
+static int set_pre_wb(
+	const std::pair<refBlock,ProgCtr> &meta,
+	const cs_arm_op &op,
+	refExpr *nreg
+) {
+	assert(op.type == ARM_OP_MEM);
+	assert(op.mem.base != ARM_REG_INVALID);
+	nreg[op.mem.base] = get_op_expr(meta,op);
+	return 0;
+}
+static int set_post_wb(
+	const std::pair<refBlock,ProgCtr> &meta,
+	const cs_arm_op op_base,
+	const cs_arm_op op_append,
+	refExpr *nreg
+) {
+	refExpr append;
+	assert(op_base.type == ARM_OP_MEM);
+	assert(op_base.mem.base != ARM_REG_INVALID);
+	assert(op_append.type != ARM_OP_MEM);
+	if(op_append.subtracted) {
+		append = expr_sub(
+			get_op_expr(meta,op_base),
+			get_op_expr(meta,op_append));
+	} else {
+		append = expr_add(
+			get_op_expr(meta,op_base),
+			get_op_expr(meta,op_append));
+	}
+	nreg[op_base.mem.base] = append;
+	return 0;
 }
 static refExpr get_cc_expr(
 	const refExpr old_expr,
@@ -408,7 +446,7 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			nm = blk->mem;
 			for(i = det->op_count - 1; i >= 0; i--) {
 				xrt = expr_sub(xrt,imm44);
-				xrs = get_op_expr(meta,&ops[i]);
+				xrs = get_op_expr(meta,ops[i]);
 				nm = expr_store(nm,xrt,xrs);
 			}
 			nr[ARM_REG_SP] = xrt;
@@ -420,14 +458,10 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 				xrt = expr_add(xrt,imm44);
 			}
 			nr[ARM_REG_SP] = xrt;
+			break;
 		case ARM_INS_ADD:
-			if(det->op_count == 2) {
-				xrd = get_op_expr(meta,&ops[0]);
-				xrs = get_op_expr(meta,&ops[1]);
-			} else {
-				xrd = get_op_expr(meta,&ops[1]);
-				xrs = get_op_expr(meta,&ops[2]);
-			}
+			xrd = get_op_expr(meta,ops[0]);
+			xrs = get_op_expr(meta,ops[1]);
 			nr[ops[0].reg] = expr_add(xrd,xrs);
 			/*
 			cond_sl(xrt,imm40);
@@ -441,8 +475,8 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			*/
 			break;
 		case ARM_INS_SUB:
-			xrd = get_op_expr(meta,&ops[0]);
-			xrs = get_op_expr(meta,&ops[1]);
+			xrd = get_op_expr(meta,ops[0]);
+			xrs = get_op_expr(meta,ops[1]);
 			nr[ops[0].reg] = expr_sub(xrd,xrs);
 			/*
 			if(ins->id == ARM_INS_SUBS){
@@ -459,7 +493,7 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			*/
 			break;
 		case ARM_INS_MOV:
-			nr[ops[0].reg] = get_op_expr(meta,&ops[1]);
+			nr[ops[0].reg] = get_op_expr(meta,ops[1]);
 			break;
 		case ARM_INS_MOVW:
 			assert(ops[1].type == ARM_OP_IMM);
@@ -469,14 +503,14 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			break;
 		case ARM_INS_MOVT:
 			assert(ops[1].type == ARM_OP_IMM);
-			xrd = get_op_expr(meta,&ops[0]);
+			xrd = get_op_expr(meta,ops[0]);
 			xrs = BytVec::create_imm(2,ops[1].imm);
 			nr[ops[0].reg] = expr_concat(expr_extract(xrd,0,2),xrs);
 			break;
 		case ARM_INS_STR:
 		case ARM_INS_STRB:
-			xrs = get_op_expr(meta,&ops[0]);
-			xrd = get_op_expr(meta,&ops[1]);
+			xrs = get_op_expr(meta,ops[0]);
+			xrd = get_op_expr(meta,ops[1]);
 			if(ins->id == ARM_INS_STR) {
 				nm = expr_store(blk->mem,xrd,xrs);
 			} else {
@@ -485,10 +519,19 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 					xrd,
 					expr_extract(xrs,0,1));
 			}
+			if(det->writeback) {
+				if(det->op_count == 2) {
+					set_pre_wb(meta,ops[1],nr);
+				} else if(det->op_count == 3){
+					set_post_wb(meta,ops[1],ops[2],nr);
+				} else {
+					err("WB unexcepted\n");
+				}
+			}
 			break;
 		case ARM_INS_LDR:
 		case ARM_INS_LDRB:
-			xrs = get_op_expr(meta,&ops[1]);
+			xrs = get_op_expr(meta,ops[1]);
 			if(ins->id == ARM_INS_LDR) {
 				nr[ops[0].reg] = expr_select(blk->mem,xrs,4);
 			} else {
@@ -496,10 +539,19 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 					expr_select(blk->mem,xrs,1),
 					4);
 			}
+			if(det->writeback) {
+				if(det->op_count == 2) {
+					set_pre_wb(meta,ops[1],nr);
+				} else if(det->op_count == 3){
+					set_post_wb(meta,ops[1],ops[2],nr);
+				} else {
+					err("WB unexcepted\n");
+				}
+			}
 			break;
 		case ARM_INS_CMP:
-			xrd = get_op_expr(meta,&ops[0]);
-			xrs = get_op_expr(meta,&ops[1]);
+			xrd = get_op_expr(meta,ops[0]);
+			xrs = get_op_expr(meta,ops[1]);
 			xrt = expr_sub(xrd,xrs);
 			cdt = cond_sl(xrt,imm40);
 			nf[ARM_SR_N] = cdt;
@@ -510,7 +562,7 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 				cond_xor(cond_sl(expr_neg(xrs),imm40),cdt));
 			break;
 		case ARM_INS_TBB:
-			xrs = get_op_expr(meta,&ops[0]);
+			xrs = get_op_expr(meta,ops[0]);
 			xrt = expr_zext(expr_select(blk->mem,xrs,1),4);
 			nr[ARM_REG_PC] = expr_add(
 				get_relative_pc(pc),
@@ -519,8 +571,8 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			break;
 		case ARM_INS_CBZ:
 		case ARM_INS_CBNZ:
-			xrs = get_op_expr(meta,&ops[0]);
-			xrd = get_op_expr(meta,&ops[1]);
+			xrs = get_op_expr(meta,ops[0]);
+			xrd = get_op_expr(meta,ops[1]);
 			cdt = cond_eq(xrs,imm40);
 			if(ins->id == ARM_INS_CBZ) {
 				nr[ARM_REG_PC] = expr_ite(
@@ -553,7 +605,7 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			nr[ARM_REG_LR] = xrt;
 		case ARM_INS_B:
 		case ARM_INS_BX:
-			xrd = get_op_expr(meta,&ops[0]);
+			xrd = get_op_expr(meta,ops[0]);
 			if(ins->id == ARM_INS_B || ins->id == ARM_INS_BL) {
 				branch_flag = true;
 			}
@@ -563,18 +615,6 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			err("TODO: inst\n");
 			break;
                 }
-		
-		//writeback
-		if(det->writeback) {
-			for(i = 0; i < det->op_count; i++) {
-				if(ops[i].type == ARM_OP_MEM) {
-					nr[ops[i].mem.base] = get_op_expr(
-						meta,
-						&ops[i]);
-					break;
-				}
-			}
-		}
 
 		if(nm != blk->mem) {
 			blk->mem = get_cc_expr(blk->mem,nm,blk->flag,det);
