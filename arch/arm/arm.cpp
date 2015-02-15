@@ -180,66 +180,72 @@ static refExpr get_op_expr(
 				index = blk->reg[op.mem.index];
 			} else {
 				err("unhandled scale\n");
-				index = expr_mul(
+				/*index = expr_mul(
 					blk->reg[op.mem.index],
-					BytVec::create_imm(4,op.mem.scale));
+					BytVec::create_imm(4,op.mem.scale));*/
 			}
-			switch(op.shift.type) {
-			case ARM_SFT_INVALID:
-				break;
-			case ARM_SFT_ASR:
-				index = expr_ashr(
-					index,
-					BytVec::create_imm(4,op.shift.value));
-				break;
-			case ARM_SFT_LSL:
+			if(op.mem.lshift > 0) {
 				index = expr_shl(
 					index,
-					BytVec::create_imm(4,op.shift.value));
-				break;
-			case ARM_SFT_LSR:
-				index = expr_lshr(
-					index,
-					BytVec::create_imm(4,op.shift.value));
-				break;
-			case ARM_SFT_ROR:
-				index = expr_ror(
-					index,
-					BytVec::create_imm(4,op.shift.value));
-				break;
-			case ARM_SFT_ASR_REG:
-				index = expr_ashr(
-					index,
-					blk->reg[op.shift.value]);
-				break;
-			case ARM_SFT_LSL_REG:
-				index = expr_shl(
-					index,
-					blk->reg[op.shift.value]);
-				break;
-			case ARM_SFT_LSR_REG:
-				index = expr_lshr(
-					index,
-					blk->reg[op.shift.value]);
-				break;
-			case ARM_SFT_ROR_REG:
-				index = expr_ror(
-					index,
-					blk->reg[op.shift.value]);
-				break;
-			default:
-				err("TODO: shift\n");
-				break;
+					BytVec::create_imm(4,op.mem.lshift));
 			}
-			if(op.subtracted) {
-				ret = expr_sub(ret,index);
-			} else {
-				ret = expr_add(ret,index);
-			}
+			ret = expr_add(ret,index);
 		}
 		if(op.mem.disp != 0) {
 			ret = expr_add(ret,BytVec::create_imm(4,op.mem.disp));
 		}
+
+		switch(op.shift.type) {
+		case ARM_SFT_INVALID:
+			break;
+		/*case ARM_SFT_ASR:
+			index = expr_ashr(
+				index,
+				BytVec::create_imm(4,op.shift.value));
+			break;
+		case ARM_SFT_LSL:
+			index = expr_shl(
+				index,
+				BytVec::create_imm(4,op.shift.value));
+			break;
+		case ARM_SFT_LSR:
+			index = expr_lshr(
+				index,
+				BytVec::create_imm(4,op.shift.value));
+			break;
+		case ARM_SFT_ROR:
+			index = expr_ror(
+				index,
+				BytVec::create_imm(4,op.shift.value));
+			break;
+		case ARM_SFT_ASR_REG:
+			index = expr_ashr(
+				index,
+				blk->reg[op.shift.value]);
+			break;
+		case ARM_SFT_LSL_REG:
+			index = expr_shl(
+				index,
+				blk->reg[op.shift.value]);
+			break;
+		case ARM_SFT_LSR_REG:
+			index = expr_lshr(
+				index,
+				blk->reg[op.shift.value]);
+			break;
+		case ARM_SFT_ROR_REG:
+			index = expr_ror(
+				index,
+				blk->reg[op.shift.value]);
+			break;*/
+		default:
+			err("TODO: shift\n");
+			break;
+		}
+		/*if(op.subtracted) {
+			ret = expr_sub(ret,index);
+		} else {
+		}*/
 	}
 
 	return ret;
