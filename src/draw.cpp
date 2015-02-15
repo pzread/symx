@@ -11,7 +11,13 @@ Draw::Draw() {
 	g = agopen((char*)"flow",Agdirected,NULL);
 	agattr(g,AGNODE,(char*)"shape",(char*)"box");
 	agattr(g,AGNODE,(char*)"label",(char*)"");
-	agattr(g,AGNODE,(char*)"labelfloat",(char*)"Monospace");
+	agattr(g,AGNODE,(char*)"fontname",(char*)"Courier");
+	agattr(g,AGEDGE,(char*)"headport",(char*)"n");
+	agattr(g,AGEDGE,(char*)"tailport",(char*)"s");
+	agattr(g,AGEDGE,(char*)"arrowsize",(char*)"0.5");
+	agattr(g,AGRAPH,(char*)"splines",(char*)"spline");
+	agattr(g,AGRAPH,(char*)"ranksep",(char*)"0.8");
+	agattr(g,AGRAPH,(char*)"center",(char*)"true");
 }
 Draw::~Draw() {
 	agclose(g);

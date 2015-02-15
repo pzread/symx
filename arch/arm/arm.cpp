@@ -151,7 +151,7 @@ static refExpr get_op_expr(
 	const cs_arm_op &op
 ) {
 	refExpr ret;
-	refExpr index;
+	refExpr append;
 	
 	auto blk = meta.first;
 	auto &pc = meta.second;
@@ -165,34 +165,39 @@ static refExpr get_op_expr(
 			ret = blk->reg[op.reg];
 		}
 	} else if(op.type == ARM_OP_MEM) {
-		refExpr index;
-		if(op.mem.base != ARM_REG_INVALID) {
-			if(op.mem.base == ARM_REG_PC) {
-				ret = get_relative_pc(pc);
-			} else {
-				ret = blk->reg[op.mem.base];
-			}
+		assert(op.mem.base != ARM_REG_INVALID);
+		if(op.mem.base == ARM_REG_PC) {
+			ret = get_relative_pc(pc);
 		} else {
-			ret = BytVec::create_imm(4,0);
+			ret = blk->reg[op.mem.base];
 		}
+		append = imm40;
 		if(op.mem.index != ARM_REG_INVALID) {
-			if(op.mem.scale == 1) {
-				index = blk->reg[op.mem.index];
-			} else {
-				err("unhandled scale\n");
-				/*index = expr_mul(
-					blk->reg[op.mem.index],
-					BytVec::create_imm(4,op.mem.scale));*/
+			append = blk->reg[op.mem.index];
+			if(op.mem.scale == -1) {
+				append = expr_neg(blk->reg[op.mem.index]);
 			}
 			if(op.mem.lshift > 0) {
-				index = expr_shl(
-					index,
+				append = expr_shl(
+					append,
 					BytVec::create_imm(4,op.mem.lshift));
 			}
-			ret = expr_add(ret,index);
 		}
 		if(op.mem.disp != 0) {
-			ret = expr_add(ret,BytVec::create_imm(4,op.mem.disp));
+			if(append == imm40) {
+				append = BytVec::create_imm(4,op.mem.disp);
+			} else {
+				append = expr_add(
+					append,
+					BytVec::create_imm(4,op.mem.disp));
+			}
+		}
+		if(append != imm40) {
+			if(op.subtracted) {
+				ret = expr_sub(ret,append);
+			} else {
+				ret = expr_add(ret,append);
+			}
 		}
 
 		switch(op.shift.type) {
@@ -242,10 +247,6 @@ static refExpr get_op_expr(
 			err("TODO: shift\n");
 			break;
 		}
-		/*if(op.subtracted) {
-			ret = expr_sub(ret,index);
-		} else {
-		}*/
 	}
 
 	return ret;
