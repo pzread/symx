@@ -12,6 +12,8 @@
 #include"draw.h"
 #include"state.h"
 
+#include<capstone/capstone.h>
+
 using namespace symx;
 
 namespace symx {
@@ -383,12 +385,14 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 	int next_insmd;
 	std::unordered_set<refMemRecord> selrec;
 
+	bool exp_flag = false;
+
 	auto draw = Draw();
 
 	nstate = create_static_state(ctx,probe,addrsp,entry_rawpc);
 	ctx->state.push(nstate);
 
-	while(!ctx->state.empty()) {
+	while(!ctx->state.empty() && !exp_flag) {
 		cstate = ctx->state.front();
 		ctx->state.pop();
 		info("\e[1;32mrun state 0x%x\e[m\n",cstate->pc);
@@ -450,8 +454,10 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 		next_expc = next_reg[ctx->REGIDX_PC];
 		var[next_expc->solver_expr] = 0;
 
-		var[next_reg[ARM_REG_R2]->solver_expr] = 0;
+		var[next_reg[ARM_REG_R0]->solver_expr] = 0;
 		var[next_reg[ARM_REG_R3]->solver_expr] = 0;
+		var[next_reg[ARM_REG_R7]->solver_expr] = 0;
+		var[next_reg[ARM_REG_SP]->solver_expr] = 0;
 
 		var[next_exinsmd->solver_expr] = 0;
 		for(i = 0; i < cstate->symbol.size(); i++) {
@@ -486,8 +492,8 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 				it++
 			) {
 				auto selidx = var[(*it)->idx->solver_expr];
-				auto selval = var[(*it)->oper->solver_expr];
-				dbg("  sel: 0x%08lx\t0x%08lx\n",selidx,selval);
+				//auto selval = var[(*it)->oper->solver_expr];
+				//dbg("  sel: 0x%08lx\t0x%08lx\n",selidx,selval);
 				if(addrsp.handle_select(
 					selidx,(*it)->size) == 1
 				) {
@@ -518,24 +524,34 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 					next_exinsmd,
 					next_rawpc,
 					next_insmd);
-				break;
-				//continue;
-			}
 
-			//show message
-			info("next pc 0x%08lx\n",next_rawpc);
-			for(i = 0; i < cstate->symbol.size(); i++) {
-				info("  sym\t%d: 0x%08lx\n",
-					cstate->symbol[i]->id,
-					var[cstate->symbol[i]->solver_expr]);
+				//show message
+				info("next pc 0x%08lx\n",next_rawpc);
+				for(i = 0; i < cstate->symbol.size(); i++) {
+					info("  sym\t%d: 0x%08lx\n",
+						cstate->symbol[i]->id,
+						var[cstate->symbol[i]->solver_expr]);
+				}
+				for(i = 0; i < addrsp.mem_symbol.size(); i++) {
+					info("  addr\t%d\t0x%08lx: 0x%08lx\n",
+						addrsp.mem_symbol[i].second->id,
+						addrsp.mem_symbol[i].first,
+						var[addrsp.mem_symbol[i].second-> \
+							solver_expr]);
+				}
+
+				if(next_rawpc == 0xDEADBEEE) {
+					continue;
+				} else {
+					dbg("exp\n");
+					exp_flag = true;
+					break;
+				}
 			}
-			for(i = 0; i < addrsp.mem_symbol.size(); i++) {
-				info("  addr\t%d\t0x%08lx: 0x%08lx\n",
-					addrsp.mem_symbol[i].second->id,
-					addrsp.mem_symbol[i].first,
-					var[addrsp.mem_symbol[i].second-> \
-						solver_expr]);
-			}
+			/*info(" r0\t%08lx\n",var[next_reg[ARM_REG_R0]->solver_expr]);
+			info(" r3\t%08lx\n",var[next_reg[ARM_REG_R3]->solver_expr]);
+			info(" r7\t%08lx\n",var[next_reg[ARM_REG_R7]->solver_expr]);
+			info(" sp\t%08lx\n",var[next_reg[ARM_REG_SP]->solver_expr]);*/
 
 			//create next state
 			nstate = ref<State>(

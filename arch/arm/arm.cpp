@@ -78,7 +78,7 @@ uint64_t ARMProbe::read_reg(const unsigned int regid,bool *symbol) {
 	case ARM_REG_SP:
 		return 0xBEAFF000;
 	case ARM_REG_LR:
-		return 0xDEADEEF0;
+		return 0xDEADBEEE;
 	}
 	return 0;
 }
@@ -518,9 +518,28 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			nr[ARM_REG_SP] = xrt;
 			break;
 		case ARM_INS_ADD:
-			xrd = get_op_expr(meta,ops[0]);
-			xrs = get_op_expr(meta,ops[1]);
-			nr[ops[0].reg] = expr_add(xrd,xrs);
+		case ARM_INS_SUB:
+		case ARM_INS_MUL:
+			if(det->op_count == 2) {
+				xrd = get_op_expr(meta,ops[0]);
+				xrs = get_op_expr(meta,ops[1]);
+			} else {
+				xrd = get_op_expr(meta,ops[1]);
+				xrs = get_op_expr(meta,ops[2]);
+			}
+			switch(ins->id) {
+			case ARM_INS_ADD:
+				xrt = expr_add(xrd,xrs);
+				break;
+			case ARM_INS_SUB:
+				xrt = expr_sub(xrd,xrs);
+				break;
+			case ARM_INS_MUL:
+				xrt = expr_mul(xrd,xrs);
+				break;
+			}
+			nr[ops[0].reg] = xrt;
+			break;
 			/*
 			cond_sl(xrt,imm40);
 			cond_eq(xrt,imm40);
@@ -531,34 +550,6 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 				cond_xor(cond_sl(xrd,imm40),cdt),
 				cond_xor(cond_sl(xrs,imm40),cdt));
 			*/
-			break;
-		case ARM_INS_SUB:
-			xrd = get_op_expr(meta,ops[0]);
-			xrs = get_op_expr(meta,ops[1]);
-			nr[ops[0].reg] = expr_sub(xrd,xrs);
-			/*
-			if(ins->id == ARM_INS_SUBS){
-				cdt = cond_sl(xrt,imm40);
-				cond_sl(xrt,imm40);
-				cond_eq(xrt,imm40);
-				cond_uge(xrd,xrs);
-				cond_and(
-					cond_xor(cond_sl(xrd,imm40),cdt),
-					cond_xor(
-						cond_sl(expr_neg(xrs),imm40),
-						cdt));
-			}
-			*/
-			break;
-		case ARM_INS_MUL:
-			if(det->op_count == 2) {
-				err("TODO mul\n");
-			} else {
-				xrd = get_op_expr(meta,ops[1]);
-				xrs = get_op_expr(meta,ops[2]);
-				nr[ops[0].reg] = expr_mul(xrd,xrs);
-			}
-			break;
 		case ARM_INS_MOV:
 			nr[ops[0].reg] = get_op_expr(meta,ops[1]);
 			break;
