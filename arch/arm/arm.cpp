@@ -74,7 +74,7 @@ uint64_t ARMProbe::read_reg(const unsigned int regid,bool *symbol) {
 	case ARM_REG_R12:
 		return 0x0;
 	case ARM_REG_PC:
-		return 0x102E0;
+		return 0x10A0C;
 	case ARM_REG_SP:
 		return 0xBEAFF000;
 	case ARM_REG_LR:
@@ -550,6 +550,15 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			}
 			*/
 			break;
+		case ARM_INS_MUL:
+			if(det->op_count == 2) {
+				err("TODO mul\n");
+			} else {
+				xrd = get_op_expr(meta,ops[1]);
+				xrs = get_op_expr(meta,ops[2]);
+				nr[ops[0].reg] = expr_mul(xrd,xrs);
+			}
+			break;
 		case ARM_INS_MOV:
 			nr[ops[0].reg] = get_op_expr(meta,ops[1]);
 			break;
@@ -589,7 +598,6 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 			break;
 		case ARM_INS_LDR:
 		case ARM_INS_LDRB:
-			info("%d\n",ops[1].shift.value);
 			xrs = get_op_expr(meta,ops[1]);
 			if(ins->id == ARM_INS_LDR) {
 				nr[ops[0].reg] = expr_select(blk->mem,xrs,4);

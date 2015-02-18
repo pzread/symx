@@ -518,7 +518,8 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 					next_exinsmd,
 					next_rawpc,
 					next_insmd);
-				continue;
+				break;
+				//continue;
 			}
 
 			//show message
