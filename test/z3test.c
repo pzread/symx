@@ -57,5 +57,7 @@ int main(){
 	model = Z3_solver_get_model(context,solver);
 	fprintf(stderr,"%s\n",Z3_model_to_string(context,model));
 
+	fprintf(stderr,"%s\n",Z3_simplify_get_help(context));
+
 	return 0;
 }

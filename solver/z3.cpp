@@ -32,6 +32,19 @@ namespace z3_solver {
 		bvsort4 = Z3_mk_bv_sort(solver->context,32);
 		bvimm41 = Z3_mk_unsigned_int64(solver->context,1,bvsort4);
 		INCREF(bvimm41);
+
+		simplify_param = Z3_mk_params(solver->context);
+		Z3_params_inc_ref(solver->context,simplify_param);
+		Z3_params_set_bool(
+			solver->context,
+			simplify_param,
+			Z3_mk_string_symbol(solver->context,"sort_store"),
+			Z3_TRUE);
+		Z3_params_set_bool(
+			solver->context,
+			simplify_param,
+			Z3_mk_string_symbol(solver->context,"mul2concat"),
+			Z3_TRUE);
 	}
 	Z3_ast Z3TransVisitor::expr_to_ast(const symx::refExpr expr) {
 		if(expr->solver_expr == nullptr) {
@@ -341,7 +354,10 @@ namespace z3_solver {
 			return -1;
 		}
 		auto old_ast = res_ast;
-		res_ast = Z3_simplify(solver->context,res_ast);
+		res_ast = Z3_simplify_ex(
+			solver->context,
+			res_ast,
+			simplify_param);
 		INCREF(res_ast);
 		DECREF(old_ast);
 		oper->solver_expr = ref<Z3SolvExpr>(solver->context,res_ast);
@@ -468,7 +484,10 @@ namespace z3_solver {
 			return -1;
 		}
 		auto old_ast = res_ast;
-		res_ast = Z3_simplify(solver->context,res_ast);
+		res_ast = Z3_simplify_ex(
+			solver->context,
+			res_ast,
+			simplify_param);
 		INCREF(res_ast);
 		DECREF(old_ast);
 		cond->solver_cond = ref<Z3SolvCond>(solver->context,res_ast);

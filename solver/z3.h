@@ -39,6 +39,7 @@ namespace z3_solver {
 			Z3_ast bvimm41;
 			Z3_ast expr_to_ast(const symx::refExpr expr);
 			Z3_ast cond_to_ast(const symx::refCond cond);
+			Z3_params simplify_param;
 	};
 	class Z3Solver : public symx::Solver {
 		public:
