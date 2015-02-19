@@ -24,7 +24,7 @@ typedef std::shared_ptr<MemRecord> refMemRecord;
 typedef std::shared_ptr<Block> refBlock;
 typedef std::shared_ptr<State> refState;
 
-class MemPage {
+class MemPage : public std::enable_shared_from_this<MemPage> {
 	public:
 		const uint64_t start;
 		const unsigned int prot;
@@ -32,7 +32,7 @@ class MemPage {
 		MemPage(const uint64_t _start,const unsigned int _prot)
 			: start(_start),prot(_prot) {}
 };
-class MemRecord {
+class MemRecord : public std::enable_shared_from_this<MemRecord> {
 	public:
 		const refOperator oper;
 		const refExpr mem;
@@ -58,7 +58,7 @@ class AddrSpace {
 		refExpr mem;
 		std::map<uint64_t,MemPage> page_map;
 };
-class BaseState {
+class BaseState : public std::enable_shared_from_this<BaseState> {
 	public:
 		refExpr mem;
 		refExpr reg[256];
@@ -81,7 +81,6 @@ class Block : public BaseState {
 		std::vector<std::string> discode;
 		Block(const ProgCtr _pc) : pc(_pc) {};
 };
-class TransVisitor : public symx::ExprVisitor {};
 class BuildVisitor : public ExprVisitor {
 	public:
 		BuildVisitor(const refState _state) : state(_state) {}
@@ -103,6 +102,7 @@ class BuildVisitor : public ExprVisitor {
 		std::unordered_map<refCond,refCond> cond_map;
 		std::unordered_set<refMemRecord> select_record;
 };
+class TransVisitor : public ExprVisitor {};
 
 refBlock state_create_block(Context *ctx,const ProgCtr &pc);
 int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc);
