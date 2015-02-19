@@ -47,6 +47,7 @@ namespace z3_solver {
 
 			Z3Solver();
 			symx::TransVisitor* create_translator();
+			symx::refSolvExpr reduce(const symx::refSolvExpr &expr);
 			bool solve(
 				const std::unordered_set
 					<symx::refSolvCond> &cons,

@@ -425,7 +425,7 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 		next_mem = build_vis->get_expr(cblk->mem);
 		for(i = 0; i < ctx->NUMREG; i++) {
 			expr_walk(build_vis,cblk->reg[i]);
-			next_reg[i] = build_vis->get_expr(cblk->reg[i]);
+			next_reg[i] =  build_vis->get_expr(cblk->reg[i]);
 		}
 		for(i = 0; i < ctx->NUMFLAG; i++) {
 			expr_walk(build_vis,cblk->flag[i]);
@@ -539,6 +539,10 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 						var[addrsp.mem_symbol[i].second-> \
 							solver_expr]);
 				}
+				info(" r0\t%08lx\n",var[next_reg[ARM_REG_R0]->solver_expr]);
+				info(" r3\t%08lx\n",var[next_reg[ARM_REG_R3]->solver_expr]);
+				info(" r7\t%08lx\n",var[next_reg[ARM_REG_R7]->solver_expr]);
+				info(" sp\t%08lx\n",var[next_reg[ARM_REG_SP]->solver_expr]);
 
 				if(next_rawpc == 0xDEADBEEE) {
 					continue;
@@ -548,11 +552,7 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 					break;
 				}
 			}
-			/*info(" r0\t%08lx\n",var[next_reg[ARM_REG_R0]->solver_expr]);
-			info(" r3\t%08lx\n",var[next_reg[ARM_REG_R3]->solver_expr]);
-			info(" r7\t%08lx\n",var[next_reg[ARM_REG_R7]->solver_expr]);
-			info(" sp\t%08lx\n",var[next_reg[ARM_REG_SP]->solver_expr]);*/
-
+			
 			//create next state
 			nstate = ref<State>(
 				ProgCtr(next_rawpc,next_insmd),

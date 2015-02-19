@@ -340,6 +340,10 @@ namespace z3_solver {
 			err("illegal case\n");
 			return -1;
 		}
+		auto old_ast = res_ast;
+		res_ast = Z3_simplify(solver->context,res_ast);
+		INCREF(res_ast);
+		DECREF(old_ast);
 		oper->solver_expr = ref<Z3SolvExpr>(solver->context,res_ast);
 		DECREF(res_ast);
 		return 0;
@@ -463,6 +467,10 @@ namespace z3_solver {
 			err("illegal case\n");
 			return -1;
 		}
+		auto old_ast = res_ast;
+		res_ast = Z3_simplify(solver->context,res_ast);
+		INCREF(res_ast);
+		DECREF(old_ast);
 		cond->solver_cond = ref<Z3SolvCond>(solver->context,res_ast);
 		DECREF(res_ast);
 		return 0;
@@ -479,6 +487,16 @@ namespace z3_solver {
 	symx::TransVisitor* Z3Solver::create_translator() {
 		return new Z3TransVisitor(this);
 	}
+	refSolvExpr Z3Solver::reduce(const refSolvExpr &expr) {
+		auto solvexpr = std::static_pointer_cast<Z3SolvExpr>(expr);
+		auto tmp = Z3_simplify(context,(solvexpr)->ast);
+		Z3_inc_ref(context,tmp);
+		//dbg("%s\n",Z3_ast_to_string(context,tmp));
+		//dbg("---- %s\n",Z3_ast_to_string(context,solvexpr->ast));
+		return ref<Z3SolvExpr>(
+			context,
+			tmp);
+	}
 	bool Z3Solver::solve(
 		const std::unordered_set<refSolvCond> &cons,
 		std::unordered_map<refSolvExpr,uint64_t> *var
@@ -491,6 +509,7 @@ namespace z3_solver {
 		for(auto it = cons.begin(); it != cons.end(); it++) {
 			auto cond = std::static_pointer_cast<Z3SolvCond>(*it);
 			Z3_solver_assert(context,solver,cond->ast);
+			//dbg("---%s\n",Z3_ast_to_string(context,cond->ast));
 		}
 		if(Z3_solver_check(context,solver) != Z3_TRUE) {
 			return false;
