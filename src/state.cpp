@@ -380,6 +380,7 @@ int state_executor(
 	unsigned int i;
 	Solver *solver = ctx->solver;
 	AddrSpace addrsp(ctx,probe);
+	TransVisitor *trans_vis;
 	refState nstate,cstate;
 	refBlock cblk;
 	std::unordered_set<refCond> cons;
@@ -400,6 +401,7 @@ int state_executor(
 	nstate = create_static_state(ctx,probe,addrsp,entry_rawpc);
 	ctx->state.push(nstate);
 
+	trans_vis = solver->create_translator();
 	while(!ctx->state.empty() && !exp_flag) {
 		cstate = ctx->state.front();
 		ctx->state.pop();
@@ -445,7 +447,6 @@ int state_executor(
 		build_vis->get_mem_record(&selrec);
 		delete build_vis;
 
-		auto trans_vis = solver->create_translator();
 		//initialize reg, flag, constraint
 		expr_walk(trans_vis,next_exinsmd);
 		expr_walk(trans_vis,next_mem);
@@ -597,12 +598,11 @@ int state_executor(
 				next_insmd);
 			ctx->state.push(nstate);
 		}
-
-		delete trans_vis;
 	}
 
 	draw.output("flow.dot");
 
+	delete trans_vis;
 	return 0;
 }
 
