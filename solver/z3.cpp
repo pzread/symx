@@ -512,9 +512,7 @@ namespace z3_solver {
 		Z3_inc_ref(context,tmp);
 		//dbg("%s\n",Z3_ast_to_string(context,tmp));
 		//dbg("---- %s\n",Z3_ast_to_string(context,solvexpr->ast));
-		return ref<Z3SolvExpr>(
-			context,
-			tmp);
+		return ref<Z3SolvExpr>(context,tmp);
 	}
 	bool Z3Solver::solve(
 		const std::unordered_set<refSolvCond> &cons,
