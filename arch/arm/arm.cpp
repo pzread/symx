@@ -42,7 +42,7 @@ ARMProbe::ARMProbe(pid_t _pid,int fd,uint64_t _off) : pid(_pid),off(_off) {
 	fstat(fd,&st);
 	bin = (uint8_t*)mmap(NULL,st.st_size,PROT_READ,MAP_PRIVATE,fd,0);
 }
-uint64_t ARMProbe::read_reg(const unsigned int regid,bool *symbol) {
+uint64_t ARMProbe::read_reg(const unsigned int regid,bool *symbol) const {
 	//for test
 	*symbol = false;
 	switch(regid) {
@@ -82,7 +82,7 @@ uint64_t ARMProbe::read_reg(const unsigned int regid,bool *symbol) {
 	}
 	return 0;
 }
-bool ARMProbe::read_flag(const unsigned int flagid) {
+bool ARMProbe::read_flag(const unsigned int flagid) const {
 	//for test
 	switch(flagid) {
 	case ARM_SR_N:
@@ -100,7 +100,7 @@ ssize_t ARMProbe::read_mem(
 	const uint64_t addr,
 	const uint8_t *buf,
 	const size_t len
-) {
+) const {
 	//for test
 	if(addr >= 0xBEAFF000) {
 		if(len != 1) {
@@ -114,11 +114,11 @@ ssize_t ARMProbe::read_mem(
 	}
 	return len;
 }
-int ARMProbe::get_insmd() {
+int ARMProbe::get_insmd() const {
 	//for test
 	return CS_MODE_THUMB;
 }
-std::vector<MemPage> ARMProbe::get_mem_map() {
+std::vector<MemPage> ARMProbe::get_mem_map() const {
 	std::vector<MemPage> mem_map;
 	//for test
 	mem_map.push_back(MemPage(0x10000,PAGE_READ | PAGE_EXEC | PAGE_PROBE));
@@ -439,9 +439,9 @@ static refCond get_cc_cond(
 	}
 	return ret_cond;
 }
-refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
+refBlock ARMContext::interpret(const refProbe &_probe,const ProgCtr &entry_pc) {
 	int i;
-	refARMProbe probe = std::dynamic_pointer_cast<ARMProbe>(_probe);
+	const refARMProbe probe = std::dynamic_pointer_cast<ARMProbe>(_probe);
         refBlock blk = state_create_block(this,entry_pc);
 	cs_insn *insn,*ins;
         size_t count;
@@ -450,6 +450,8 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
         cs_arm_op *ops;
 	bool end_flag;
 
+	ProgCtr pc;
+	std::pair<refBlock,ProgCtr> meta;
 	bool branch_flag;
 	refExpr nr[ARM_REG_ENDING];
 	refExpr nm,xrd,xrs,xrt;
@@ -477,6 +479,9 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 		0,
 		&insn);
 
+	pc = entry_pc;
+	meta.first = blk;
+	meta.second = pc;
         ins = insn;
 	end_flag = false;
 	for(idx = 0; idx < count && !end_flag; idx++) {
@@ -490,8 +495,7 @@ refBlock ARMContext::interpret(refProbe _probe,const ProgCtr &entry_pc) {
 		info("%s\n",codeline);
 		blk->discode.push_back(codeline);
 
-		auto pc = ProgCtr(ins->address,entry_pc.insmd);
-		auto meta = std::make_pair(blk,pc);
+		pc.rawpc = ins->address;
                 det = &ins->detail->arm;
                 ops = det->operands;
 		blk->reg[ARM_REG_PC] = BytVec::create_imm(4,pc.rawpc);

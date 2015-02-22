@@ -49,12 +49,12 @@ class AddrSpace {
 	public:
 		std::vector<std::pair<uint64_t,refBytVec>> mem_symbol;
 		std::unordered_set<refCond> mem_constraint;
-		AddrSpace(Context *ctx,refProbe _probe);
+		AddrSpace(Context *ctx,const refProbe &_probe);
 		refExpr get_mem() const;
 		int handle_select(const uint64_t idx,const unsigned int size);
 	private:
+		const refProbe probe;
 		Context *ctx;
-		refProbe probe;
 		refExpr mem;
 		std::map<uint64_t,MemPage> page_map;
 };
@@ -67,11 +67,11 @@ class BaseState : public std::enable_shared_from_this<BaseState> {
 class State : public BaseState {
 	public:
 		const ProgCtr pc;
-		refProbe probe;
+		const refProbe probe;
 		std::vector<refBytVec> symbol;
 		std::unordered_set<refCond> constraint;
 		std::unordered_set<refMemRecord> select_record;
-		State(const ProgCtr _pc,refProbe _probe)
+		State(const ProgCtr &_pc,const refProbe &_probe)
 			: pc(_pc),probe(_probe) {}
 };
 class Block : public BaseState {
@@ -105,7 +105,10 @@ class BuildVisitor : public ExprVisitor {
 class TransVisitor : public ExprVisitor {};
 
 refBlock state_create_block(Context *ctx,const ProgCtr &pc);
-int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc);
+int state_executor(
+	Context *ctx,
+	const refProbe &probe,
+	const uint64_t entry_rawpc);
 
 }
 

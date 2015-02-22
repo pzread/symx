@@ -18,7 +18,12 @@ using namespace symx;
 
 namespace symx {
 
-AddrSpace::AddrSpace(Context *_ctx,refProbe _probe) : ctx(_ctx),probe(_probe) {
+AddrSpace::AddrSpace(
+	Context *_ctx,
+	const refProbe &_probe) :
+	probe(_probe),
+	ctx(_ctx)
+{
 	mem = BytMem::create_var(ctx);
 	auto mem_map = probe->get_mem_map();
 	for(auto it = mem_map.begin(); it != mem_map.end(); it++) {
@@ -304,7 +309,7 @@ refBlock state_create_block(Context *ctx,const ProgCtr &pc) {
 }
 static refState create_static_state(
 	Context *ctx,
-	refProbe probe,
+	const refProbe &probe,
 	const AddrSpace &addrsp,
 	uint64_t rawpc
 ) {
@@ -367,7 +372,11 @@ static void exclude_pc(
 ) {
 	cons->insert(cond_not(create_pc_cond(ctx,expc,exinsmd,rawpc,insmd)));
 }
-int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
+int state_executor(
+	Context *ctx,
+	const refProbe &probe,
+	const uint64_t entry_rawpc
+) {
 	unsigned int i;
 	Solver *solver = ctx->solver;
 	AddrSpace addrsp(ctx,probe);
@@ -385,9 +394,8 @@ int state_executor(Context *ctx,refProbe probe,const uint64_t entry_rawpc) {
 	int next_insmd;
 	std::unordered_set<refMemRecord> selrec;
 
-	bool exp_flag = false;
-
 	auto draw = Draw();
+	bool exp_flag = false;
 
 	nstate = create_static_state(ctx,probe,addrsp,entry_rawpc);
 	ctx->state.push(nstate);

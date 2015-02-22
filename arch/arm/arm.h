@@ -29,20 +29,20 @@ class ARMProbe : public symx::Probe {
 		uint64_t off;
 
 		ARMProbe(pid_t _pid,int fd,uint64_t _off);
-		uint64_t read_reg(const unsigned int regid,bool *symbol);
-		bool read_flag(const unsigned int flagid);
+		uint64_t read_reg(const unsigned int regid,bool *symbol) const;
+		bool read_flag(const unsigned int flagid) const;
 		ssize_t read_mem(
 			const uint64_t addr,
 			const uint8_t *buf,
-			const size_t len);
-		int get_insmd();
-		std::vector<symx::MemPage> get_mem_map();
+			const size_t len) const;
+		int get_insmd() const;
+		std::vector<symx::MemPage> get_mem_map() const;
 };
 class ARMContext : public symx::Context {
 	public:
 		ARMContext(symx::Solver *solver);
 		symx::refBlock interpret(
-			symx::refProbe _probe,
+			const symx::refProbe &_probe,
 			const symx::ProgCtr &pc);
 };
 

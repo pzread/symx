@@ -18,8 +18,9 @@
 namespace symx {
 	class ProgCtr {
 		public:
-			const uint64_t rawpc;
-			const int insmd;
+			uint64_t rawpc;
+			int insmd;
+			ProgCtr() {}
 			ProgCtr(const uint64_t _rawpc,const int _insmd)
 				: rawpc(_rawpc),insmd(_insmd) {}
 			bool operator==(const ProgCtr &other) const {
@@ -66,15 +67,16 @@ namespace symx {
 		public:
 			virtual uint64_t read_reg(
 				const unsigned int regid,
-				bool *symbol) = 0;
-			virtual bool read_flag(const unsigned int flagid) = 0;
+				bool *symbol) const = 0;
+			virtual bool read_flag(
+				const unsigned int flagid) const = 0;
 			virtual ssize_t read_mem(
 				const uint64_t addr,
 				const uint8_t *buf,
 				const size_t len
-			) = 0;
-			virtual int get_insmd() = 0;
-			virtual std::vector<MemPage> get_mem_map() = 0;
+			) const = 0;
+			virtual int get_insmd() const = 0;
+			virtual std::vector<MemPage> get_mem_map() const = 0;
 	};
 	class Context {
 		public:
@@ -102,7 +104,7 @@ namespace symx {
 				REGIDX_PC(_REGIDX_PC),
 				last_var_id(0) {}
 			virtual refBlock interpret(
-				refProbe probe,
+				const refProbe &probe,
 				const ProgCtr &pc) = 0;
 	};
 };
