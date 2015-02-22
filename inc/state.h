@@ -81,9 +81,18 @@ class Block : public BaseState {
 		std::vector<std::string> discode;
 		Block(const ProgCtr _pc) : pc(_pc) {};
 };
+/*
+class PrintVisitor : public ExprVisitor {
+	public:
+		int post_visit(symx::refBytVec vec);
+		int post_visit(symx::refBytMem mem);
+		int post_visit(symx::refOperator oper);
+		int post_visit(symx::refCond cond);
+};
+*/
 class BuildVisitor : public ExprVisitor {
 	public:
-		BuildVisitor(const refState _state) : state(_state) {}
+		BuildVisitor(const refState &_state) : state(_state) {}
 		refExpr get_expr(const refExpr expr);
 		refCond get_cond(const refCond cond);
 		int get_mem_record(

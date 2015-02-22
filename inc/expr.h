@@ -30,10 +30,10 @@ typedef std::shared_ptr<SolvCond> refSolvCond;
 class ExprVisitor {
 	public:
 		virtual ~ExprVisitor() {};
-		virtual int pre_visit(refBytVec vec) = 0;
-		virtual int pre_visit(refBytMem mem) = 0;
-		virtual int pre_visit(refOperator oper) = 0;
-		virtual int pre_visit(refCond cond) = 0;
+		int pre_visit(refBytVec vec) {return 1;}
+		int pre_visit(refBytMem mem) {return 1;}
+		int pre_visit(refOperator oper) {return 1;}
+		int pre_visit(refCond cond) {return 1;}
 		virtual int post_visit(refBytVec vec) = 0;
 		virtual int post_visit(refBytMem mem) = 0;
 		virtual int post_visit(refOperator oper) = 0;
