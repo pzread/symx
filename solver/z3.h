@@ -24,14 +24,14 @@ namespace z3_solver {
 	class Z3TransVisitor : public symx::TransVisitor {
 		public:
 			Z3TransVisitor(const Z3Solver *_solver);
-			int pre_visit(symx::refBytVec vec);
-			int pre_visit(symx::refBytMem mem);
-			int pre_visit(symx::refOperator oper);
-			int pre_visit(symx::refCond cond);
-			int post_visit(symx::refBytVec vec);
-			int post_visit(symx::refBytMem mem);
-			int post_visit(symx::refOperator oper);
-			int post_visit(symx::refCond cond);
+			int pre_visit(const symx::refBytVec &vec);
+			int pre_visit(const symx::refBytMem &mem);
+			int pre_visit(const symx::refOperator &oper);
+			int pre_visit(const symx::refCond &cond);
+			int post_visit(const symx::refBytVec &vec);
+			int post_visit(const symx::refBytMem &mem);
+			int post_visit(const symx::refOperator &oper);
+			int post_visit(const symx::refCond &cond);
 		private:
 			const Z3Solver *solver;
 			Z3_sort bvsort1;
@@ -49,6 +49,7 @@ namespace z3_solver {
 			Z3Solver();
 			symx::TransVisitor* create_translator();
 			symx::refSolvExpr reduce(const symx::refSolvExpr &expr);
+			symx::refSolvCond reduce(const symx::refSolvCond &cond);
 			bool solve(
 				const std::unordered_set
 					<symx::refSolvCond> &cons,

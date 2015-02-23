@@ -81,15 +81,6 @@ class Block : public BaseState {
 		std::vector<std::string> discode;
 		Block(const ProgCtr _pc) : pc(_pc) {};
 };
-/*
-class PrintVisitor : public ExprVisitor {
-	public:
-		int post_visit(symx::refBytVec vec);
-		int post_visit(symx::refBytMem mem);
-		int post_visit(symx::refOperator oper);
-		int post_visit(symx::refCond cond);
-};
-*/
 class BuildVisitor : public ExprVisitor {
 	public:
 		BuildVisitor(const refState &_state) : state(_state) {}
@@ -97,14 +88,14 @@ class BuildVisitor : public ExprVisitor {
 		refCond get_cond(const refCond cond);
 		int get_mem_record(
 			std::unordered_set<refMemRecord> *selrec);
-		int pre_visit(symx::refBytVec vec);
-		int pre_visit(symx::refBytMem mem);
-		int pre_visit(symx::refOperator oper);
-		int pre_visit(symx::refCond cond);
-		int post_visit(symx::refBytVec vec);
-		int post_visit(symx::refBytMem mem);
-		int post_visit(symx::refOperator oper);
-		int post_visit(symx::refCond cond);
+		int pre_visit(const refBytVec &vec);
+		int pre_visit(const refBytMem &mem);
+		int pre_visit(const refOperator &oper);
+		int pre_visit(const refCond &cond);
+		int post_visit(const refBytVec &vec);
+		int post_visit(const refBytMem &mem);
+		int post_visit(const refOperator &oper);
+		int post_visit(const refCond &cond);
 	private:
 		const refState state;
 		std::unordered_map<refExpr,refExpr> expr_map;

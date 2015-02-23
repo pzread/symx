@@ -12,15 +12,14 @@
 #include"draw.h"
 #include"state.h"
 
-#include<capstone/capstone.h>
-
 using namespace symx;
 
 namespace symx {
 
 AddrSpace::AddrSpace(
 	Context *_ctx,
-	const refProbe &_probe) :
+	const refProbe &_probe
+) :
 	probe(_probe),
 	ctx(_ctx)
 {
@@ -86,7 +85,6 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 
 	return ret;
 }
-
 refExpr BuildVisitor::get_expr(const refExpr expr) {
 	auto it = expr_map.find(expr);
 	if(it == expr_map.end()) {
@@ -107,31 +105,31 @@ int BuildVisitor::get_mem_record(std::unordered_set<refMemRecord> *selrec) {
 	selrec->insert(select_record.begin(),select_record.end());
 	return 0;
 }
-int BuildVisitor::pre_visit(symx::refBytVec vec) {
+int BuildVisitor::pre_visit(const refBytVec &vec) {
 	if(expr_map.find(vec) != expr_map.end()) {
 		return 0;
 	}
 	return 1;
 }
-int BuildVisitor::pre_visit(symx::refBytMem mem) {
+int BuildVisitor::pre_visit(const refBytMem &mem) {
 	if(expr_map.find(mem) != expr_map.end()) {
 		return 0;
 	}
 	return 1;
 }
-int BuildVisitor::pre_visit(symx::refOperator oper) {
+int BuildVisitor::pre_visit(const refOperator &oper) {
 	if(expr_map.find(oper) != expr_map.end()) {
 		return 0;
 	}
 	return 1;
 }
-int BuildVisitor::pre_visit(symx::refCond cond) {
+int BuildVisitor::pre_visit(const refCond &cond) {
 	if(cond_map.find(cond) != cond_map.end()) {
 		return 0;
 	}
 	return 1;
 }
-int BuildVisitor::post_visit(symx::refBytVec vec) {
+int BuildVisitor::post_visit(const refBytVec &vec) {
 	if(vec->type == ExprDangle) {
 		expr_map[vec] = state->reg[vec->index];
 	} else {
@@ -139,7 +137,7 @@ int BuildVisitor::post_visit(symx::refBytVec vec) {
 	}
 	return 1;
 }
-int BuildVisitor::post_visit(symx::refBytMem mem) {
+int BuildVisitor::post_visit(const refBytMem &mem) {
 	if(mem->type == ExprDangle) {
 		expr_map[mem] = state->mem;
 	} else {
@@ -147,7 +145,7 @@ int BuildVisitor::post_visit(symx::refBytMem mem) {
 	}
 	return 1;
 }
-int BuildVisitor::post_visit(symx::refOperator oper) {
+int BuildVisitor::post_visit(const refOperator &oper) {
 	switch(oper->type) {
 	case ExprOpSelect:
 	{
@@ -194,7 +192,7 @@ int BuildVisitor::post_visit(symx::refOperator oper) {
 	}
 	return 1;
 }
-int BuildVisitor::post_visit(symx::refCond cond) {
+int BuildVisitor::post_visit(const refCond &cond) {
 	switch(cond->type) {
 	case CondDangle:
 		cond_map[cond] = state->flag[cond->index];
@@ -284,8 +282,8 @@ static refState create_static_state(
 }
 static refCond create_pc_cond(
 	const Context *ctx,
-	const refExpr expc,
-	const refExpr exinsmd,
+	const refExpr &expc,
+	const refExpr &exinsmd,
 	const uint64_t rawpc,
 	const uint64_t insmd
 ) {
@@ -296,8 +294,8 @@ static refCond create_pc_cond(
 static void exclude_pc(
 	const Context *ctx,
 	std::unordered_set<refCond> *cons,
-	const refExpr expc,
-	const refExpr exinsmd,
+	const refExpr &expc,
+	const refExpr &exinsmd,
 	const uint64_t rawpc,
 	const int insmd
 ) {
@@ -392,14 +390,8 @@ int state_executor(
 
 		//initialize solver variable
 		next_expc = next_reg[ctx->REGIDX_PC];
-		var[next_expc->solver_expr] = 0;
-
-		var[next_reg[ARM_REG_R0]->solver_expr] = 0;
-		var[next_reg[ARM_REG_R3]->solver_expr] = 0;
-		var[next_reg[ARM_REG_R7]->solver_expr] = 0;
-		var[next_reg[ARM_REG_SP]->solver_expr] = 0;
-
 		var[next_exinsmd->solver_expr] = 0;
+
 		for(i = 0; i < cstate->symbol.size(); i++) {
 			expr_walk(trans_vis,cstate->symbol[i]);
 			var[cstate->symbol[i]->solver_expr] = 0;
@@ -414,6 +406,7 @@ int state_executor(
 		}
 
 		while(true) {
+			var[next_expc->solver_expr] = 0xdeadbeef;
 			//Translate constraint
 			expr_iter_walk(trans_vis,cons.begin(),cons.end());
 			for(auto it = cons.begin(); it != cons.end(); it++) {
@@ -476,13 +469,9 @@ int state_executor(
 					info("  addr\t%d\t0x%08lx: 0x%08lx\n",
 						addrsp.mem_symbol[i].second->id,
 						addrsp.mem_symbol[i].first,
-						var[addrsp.mem_symbol[i].second-> \
-							solver_expr]);
+						var[addrsp.mem_symbol[i]. \
+							second-> solver_expr]);
 				}
-				info(" r0\t%08lx\n",var[next_reg[ARM_REG_R0]->solver_expr]);
-				info(" r3\t%08lx\n",var[next_reg[ARM_REG_R3]->solver_expr]);
-				info(" r7\t%08lx\n",var[next_reg[ARM_REG_R7]->solver_expr]);
-				info(" sp\t%08lx\n",var[next_reg[ARM_REG_SP]->solver_expr]);
 
 				if(next_rawpc == 0xDEADBEEE) {
 					continue;
