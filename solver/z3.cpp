@@ -39,7 +39,7 @@ Z3TransVisitor::Z3TransVisitor(const Z3Solver *_solver) : solver(_solver) {
 	bvimm41 = Z3_mk_unsigned_int64(solver->context,1,bvsort4);
 	INCREF(bvimm41);
 
-	/*simplify_param = Z3_mk_params(solver->context);
+	simplify_param = Z3_mk_params(solver->context);
 	Z3_params_inc_ref(solver->context,simplify_param);
 	Z3_params_set_bool(
 		solver->context,
@@ -50,7 +50,7 @@ Z3TransVisitor::Z3TransVisitor(const Z3Solver *_solver) : solver(_solver) {
 		solver->context,
 		simplify_param,
 		Z3_mk_string_symbol(solver->context,"mul2concat"),
-		Z3_TRUE);*/
+		Z3_TRUE);
 }
 Z3_ast Z3TransVisitor::expr_to_ast(const symx::refExpr expr) {
 	if(expr->solver_expr == nullptr) {
@@ -547,15 +547,15 @@ bool Z3Solver::solve(
 			return false;
 		}
 		Z3_inc_ref(context,res_ast);
-		if(Z3_get_numeral_uint64(
+		auto ret = Z3_get_numeral_uint64(
 			context,
 			res_ast,
-			(unsigned __int64*)&it->second
-		) == Z3_FALSE) {
+			(unsigned __int64*)&it->second);
+		Z3_dec_ref(context,res_ast);
+		if(ret == Z3_FALSE) {
 			err("get numeral error\n");
 			return false;
 		}
-		Z3_dec_ref(context,res_ast);
 	}
 
 	Z3_model_dec_ref(context,model);
