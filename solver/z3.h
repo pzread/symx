@@ -37,8 +37,8 @@ namespace z3_solver {
 			Z3_sort bvsort1;
 			Z3_sort bvsort4;
 			Z3_ast bvimm41;
-			Z3_ast expr_to_ast(const symx::refExpr expr);
-			Z3_ast cond_to_ast(const symx::refCond cond);
+			Z3_ast expr_to_ast(const symx::refExpr &expr);
+			Z3_ast cond_to_ast(const symx::refCond &cond);
 			Z3_params simplify_param;
 	};
 	class Z3Solver : public symx::Solver {
@@ -52,9 +52,9 @@ namespace z3_solver {
 			symx::refSolvCond reduce(const symx::refSolvCond &cond);
 			bool solve(
 				const std::unordered_set
-					<symx::refSolvCond> &cons,
+					<symx::refCond> &cons,
 				std::unordered_map
-					<symx::refSolvExpr,uint64_t> *var
+					<symx::refExpr,uint64_t> *var
 			);
 
 		private:

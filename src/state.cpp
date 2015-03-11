@@ -313,8 +313,7 @@ int state_executor(
 	refState nstate,cstate;
 	refBlock cblk;
 	std::unordered_set<refCond> cons;
-	std::unordered_set<refSolvCond> solvcons;
-	std::unordered_map<refSolvExpr,uint64_t> var;
+	std::unordered_map<refExpr,uint64_t> var;
 	refExpr next_expc;
 	refExpr next_exinsmd;
 	refExpr next_mem;
@@ -352,7 +351,6 @@ int state_executor(
 
 		//initialize
 		cons.clear();
-		solvcons.clear();
 		var.clear();
 		selrec.clear();
 
@@ -390,33 +388,30 @@ int state_executor(
 
 		//initialize solver variable
 		next_expc = next_reg[ctx->REGIDX_PC];
-		var[next_exinsmd->solver_expr] = 0;
+		var[next_exinsmd] = 0;
 
 		for(i = 0; i < cstate->symbol.size(); i++) {
 			expr_walk(trans_vis,cstate->symbol[i]);
-			var[cstate->symbol[i]->solver_expr] = 0;
+			var[cstate->symbol[i]] = 0;
 		}
 		for(i = 0; i < addrsp.mem_symbol.size(); i++) {
 			expr_walk(trans_vis,addrsp.mem_symbol[i].second);
-			var[addrsp.mem_symbol[i].second->solver_expr] = 0;
+			var[addrsp.mem_symbol[i].second] = 0;
 		}
 		for(auto it = selrec.begin(); it != selrec.end(); it++) {
-			var[(*it)->oper->solver_expr] = 0;
-			var[(*it)->idx->solver_expr] = 0;
+			var[(*it)->oper] = 0;
+			var[(*it)->idx] = 0;
 		}
 
 		while(true) {
-			var[next_expc->solver_expr] = 0xdeadbeef;
+			var[next_expc] = 0xdeadbeef;
 			//Translate constraint
 			expr_iter_walk(trans_vis,cons.begin(),cons.end());
-			for(auto it = cons.begin(); it != cons.end(); it++) {
-				solvcons.insert((*it)->solver_cond);
-			}
-			if(!solver->solve(solvcons,&var)) {
+			if(!solver->solve(cons,&var)) {
 				break;	
 			}
-			next_rawpc = var[next_expc->solver_expr];
-			next_insmd = var[next_exinsmd->solver_expr];
+			next_rawpc = var[next_expc];
+			next_insmd = var[next_exinsmd];
 
 			//update address space
 			bool addrsp_update = false;
@@ -424,7 +419,7 @@ int state_executor(
 				it != selrec.end();
 				it++
 			) {
-				auto selidx = var[(*it)->idx->solver_expr];
+				auto selidx = var[(*it)->idx];
 				//auto selval = var[(*it)->oper->solver_expr];
 				//dbg("  sel: 0x%08lx\t0x%08lx\n",selidx,selval);
 				if(addrsp.handle_select(
@@ -440,7 +435,7 @@ int state_executor(
 				for(i = 0; i < addrsp.mem_symbol.size(); i++) {
 					auto sym = addrsp.mem_symbol[i].second;
 					expr_walk(trans_vis,sym);
-					var[sym->solver_expr] = 0;
+					var[sym] = 0;
 				}
 				continue;
 			}
@@ -463,14 +458,13 @@ int state_executor(
 				for(i = 0; i < cstate->symbol.size(); i++) {
 					info("  sym\t%d: 0x%08lx\n",
 						cstate->symbol[i]->id,
-						var[cstate->symbol[i]->solver_expr]);
+						var[cstate->symbol[i]]);
 				}
 				for(i = 0; i < addrsp.mem_symbol.size(); i++) {
 					info("  addr\t%d\t0x%08lx: 0x%08lx\n",
 						addrsp.mem_symbol[i].second->id,
 						addrsp.mem_symbol[i].first,
-						var[addrsp.mem_symbol[i]. \
-							second-> solver_expr]);
+						var[addrsp.mem_symbol[i].second]);
 				}
 
 				if(next_rawpc == 0xDEADBEEE) {

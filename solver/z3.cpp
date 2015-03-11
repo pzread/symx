@@ -52,14 +52,14 @@ Z3TransVisitor::Z3TransVisitor(const Z3Solver *_solver) : solver(_solver) {
 		Z3_mk_string_symbol(solver->context,"mul2concat"),
 		Z3_TRUE);
 }
-Z3_ast Z3TransVisitor::expr_to_ast(const symx::refExpr expr) {
+Z3_ast Z3TransVisitor::expr_to_ast(const refExpr &expr) {
 	if(expr->solver_expr == nullptr) {
 		err("expr hasn't been translated\n");
 	}
 	return std::static_pointer_cast<Z3SolvExpr>
 		(expr->solver_expr)->ast;
 }
-Z3_ast Z3TransVisitor::cond_to_ast(const symx::refCond cond) {
+Z3_ast Z3TransVisitor::cond_to_ast(const refCond &cond) {
 	if(cond->solver_cond == nullptr) {
 		err("cond hasn't been translated\n");
 	}
@@ -515,8 +515,8 @@ symx::TransVisitor* Z3Solver::create_translator() {
 	return new Z3TransVisitor(this);
 }
 bool Z3Solver::solve(
-	const std::unordered_set<refSolvCond> &cons,
-	std::unordered_map<refSolvExpr,uint64_t> *var
+	const std::unordered_set<refCond> &cons,
+	std::unordered_map<refExpr,uint64_t> *var
 ) {
 	refZ3SolvExpr expr;
 	Z3_model model;
@@ -524,7 +524,8 @@ bool Z3Solver::solve(
 
 	Z3_solver_reset(context,solver);
 	for(auto it = cons.begin(); it != cons.end(); it++) {
-		auto cond = std::static_pointer_cast<Z3SolvCond>(*it);
+		auto cond = std::static_pointer_cast<Z3SolvCond>
+			((*it)->solver_cond);
 		Z3_solver_assert(context,solver,cond->ast);
 	}
 	if(Z3_solver_check(context,solver) != Z3_TRUE) {
@@ -535,7 +536,8 @@ bool Z3Solver::solve(
 	Z3_model_inc_ref(context,model);
 	
 	for(auto it = var->begin(); it != var->end(); it++) {
-		expr = std::static_pointer_cast<Z3SolvExpr>(it->first);
+		expr = std::static_pointer_cast<Z3SolvExpr>
+			(it->first->solver_expr);
 		if(Z3_model_eval(
 			context,
 			model,
