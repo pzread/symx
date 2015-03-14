@@ -301,6 +301,26 @@ static void exclude_pc(
 ) {
 	cons->insert(cond_not(create_pc_cond(ctx,expc,exinsmd,rawpc,insmd)));
 }
+static int show_message(
+	const uint64_t rawpc,
+	std::unordered_map<refExpr,uint64_t> &var,
+	const std::vector<refBytVec> &symbol,
+	const std::vector<std::pair<uint64_t,refBytVec>> &mem_symbol
+) {
+	unsigned int i;
+
+	info("next pc 0x%08lx\n",rawpc);
+	for(i = 0; i < symbol.size(); i++) {
+		info("  symt%d: 0x%08lx\n",symbol[i]->id,var[symbol[i]]);
+	}
+	for(i = 0; i < mem_symbol.size(); i++) {
+		info("  addr\t%d\t0x%08lx: 0x%08lx\n",
+			mem_symbol[i].second->id,
+			mem_symbol[i].first,
+			var[mem_symbol[i].second]);
+	}
+	return 0;
+}
 int state_executor(
 	Context *ctx,
 	const refProbe &probe,
@@ -403,6 +423,10 @@ int state_executor(
 			var[(*it)->idx] = 0;
 		}
 
+		for(i = 0; i < ctx->NUMREG; i++) {
+			var[next_reg[i]] = 0;
+		}
+
 		while(true) {
 			var[next_expc] = 0xdeadbeef;
 			//Translate constraint
@@ -453,19 +477,11 @@ int state_executor(
 					next_rawpc,
 					next_insmd);
 
-				//show message
-				info("next pc 0x%08lx\n",next_rawpc);
-				for(i = 0; i < cstate->symbol.size(); i++) {
-					info("  sym\t%d: 0x%08lx\n",
-						cstate->symbol[i]->id,
-						var[cstate->symbol[i]]);
-				}
-				for(i = 0; i < addrsp.mem_symbol.size(); i++) {
-					info("  addr\t%d\t0x%08lx: 0x%08lx\n",
-						addrsp.mem_symbol[i].second->id,
-						addrsp.mem_symbol[i].first,
-						var[addrsp.mem_symbol[i].second]);
-				}
+				show_message(
+					next_rawpc,
+					var,
+					cstate->symbol,
+					addrsp.mem_symbol);
 
 				if(next_rawpc == 0xDEADBEEE) {
 					continue;
@@ -482,7 +498,8 @@ int state_executor(
 				cstate->probe);
 			nstate->mem = next_mem;
 			for(i = 0; i < ctx->NUMREG; i++) {
-				nstate->reg[i] = next_reg[i];
+				nstate->reg[i] = BytVec::create_imm(4,var[next_reg[i]]);
+				//nstate->reg[i] = next_reg[i];
 			}
 			for(i = 0; i < ctx->NUMFLAG; i++) {
 				nstate->flag[i] = next_flag[i];
