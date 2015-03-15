@@ -562,6 +562,7 @@ bool Z3Solver::solve(
 	}
 	Z3_model_dec_ref(context,model);
 
+	/*
 	for(auto it = fix->begin(); it != fix->end();) {
 		Z3_solver_push(context,solver);
 
@@ -589,6 +590,7 @@ bool Z3Solver::solve(
 
 		Z3_solver_pop(context,solver,1);
 	}
+	*/
 
 	return true;
 }

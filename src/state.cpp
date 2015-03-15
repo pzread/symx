@@ -68,6 +68,7 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 				val = BytVec::create_imm(1,buf[0]);
 			} else {
 				//for test
+				//val = BytVec::create_imm(1,1);
 				val = BytVec::create_var(1,ctx);
 				mem_symbol.push_back(std::make_pair(pos,val));
 			}
@@ -458,8 +459,9 @@ int state_executor(
 				//auto selval = var[(*it)->oper->solver_expr];
 				//dbg("  sel: 0x%08lx\t0x%08lx\n",selidx,selval);
 				if(addrsp.handle_select(
-					selidx,(*it)->size) == 1
-				) {
+					selidx,
+					(*it)->size
+				) == 1) {
 					addrsp_update = true;	
 				}
 			}
@@ -497,7 +499,7 @@ int state_executor(
 				if(next_rawpc == 0xDEADBEEE) {
 					continue;
 				} else {
-					dbg("exp\n");
+					dbg("find\n");
 					exp_flag = true;
 					break;
 				}
@@ -509,7 +511,7 @@ int state_executor(
 				cstate->probe);
 			nstate->mem = next_mem;
 			for(i = 0; i < ctx->NUMREG; i++) {
-				if(fix.find(next_reg[i]) != fix.end()) {
+				if(cstate->pc.rawpc == 0x10a0c) {
 					nstate->reg[i] = BytVec::create_imm(
 						ctx->REGSIZE,
 						var[next_reg[i]]);
