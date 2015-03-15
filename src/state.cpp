@@ -334,6 +334,7 @@ int state_executor(
 	refBlock cblk;
 	std::unordered_set<refCond> cons;
 	std::unordered_map<refExpr,uint64_t> var;
+	std::unordered_set<refExpr> fix;
 	refExpr next_expc;
 	refExpr next_exinsmd;
 	refExpr next_mem;
@@ -374,6 +375,8 @@ int state_executor(
 		var.clear();
 		selrec.clear();
 
+		std::vector<int> modify_reg;
+
 		auto build_vis = new BuildVisitor(cstate);
 		//build expression tree
 		expr_walk(build_vis,cblk->next_insmd);
@@ -383,6 +386,9 @@ int state_executor(
 		for(i = 0; i < ctx->NUMREG; i++) {
 			expr_walk(build_vis,cblk->reg[i]);
 			next_reg[i] =  build_vis->get_expr(cblk->reg[i]);
+			if(cstate->reg[i] != next_reg[i]) {
+				modify_reg.push_back(i);
+			}
 		}
 		for(i = 0; i < ctx->NUMFLAG; i++) {
 			expr_walk(build_vis,cblk->flag[i]);
@@ -408,6 +414,7 @@ int state_executor(
 
 		//initialize solver variable
 		next_expc = next_reg[ctx->REGIDX_PC];
+		var[next_expc] = 0;
 		var[next_exinsmd] = 0;
 
 		for(i = 0; i < cstate->symbol.size(); i++) {
@@ -428,10 +435,14 @@ int state_executor(
 		}
 
 		while(true) {
-			var[next_expc] = 0xdeadbeef;
 			//Translate constraint
 			expr_iter_walk(trans_vis,cons.begin(),cons.end());
-			if(!solver->solve(cons,&var)) {
+
+			fix.clear();
+			for(i = 0;i < modify_reg.size(); i++) {
+				fix.insert(next_reg[modify_reg[i]]);
+			}
+			if(!solver->solve(cons,&var,&fix)) {
 				break;	
 			}
 			next_rawpc = var[next_expc];
@@ -498,8 +509,13 @@ int state_executor(
 				cstate->probe);
 			nstate->mem = next_mem;
 			for(i = 0; i < ctx->NUMREG; i++) {
-				nstate->reg[i] = BytVec::create_imm(4,var[next_reg[i]]);
-				//nstate->reg[i] = next_reg[i];
+				if(fix.find(next_reg[i]) != fix.end()) {
+					nstate->reg[i] = BytVec::create_imm(
+						ctx->REGSIZE,
+						var[next_reg[i]]);
+				} else {
+					nstate->reg[i] = next_reg[i];
+				}
 			}
 			for(i = 0; i < ctx->NUMFLAG; i++) {
 				nstate->flag[i] = next_flag[i];

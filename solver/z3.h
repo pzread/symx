@@ -51,10 +51,9 @@ namespace z3_solver {
 			symx::refSolvExpr reduce(const symx::refSolvExpr &expr);
 			symx::refSolvCond reduce(const symx::refSolvCond &cond);
 			bool solve(
-				const std::unordered_set
-					<symx::refCond> &cons,
-				std::unordered_map
-					<symx::refExpr,uint64_t> *var
+				const std::unordered_set<symx::refCond> &cons,
+				std::unordered_map<symx::refExpr,uint64_t> *var,
+				std::unordered_set<symx::refExpr> *fix
 			);
 
 		private:

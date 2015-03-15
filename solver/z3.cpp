@@ -516,13 +516,15 @@ symx::TransVisitor* Z3Solver::create_translator() {
 }
 bool Z3Solver::solve(
 	const std::unordered_set<refCond> &cons,
-	std::unordered_map<refExpr,uint64_t> *var
+	std::unordered_map<refExpr,uint64_t> *var,
+	std::unordered_set<refExpr> *fix
 ) {
 	refZ3SolvExpr expr;
 	Z3_model model;
 	Z3_ast res_ast;
 
 	Z3_solver_reset(context,solver);
+
 	for(auto it = cons.begin(); it != cons.end(); it++) {
 		auto cond = std::static_pointer_cast<Z3SolvCond>
 			((*it)->solver_cond);
@@ -534,7 +536,6 @@ bool Z3Solver::solve(
 
 	model = Z3_solver_get_model(context,solver);
 	Z3_model_inc_ref(context,model);
-	
 	for(auto it = var->begin(); it != var->end(); it++) {
 		expr = std::static_pointer_cast<Z3SolvExpr>
 			(it->first->solver_expr);
@@ -559,8 +560,36 @@ bool Z3Solver::solve(
 			return false;
 		}
 	}
-
 	Z3_model_dec_ref(context,model);
+
+	for(auto it = fix->begin(); it != fix->end();) {
+		Z3_solver_push(context,solver);
+
+		auto ast = std::static_pointer_cast<Z3SolvExpr>
+			((*it)->solver_expr)->ast;
+		auto imm_ast = Z3_mk_unsigned_int64(
+			context,
+			var->find(*it)->second,
+			Z3_mk_bv_sort(context,(*it)->size * 8));
+		Z3_inc_ref(context,imm_ast);
+		auto eq_ast = Z3_mk_eq(context,ast,imm_ast);
+		Z3_inc_ref(context,eq_ast);
+		Z3_dec_ref(context,imm_ast);
+		auto cond_ast = Z3_mk_not(context,eq_ast);
+		Z3_inc_ref(context,cond_ast);
+		Z3_dec_ref(context,eq_ast);
+		Z3_solver_assert(context,solver,cond_ast);
+		Z3_dec_ref(context,cond_ast);
+
+		if(Z3_solver_check(context,solver) != Z3_TRUE) {
+			fix->erase(it++);
+		} else {
+			it++;
+		}
+
+		Z3_solver_pop(context,solver,1);
+	}
+
 	return true;
 }
 
