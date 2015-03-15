@@ -29,8 +29,25 @@ class MemPage : public std::enable_shared_from_this<MemPage> {
 		const uint64_t start;
 		const unsigned int prot;
 		std::bitset<PAGE_SIZE> dirty;
+		std::bitset<PAGE_SIZE> symbol;
 		MemPage(const uint64_t _start,const unsigned int _prot)
 			: start(_start),prot(_prot) {}
+};
+class AddrSpace {
+	public:
+		std::unordered_map<uint64_t,refBytVec> mem_symbol;
+		std::unordered_set<refCond> mem_constraint;
+		AddrSpace(Context *ctx,const refProbe &_probe);
+		int handle_select(const uint64_t idx,const unsigned int size);
+		refExpr get_mem() const;
+		std::vector<refOperator> source_select(
+			const refOperator &sel,
+			const std::unordered_map<refExpr,uint64_t> &var) const;
+	private:
+		const refProbe probe;
+		Context *ctx;
+		refExpr mem;
+		std::map<uint64_t,MemPage> page_map;
 };
 class MemRecord : public std::enable_shared_from_this<MemRecord> {
 	public:
@@ -44,22 +61,6 @@ class MemRecord : public std::enable_shared_from_this<MemRecord> {
 			const refExpr _idx,
 			const unsigned int _size
 		) : oper(_oper),mem(_mem),idx(_idx),size(_size) {}
-};
-class AddrSpace {
-	public:
-		std::vector<std::pair<uint64_t,refBytVec>> mem_symbol;
-		std::unordered_set<refCond> mem_constraint;
-		AddrSpace(Context *ctx,const refProbe &_probe);
-		refExpr get_mem() const;
-		int handle_select(const uint64_t idx,const unsigned int size);
-		std::vector<refOperator> source_select(
-			const refMemRecord &sel,
-			const std::unordered_map<refExpr,uint64_t> &var);
-	private:
-		const refProbe probe;
-		Context *ctx;
-		refExpr mem;
-		std::map<uint64_t,MemPage> page_map;
 };
 class BaseState : public std::enable_shared_from_this<BaseState> {
 	public:
@@ -108,6 +109,25 @@ class BuildVisitor : public ExprVisitor {
 		std::unordered_map<refCond,refCond> cond_map;
 		std::unordered_set<refMemRecord> select_set;
 		std::vector<refMemRecord> store_seq;
+};
+class TestVisitor : public ExprVisitor {
+	public:
+		bool fix;
+		TestVisitor(
+			const AddrSpace &_addrsp,
+			const std::unordered_map<refExpr,uint64_t> &_var
+		) : fix(true),addrsp(_addrsp),var(_var) {}
+		int pre_visit(const refBytVec &vec);
+		int pre_visit(const refBytMem &mem);
+		int pre_visit(const refOperator &oper);
+		int pre_visit(const refCond &cond);
+		int post_visit(const refBytVec &vec);
+		int post_visit(const refBytMem &mem);
+		int post_visit(const refOperator &oper);
+		int post_visit(const refCond &cond);
+	private:
+		const AddrSpace &addrsp;
+		const std::unordered_map<refExpr,uint64_t> &var;
 };
 class TransVisitor : public ExprVisitor {};
 

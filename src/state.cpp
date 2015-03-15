@@ -67,11 +67,13 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 					err("read page failed\n");
 				}
 				val = BytVec::create_imm(1,buf[0]);
+				page.symbol.reset(off);
 			} else {
 				//for test
 				//val = BytVec::create_imm(1,1);
 				val = BytVec::create_var(1,ctx);
-				mem_symbol.push_back(std::make_pair(pos,val));
+				mem_symbol[pos] = val;
+				page.symbol.set(off);
 			}
 
 			auto byte = expr_select(
@@ -88,18 +90,20 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 	return ret;
 }
 std::vector<refOperator> AddrSpace::source_select(
-	const refMemRecord &sel,
+	const refOperator &sel,
 	const std::unordered_map<refExpr,uint64_t> &var
-) {
+) const {
 	std::vector<refOperator> retseq;
 	refExpr mem;
 	uint64_t base;
 	unsigned int size;
 	uint64_t idx;
 
-	auto base_it = var.find(sel->idx);
+	assert(sel->type == ExprOpSelect);
+
+	auto base_it = var.find(sel->operand[1]);
 	assert(base_it != var.end());
-	mem = sel->mem;
+	mem = sel->operand[0];
 	base = base_it->second;
 	size = sel->size;
 
@@ -276,6 +280,51 @@ int BuildVisitor::post_visit(const refCond &cond) {
 	return 1;
 }
 
+int TestVisitor::pre_visit(const refBytVec &vec) {
+	if(vec->type == ExprVar) {
+		fix = false;
+		return 0;
+	}
+	return 1;
+}
+int TestVisitor::pre_visit(const refBytMem &mem) {
+	return 1;
+}
+int TestVisitor::pre_visit(const refOperator &oper) {
+	if(oper->type == ExprOpSelect) {
+		auto strseq = addrsp.source_select(oper,var);
+		if(strseq.size() == 0) {
+			auto idx_it = var.find(oper->operand[1]);
+			assert(idx_it != var.end());
+			if(addrsp.mem_symbol.find(
+				idx_it->second
+			) != addrsp.mem_symbol.end()) {
+				fix = false;
+			}
+		} else {
+			expr_iter_walk(this,strseq.begin(),strseq.end());
+		}
+	} else if(oper->type == ExprOpStore) {
+		return 0;
+	}
+	return 1;
+}
+int TestVisitor::pre_visit(const refCond &cond) {
+	return 1;
+}
+int TestVisitor::post_visit(const refBytVec &vec) {
+	return 1;
+}
+int TestVisitor::post_visit(const refBytMem &mem) {
+	return 1;
+}
+int TestVisitor::post_visit(const refOperator &oper) {
+	return 1;
+}
+int TestVisitor::post_visit(const refCond &cond) {
+	return 1;
+}
+
 refBlock state_create_block(Context *ctx,const ProgCtr &pc) {
 	unsigned int i;
 	refBlock blk = ref<Block>(pc);
@@ -358,7 +407,7 @@ static int show_message(
 	const uint64_t rawpc,
 	std::unordered_map<refExpr,uint64_t> &var,
 	const std::vector<refBytVec> &symbol,
-	const std::vector<std::pair<uint64_t,refBytVec>> &mem_symbol
+	const std::unordered_map<uint64_t,refBytVec> &mem_symbol
 ) {
 	unsigned int i;
 
@@ -366,11 +415,15 @@ static int show_message(
 	for(i = 0; i < symbol.size(); i++) {
 		info("  symt%d: 0x%08lx\n",symbol[i]->id,var[symbol[i]]);
 	}
-	for(i = 0; i < mem_symbol.size(); i++) {
+	for(
+		auto it = mem_symbol.begin();
+		it != mem_symbol.end();
+		it++
+	) {
 		info("  addr\t%d\t0x%08lx: 0x%08lx\n",
-			mem_symbol[i].second->id,
-			mem_symbol[i].first,
-			var[mem_symbol[i].second]);
+			it->second->id,
+			it->first,
+			var[it->second]);
 	}
 	return 0;
 }
@@ -468,9 +521,13 @@ int state_executor(
 			expr_walk(trans_vis,cstate->symbol[i]);
 			var[cstate->symbol[i]] = 0;
 		}
-		for(i = 0; i < addrsp.mem_symbol.size(); i++) {
-			expr_walk(trans_vis,addrsp.mem_symbol[i].second);
-			var[addrsp.mem_symbol[i].second] = 0;
+		for(
+			auto it = addrsp.mem_symbol.begin();
+			it != addrsp.mem_symbol.end();
+			it++
+		) {
+			expr_walk(trans_vis,it->second);
+			var[it->second] = 0;
 		}
 		for(auto it = selset.begin(); it != selset.end(); it++) {
 			var[(*it)->oper] = 0;
@@ -478,6 +535,9 @@ int state_executor(
 		}
 		for(auto it = strseq.begin(); it != strseq.end(); it++) {
 			var[(*it)->idx] = 0;
+		}
+		for(i = 0; i < ctx->NUMREG; i++) {
+			var[next_reg[i]] = 0;
 		}
 
 		while(true) {
@@ -492,7 +552,8 @@ int state_executor(
 
 			//update address space
 			bool addrsp_update = false;
-			for(auto it = selset.begin();
+			for(
+				auto it = selset.begin();
 				it != selset.end();
 				it++
 			) {
@@ -510,10 +571,13 @@ int state_executor(
 				cons.insert(
 					addrsp.mem_constraint.begin(),
 					addrsp.mem_constraint.end());
-				for(i = 0; i < addrsp.mem_symbol.size(); i++) {
-					auto sym = addrsp.mem_symbol[i].second;
-					expr_walk(trans_vis,sym);
-					var[sym] = 0;
+				for(
+					auto it = addrsp.mem_symbol.begin();
+					it != addrsp.mem_symbol.end();
+					it++
+				) {
+					expr_walk(trans_vis,it->second);
+					var[it->second] = 0;
 				}
 				continue;
 			}
@@ -546,24 +610,29 @@ int state_executor(
 				}
 			}
 
-			for(auto it = selset.begin();
-				it != selset.end();
-				it++
-			) {
-				addrsp.source_select(*it,var);
-			}
-
 			//create next state
 			nstate = ref<State>(
 				ProgCtr(next_rawpc,next_insmd),
 				cstate->probe);
 			nstate->mem = next_mem;
-			for(i = 0; i < ctx->NUMREG; i++) {
-				nstate->reg[i] = next_reg[i];
-			}
 			for(i = 0; i < ctx->NUMFLAG; i++) {
 				nstate->flag[i] = next_flag[i];
 			}
+
+			TestVisitor testvis = TestVisitor(addrsp,var);
+			for(i = 0; i < ctx->NUMREG; i++) {
+				testvis.fix = true;
+				expr_walk(&testvis,next_reg[i]);
+				if(testvis.fix == true) {
+					nstate->reg[i] = BytVec::create_imm(
+						ctx->REGSIZE,
+						var[next_reg[i]]
+					);
+				} else {
+					nstate->reg[i] = next_reg[i];
+				}
+			}
+			
 			nstate->constraint = cstate->constraint;
 			nstate->constraint.insert(create_pc_cond(
 				ctx,
