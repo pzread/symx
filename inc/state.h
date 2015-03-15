@@ -52,6 +52,9 @@ class AddrSpace {
 		AddrSpace(Context *ctx,const refProbe &_probe);
 		refExpr get_mem() const;
 		int handle_select(const uint64_t idx,const unsigned int size);
+		std::vector<refOperator> source_select(
+			const refMemRecord &sel,
+			const std::unordered_map<refExpr,uint64_t> &var);
 	private:
 		const refProbe probe;
 		Context *ctx;
@@ -70,7 +73,9 @@ class State : public BaseState {
 		const refProbe probe;
 		std::vector<refBytVec> symbol;
 		std::unordered_set<refCond> constraint;
-		std::unordered_set<refMemRecord> select_record;
+		std::unordered_set<refMemRecord> select_set;
+		std::vector<refMemRecord> store_seq;
+
 		State(const ProgCtr &_pc,const refProbe &_probe)
 			: pc(_pc),probe(_probe) {}
 };
@@ -87,7 +92,8 @@ class BuildVisitor : public ExprVisitor {
 		refExpr get_expr(const refExpr expr);
 		refCond get_cond(const refCond cond);
 		int get_mem_record(
-			std::unordered_set<refMemRecord> *selrec);
+			std::unordered_set<refMemRecord> *selset,
+			std::vector<refMemRecord> *strseq);
 		int pre_visit(const refBytVec &vec);
 		int pre_visit(const refBytMem &mem);
 		int pre_visit(const refOperator &oper);
@@ -100,7 +106,8 @@ class BuildVisitor : public ExprVisitor {
 		const refState state;
 		std::unordered_map<refExpr,refExpr> expr_map;
 		std::unordered_map<refCond,refCond> cond_map;
-		std::unordered_set<refMemRecord> select_record;
+		std::unordered_set<refMemRecord> select_set;
+		std::vector<refMemRecord> store_seq;
 };
 class TransVisitor : public ExprVisitor {};
 

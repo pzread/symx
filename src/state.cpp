@@ -1,5 +1,6 @@
 #define LOG_PREFIX "state"
 
+#include<assert.h>
 #include<memory>
 #include<string>
 #include<unordered_map>
@@ -86,6 +87,39 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 
 	return ret;
 }
+std::vector<refOperator> AddrSpace::source_select(
+	const refMemRecord &sel,
+	const std::unordered_map<refExpr,uint64_t> &var
+) {
+	std::vector<refOperator> retseq;
+	refExpr mem;
+	uint64_t base;
+	unsigned int size;
+	uint64_t idx;
+
+	auto base_it = var.find(sel->idx);
+	assert(base_it != var.end());
+	mem = sel->mem;
+	base = base_it->second;
+	size = sel->size;
+
+	while(mem->type != ExprMem) {
+		assert(mem->type == ExprOpStore);
+		auto str = std::static_pointer_cast<Operator>(mem);
+		auto idx_it = var.find(str->operand[1]);
+		assert(idx_it != var.end());
+		idx = idx_it->second;
+
+		if(idx == base) {
+			retseq.push_back(str);
+			break;
+		}
+
+		mem = str->operand[0];
+	}
+	
+	return retseq;
+}
 refExpr BuildVisitor::get_expr(const refExpr expr) {
 	auto it = expr_map.find(expr);
 	if(it == expr_map.end()) {
@@ -102,8 +136,12 @@ refCond BuildVisitor::get_cond(const refCond cond) {
 	}
 	return it->second;
 }
-int BuildVisitor::get_mem_record(std::unordered_set<refMemRecord> *selrec) {
-	selrec->insert(select_record.begin(),select_record.end());
+int BuildVisitor::get_mem_record(
+	std::unordered_set<refMemRecord> *selset,
+	std::vector<refMemRecord> *strseq
+) {
+	selset->insert(select_set.begin(),select_set.end());
+	strseq->insert(strseq->end(),store_seq.begin(),store_seq.end());
 	return 0;
 }
 int BuildVisitor::pre_visit(const refBytVec &vec) {
@@ -153,9 +191,23 @@ int BuildVisitor::post_visit(const refOperator &oper) {
 		auto mem = expr_map[oper->operand[0]];
 		auto idx = expr_map[oper->operand[1]];
 		expr_map[oper] = expr_select(mem,idx,oper->size);
-		select_record.insert(ref<MemRecord>(
+		select_set.insert(ref<MemRecord>(
 			std::static_pointer_cast<Operator>(expr_map[oper]),
-			mem,idx,
+			mem,
+			idx,
+			oper->size));
+		break;
+	}
+	case ExprOpStore:
+	{
+		auto mem = expr_map[oper->operand[0]];
+		auto idx = expr_map[oper->operand[1]];
+		auto val = expr_map[oper->operand[2]];
+		expr_map[oper] = expr_store(mem,idx,val);
+		store_seq.push_back(ref<MemRecord>
+			(std::static_pointer_cast<Operator>(expr_map[oper]),
+			mem,
+			idx,
 			oper->size));
 		break;
 	}
@@ -343,16 +395,17 @@ int state_executor(
 	refCond next_flag[64];
 	uint64_t next_rawpc;
 	int next_insmd;
-	std::unordered_set<refMemRecord> selrec;
+	std::unordered_set<refMemRecord> selset;
+	std::vector<refMemRecord> strseq;
 
 	auto draw = Draw();
-	bool exp_flag = false;
+	bool find_flag = false;
 
 	nstate = create_static_state(ctx,probe,addrsp,entry_rawpc);
 	ctx->state.push(nstate);
 
 	trans_vis = solver->create_translator();
-	while(!ctx->state.empty() && !exp_flag) {
+	while(!ctx->state.empty() && !find_flag) {
 		cstate = ctx->state.front();
 		ctx->state.pop();
 		info("\e[1;32mrun state 0x%x\e[m\n",cstate->pc);
@@ -374,9 +427,8 @@ int state_executor(
 		//initialize
 		cons.clear();
 		var.clear();
-		selrec.clear();
-
-		std::vector<int> modify_reg;
+		selset = cstate->select_set;
+		strseq = cstate->store_seq;
 
 		auto build_vis = new BuildVisitor(cstate);
 		//build expression tree
@@ -387,18 +439,12 @@ int state_executor(
 		for(i = 0; i < ctx->NUMREG; i++) {
 			expr_walk(build_vis,cblk->reg[i]);
 			next_reg[i] =  build_vis->get_expr(cblk->reg[i]);
-			if(cstate->reg[i] != next_reg[i]) {
-				modify_reg.push_back(i);
-			}
 		}
 		for(i = 0; i < ctx->NUMFLAG; i++) {
 			expr_walk(build_vis,cblk->flag[i]);
 			next_flag[i] = build_vis->get_cond(cblk->flag[i]);
 		}
-		selrec.insert(
-			cstate->select_record.begin(),
-			cstate->select_record.end());
-		build_vis->get_mem_record(&selrec);
+		build_vis->get_mem_record(&selset,&strseq);
 		delete build_vis;
 
 		//initialize reg, flag, constraint
@@ -426,23 +472,18 @@ int state_executor(
 			expr_walk(trans_vis,addrsp.mem_symbol[i].second);
 			var[addrsp.mem_symbol[i].second] = 0;
 		}
-		for(auto it = selrec.begin(); it != selrec.end(); it++) {
+		for(auto it = selset.begin(); it != selset.end(); it++) {
 			var[(*it)->oper] = 0;
 			var[(*it)->idx] = 0;
 		}
-
-		for(i = 0; i < ctx->NUMREG; i++) {
-			var[next_reg[i]] = 0;
+		for(auto it = strseq.begin(); it != strseq.end(); it++) {
+			var[(*it)->idx] = 0;
 		}
 
 		while(true) {
 			//Translate constraint
 			expr_iter_walk(trans_vis,cons.begin(),cons.end());
 
-			fix.clear();
-			for(i = 0;i < modify_reg.size(); i++) {
-				fix.insert(next_reg[modify_reg[i]]);
-			}
 			if(!solver->solve(cons,&var,&fix)) {
 				break;	
 			}
@@ -451,8 +492,8 @@ int state_executor(
 
 			//update address space
 			bool addrsp_update = false;
-			for(auto it = selrec.begin();
-				it != selrec.end();
+			for(auto it = selset.begin();
+				it != selset.end();
 				it++
 			) {
 				auto selidx = var[(*it)->idx];
@@ -500,43 +541,39 @@ int state_executor(
 					continue;
 				} else {
 					dbg("find\n");
-					exp_flag = true;
+					find_flag = true;
 					break;
 				}
 			}
-			
+
+			for(auto it = selset.begin();
+				it != selset.end();
+				it++
+			) {
+				addrsp.source_select(*it,var);
+			}
+
 			//create next state
 			nstate = ref<State>(
 				ProgCtr(next_rawpc,next_insmd),
 				cstate->probe);
 			nstate->mem = next_mem;
 			for(i = 0; i < ctx->NUMREG; i++) {
-				if(cstate->pc.rawpc == 0x10a0c) {
-					nstate->reg[i] = BytVec::create_imm(
-						ctx->REGSIZE,
-						var[next_reg[i]]);
-				} else {
-					nstate->reg[i] = next_reg[i];
-				}
+				nstate->reg[i] = next_reg[i];
 			}
 			for(i = 0; i < ctx->NUMFLAG; i++) {
 				nstate->flag[i] = next_flag[i];
 			}
-			nstate->constraint.insert(
-				cstate->constraint.begin(),
-				cstate->constraint.end());
+			nstate->constraint = cstate->constraint;
 			nstate->constraint.insert(create_pc_cond(
 				ctx,
 				next_expc,
 				next_exinsmd,
 				next_rawpc,
 				next_insmd));
-			nstate->symbol.assign(
-				cstate->symbol.begin(),
-				cstate->symbol.end());
-			nstate->select_record.insert(
-				selrec.begin(),
-				selrec.end());
+			nstate->symbol = cstate->symbol;
+			nstate->select_set = selset;
+			nstate->store_seq = strseq;
 
 			exclude_pc(
 				ctx,
