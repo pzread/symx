@@ -112,11 +112,11 @@ class BuildVisitor : public ExprVisitor {
 };
 class TestVisitor : public ExprVisitor {
 	public:
-		bool fix;
 		TestVisitor(
 			const AddrSpace &_addrsp,
 			const std::unordered_map<refExpr,uint64_t> &_var
-		) : fix(true),addrsp(_addrsp),var(_var) {}
+		) : addrsp(_addrsp),var(_var) {}
+		bool get_fix(const refExpr &expr);
 		int pre_visit(const refBytVec &vec);
 		int pre_visit(const refBytMem &mem);
 		int pre_visit(const refOperator &oper);
@@ -128,6 +128,7 @@ class TestVisitor : public ExprVisitor {
 	private:
 		const AddrSpace &addrsp;
 		const std::unordered_map<refExpr,uint64_t> &var;
+		std::unordered_map<refExpr,bool> fix_expr;
 };
 class TransVisitor : public ExprVisitor {};
 
