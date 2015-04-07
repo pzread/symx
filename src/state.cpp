@@ -96,7 +96,6 @@ std::vector<refOperator> AddrSpace::source_select(
 	std::vector<refOperator> retseq;
 	refExpr mem;
 	uint64_t base;
-	unsigned int size;
 	uint64_t idx;
 
 	assert(sel->type == ExprOpSelect);
@@ -105,7 +104,6 @@ std::vector<refOperator> AddrSpace::source_select(
 	assert(base_it != var.end());
 	mem = sel->operand[0];
 	base = base_it->second;
-	size = sel->size;
 
 	while(mem->type != ExprMem) {
 		assert(mem->type == ExprOpStore);
@@ -280,33 +278,33 @@ int BuildVisitor::post_visit(const refCond &cond) {
 	return 1;
 }
 
-bool TestVisitor::get_fix(const refExpr &expr) {
+bool FixVisitor::get_fix(const refExpr &expr) {
 	auto log_it = fix_expr.find(expr);
 	assert(log_it != fix_expr.end());
 	return log_it->second;
 }
-int TestVisitor::pre_visit(const refBytVec &vec) {
+int FixVisitor::pre_visit(const refBytVec &vec) {
 	if(fix_expr.find(vec) != fix_expr.end()) {
 		return 0;
 	}
 	return 1;
 }
-int TestVisitor::pre_visit(const refBytMem &mem) {
+int FixVisitor::pre_visit(const refBytMem &mem) {
 	if(fix_expr.find(mem) != fix_expr.end()) {
 		return 0;
 	}
 	return 1;
 }
-int TestVisitor::pre_visit(const refOperator &oper) {
+int FixVisitor::pre_visit(const refOperator &oper) {
 	if(fix_expr.find(oper) != fix_expr.end()) {
 		return 0;
 	}
 	return 1;
 }
-int TestVisitor::pre_visit(const refCond &cond) {
+int FixVisitor::pre_visit(const refCond &cond) {
 	return 0;
 }
-int TestVisitor::post_visit(const refBytVec &vec) {
+int FixVisitor::post_visit(const refBytVec &vec) {
 	if(vec->type == ExprVar) {
 		fix_expr[vec] = false;
 		return 1;
@@ -314,11 +312,11 @@ int TestVisitor::post_visit(const refBytVec &vec) {
 	fix_expr[vec] = true;
 	return 1;
 }
-int TestVisitor::post_visit(const refBytMem &mem) {
+int FixVisitor::post_visit(const refBytMem &mem) {
 	fix_expr[mem] = true;
 	return 1;
 }
-int TestVisitor::post_visit(const refOperator &oper) {
+int FixVisitor::post_visit(const refOperator &oper) {
 	switch(oper->type) {
 	case ExprOpSelect:
 	{
@@ -363,6 +361,56 @@ int TestVisitor::post_visit(const refOperator &oper) {
 		break;
 	}
 	}
+	return 1;
+}
+int FixVisitor::post_visit(const refCond &cond) {
+	return 1;
+}
+
+bool TestVisitor::get_fix() {
+	return fix;
+}
+int TestVisitor::pre_visit(const refBytVec &vec) {
+	if(vis_expr.find(vec) != vis_expr.end()) {
+		return 0;
+	}
+	return 1;
+}
+int TestVisitor::pre_visit(const refBytMem &mem) {
+	if(vis_expr.find(mem) != vis_expr.end()) {
+		return 0;
+	}
+	return 1;
+}
+int TestVisitor::pre_visit(const refOperator &oper) {
+	if(oper->type == ExprOpStore) {
+		return 0;
+	}
+	if(vis_expr.find(oper) != vis_expr.end()) {
+		return 0;
+	}
+	return 1;
+}
+int TestVisitor::pre_visit(const refCond &cond) {
+	return 0;
+}
+int TestVisitor::post_visit(const refBytVec &vec) {
+	if(vec->type != ExprImm) {
+	    fix = false;
+	}
+	vis_expr.insert(vec);
+	return 1;
+}
+int TestVisitor::post_visit(const refBytMem &mem) {
+	fix = false;
+	vis_expr.insert(mem);
+	return 1;
+}
+int TestVisitor::post_visit(const refOperator &oper) {
+	if(oper->type == ExprOpSelect) {
+	    fix = false;
+	}
+	vis_expr.insert(oper);
 	return 1;
 }
 int TestVisitor::post_visit(const refCond &cond) {
@@ -521,6 +569,12 @@ int state_executor(
 			cblk = blk_it->second;
 		}
 
+		TestVisitor testvis = TestVisitor();
+		expr_walk(&testvis,cblk->reg[ctx->REGIDX_PC]);
+		if(!testvis.get_fix()) {
+		    info("symbolic pc %08lx\n",cstate->pc);
+		}
+
 		//initialize
 		cons.clear();
 		var.clear();
@@ -661,10 +715,10 @@ int state_executor(
 				nstate->flag[i] = next_flag[i];
 			}
 
-			TestVisitor testvis = TestVisitor(addrsp,var);
+			FixVisitor fixvis = FixVisitor(addrsp,var);
 			for(i = 0; i < ctx->NUMREG; i++) {
-				expr_walk(&testvis,next_reg[i]);
-				if(testvis.get_fix(next_reg[i])) {
+				expr_walk(&fixvis,next_reg[i]);
+				if(fixvis.get_fix(next_reg[i])) {
 					nstate->reg[i] = BytVec::create_imm(
 						ctx->REGSIZE,
 						var[next_reg[i]]

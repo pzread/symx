@@ -110,9 +110,9 @@ class BuildVisitor : public ExprVisitor {
 		std::unordered_set<refMemRecord> select_set;
 		std::vector<refMemRecord> store_seq;
 };
-class TestVisitor : public ExprVisitor {
+class FixVisitor : public ExprVisitor {
 	public:
-		TestVisitor(
+		FixVisitor(
 			const AddrSpace &_addrsp,
 			const std::unordered_map<refExpr,uint64_t> &_var
 		) : addrsp(_addrsp),var(_var) {}
@@ -129,6 +129,22 @@ class TestVisitor : public ExprVisitor {
 		const AddrSpace &addrsp;
 		const std::unordered_map<refExpr,uint64_t> &var;
 		std::unordered_map<refExpr,bool> fix_expr;
+};
+class TestVisitor : public ExprVisitor {
+	public:
+		TestVisitor() : fix(true) {}
+		bool get_fix();
+		int pre_visit(const refBytVec &vec);
+		int pre_visit(const refBytMem &mem);
+		int pre_visit(const refOperator &oper);
+		int pre_visit(const refCond &cond);
+		int post_visit(const refBytVec &vec);
+		int post_visit(const refBytMem &mem);
+		int post_visit(const refOperator &oper);
+		int post_visit(const refCond &cond);
+	private:
+		std::unordered_set<refExpr> vis_expr;
+		bool fix;
 };
 class TransVisitor : public ExprVisitor {};
 
