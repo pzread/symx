@@ -16,7 +16,7 @@ endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O2 -Wall -Wextra -Wno-unused-parameter")
 
 include_directories(symx AFTER . inc)
-add_executable(symx src/expr.cpp src/state.cpp src/utils.cpp src/draw.cpp arch/arm/arm.cpp solver/z3.cpp src/symx.cpp)
+add_executable(symx src/expr.cpp src/state.cpp src/utils.cpp src/draw.cpp arch/arm/arm.cpp solver/z3.cpp src/symx.cpp src/backward.cpp)
 target_link_libraries(symx capstone z3 cgraph)
 
 add_executable(z3test test/z3test.c)

@@ -14,7 +14,6 @@
 #define _STATE_H_
 
 namespace symx {
-
 using namespace symx;
 
 class MemRecord;
@@ -85,13 +84,13 @@ class Block : public BaseState {
 		const ProgCtr pc;
 		refExpr next_insmd;
 		std::vector<std::string> discode;
-		Block(const ProgCtr _pc) : pc(_pc) {};
+		Block(const ProgCtr &_pc) : pc(_pc) {};
 };
 class BuildVisitor : public ExprVisitor {
 	public:
 		BuildVisitor(const refState &_state) : state(_state) {}
-		refExpr get_expr(const refExpr expr);
-		refCond get_cond(const refCond cond);
+		refExpr get_expr(const refExpr &expr);
+		refCond get_cond(const refCond &cond);
 		int get_mem_record(
 			std::unordered_set<refMemRecord> *selset,
 			std::vector<refMemRecord> *strseq);
@@ -130,22 +129,6 @@ class FixVisitor : public ExprVisitor {
 		const std::unordered_map<refExpr,uint64_t> &var;
 		std::unordered_map<refExpr,bool> fix_expr;
 };
-class TestVisitor : public ExprVisitor {
-	public:
-		TestVisitor() : fix(true) {}
-		bool get_fix();
-		int pre_visit(const refBytVec &vec);
-		int pre_visit(const refBytMem &mem);
-		int pre_visit(const refOperator &oper);
-		int pre_visit(const refCond &cond);
-		int post_visit(const refBytVec &vec);
-		int post_visit(const refBytMem &mem);
-		int post_visit(const refOperator &oper);
-		int post_visit(const refCond &cond);
-	private:
-		std::unordered_set<refExpr> vis_expr;
-		bool fix;
-};
 class TransVisitor : public ExprVisitor {};
 
 refBlock state_create_block(Context *ctx,const ProgCtr &pc);
@@ -153,7 +136,6 @@ int state_executor(
 	Context *ctx,
 	const refProbe &probe,
 	const uint64_t entry_rawpc);
-
 }
 
 #endif

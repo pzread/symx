@@ -16,96 +16,95 @@
 #define PAGE_SIZE 	0x1000
 
 namespace symx {
-	class ProgCtr {
-		public:
-			uint64_t rawpc;
-			int insmd;
-			ProgCtr() {}
-			ProgCtr(const uint64_t _rawpc,const int _insmd)
-				: rawpc(_rawpc),insmd(_insmd) {}
-			bool operator==(const ProgCtr &other) const {
-				return rawpc == other.rawpc && \
-					insmd == other.insmd;
-			}
-	};
-};
-namespace std {
-	template<>
-	struct hash<symx::ProgCtr> {
-
-		std::size_t operator()(const symx::ProgCtr &key) const {
-			return (key.rawpc << 8) | key.insmd; 
+class ProgCtr {
+	public:
+		uint64_t rawpc;
+		int insmd;
+		ProgCtr() {}
+		ProgCtr(const uint64_t _rawpc,const int _insmd)
+			: rawpc(_rawpc),insmd(_insmd) {}
+		bool operator==(const ProgCtr &other) const {
+			return rawpc == other.rawpc && \
+				insmd == other.insmd;
 		}
-	};
 };
+}
+
+namespace std {
+template<> struct hash<symx::ProgCtr> {
+	std::size_t operator()(const symx::ProgCtr &key) const {
+		return (key.rawpc << 8) | key.insmd; 
+	}
+};
+}
+
 namespace symx {
-	using namespace symx;
+using namespace symx;
 
-	class MemPage;
-	class State;
-	class Block;
-	class Probe;
-	class Expr;
-	class Cond;
-	class TransVisitor;
-	typedef std::shared_ptr<Expr> refExpr;
-	typedef std::shared_ptr<Cond> refCond;
-	typedef std::shared_ptr<Probe> refProbe;
-	typedef std::shared_ptr<Block> refBlock;
-	
-	class Solver {
-		public:
-			virtual TransVisitor* create_translator() = 0;
-			virtual bool solve(
-				const std::unordered_set<refCond> &cons,
-				std::unordered_map<refExpr,uint64_t> *var,
-				std::unordered_set<refExpr> *fix
-			) = 0;
-	};
-	class Probe {
-		public:
-			virtual uint64_t read_reg(
-				const unsigned int regid,
-				bool *symbol) const = 0;
-			virtual bool read_flag(
-				const unsigned int flagid) const = 0;
-			virtual ssize_t read_mem(
-				const uint64_t addr,
-				const uint8_t *buf,
-				const size_t len
-			) const = 0;
-			virtual int get_insmd() const = 0;
-			virtual std::vector<MemPage> get_mem_map() const = 0;
-	};
-	class Context {
-		public:
-			csh cs;
-			Solver *solver;
-			const unsigned int REGSIZE;
-			const unsigned int NUMREG;
-			const unsigned int NUMFLAG;
-			const unsigned int REGIDX_PC;
-			uint64_t last_var_id;
-			std::queue<std::shared_ptr<State>> state;
-			std::unordered_map<ProgCtr,refBlock> block;
+class MemPage;
+class State;
+class Block;
+class Probe;
+class Expr;
+class Cond;
+class TransVisitor;
+typedef std::shared_ptr<Expr> refExpr;
+typedef std::shared_ptr<Cond> refCond;
+typedef std::shared_ptr<Probe> refProbe;
+typedef std::shared_ptr<Block> refBlock;
 
-			Context(
-				Solver *_solver,
-				const unsigned int _REGSIZE,
-				const unsigned int _NUMREG,
-				const unsigned int _NUMFLAG,
-				const unsigned int _REGIDX_PC
-			) :
-				solver(_solver),
-				REGSIZE(_REGSIZE),
-				NUMREG(_NUMREG),
-				NUMFLAG(_NUMFLAG),
-				REGIDX_PC(_REGIDX_PC),
-				last_var_id(0) {}
-			virtual refBlock interpret(
-				const refProbe &probe,
-				const ProgCtr &pc) = 0;
-	};
+class Solver {
+	public:
+		virtual TransVisitor* create_translator() = 0;
+		virtual bool solve(
+			const std::unordered_set<refCond> &cons,
+			std::unordered_map<refExpr,uint64_t> *var
+		) = 0;
 };
+class Probe {
+	public:
+		virtual uint64_t read_reg(
+			const unsigned int regid,
+			bool *symbol) const = 0;
+		virtual bool read_flag(
+			const unsigned int flagid) const = 0;
+		virtual ssize_t read_mem(
+			const uint64_t addr,
+			const uint8_t *buf,
+			const size_t len
+		) const = 0;
+		virtual int get_insmd() const = 0;
+		virtual std::vector<MemPage> get_mem_map() const = 0;
+};
+class Context {
+	public:
+		csh cs;
+		Solver *solver;
+		const unsigned int REGSIZE;
+		const unsigned int NUMREG;
+		const unsigned int NUMFLAG;
+		const unsigned int REGIDX_PC;
+		uint64_t last_var_id;
+		std::queue<std::shared_ptr<State>> state;
+		std::unordered_map<ProgCtr,refBlock> block;
+
+		Context(
+			Solver *_solver,
+			const unsigned int _REGSIZE,
+			const unsigned int _NUMREG,
+			const unsigned int _NUMFLAG,
+			const unsigned int _REGIDX_PC
+		) :
+			solver(_solver),
+			REGSIZE(_REGSIZE),
+			NUMREG(_NUMREG),
+			NUMFLAG(_NUMFLAG),
+			REGIDX_PC(_REGIDX_PC),
+			last_var_id(0) {}
+		virtual refBlock interpret(
+			const refProbe &probe,
+			const ProgCtr &pc) = 0;
+};
+}
 
 #endif

@@ -12,6 +12,7 @@
 #include"expr.h"
 #include"draw.h"
 #include"state.h"
+#include"backward.h"
 
 using namespace symx;
 
@@ -122,7 +123,7 @@ std::vector<refOperator> AddrSpace::source_select(
 	
 	return retseq;
 }
-refExpr BuildVisitor::get_expr(const refExpr expr) {
+refExpr BuildVisitor::get_expr(const refExpr &expr) {
 	auto it = expr_map.find(expr);
 	if(it == expr_map.end()) {
 		err("expr not exist\n");
@@ -130,7 +131,7 @@ refExpr BuildVisitor::get_expr(const refExpr expr) {
 	}
 	return it->second;
 }
-refCond BuildVisitor::get_cond(const refCond cond) {
+refCond BuildVisitor::get_cond(const refCond &cond) {
 	auto it = cond_map.find(cond);
 	if(it == cond_map.end()) {
 		err("cond not exist\n");
@@ -367,56 +368,6 @@ int FixVisitor::post_visit(const refCond &cond) {
 	return 1;
 }
 
-bool TestVisitor::get_fix() {
-	return fix;
-}
-int TestVisitor::pre_visit(const refBytVec &vec) {
-	if(vis_expr.find(vec) != vis_expr.end()) {
-		return 0;
-	}
-	return 1;
-}
-int TestVisitor::pre_visit(const refBytMem &mem) {
-	if(vis_expr.find(mem) != vis_expr.end()) {
-		return 0;
-	}
-	return 1;
-}
-int TestVisitor::pre_visit(const refOperator &oper) {
-	if(oper->type == ExprOpStore) {
-		return 0;
-	}
-	if(vis_expr.find(oper) != vis_expr.end()) {
-		return 0;
-	}
-	return 1;
-}
-int TestVisitor::pre_visit(const refCond &cond) {
-	return 0;
-}
-int TestVisitor::post_visit(const refBytVec &vec) {
-	if(vec->type != ExprImm) {
-	    fix = false;
-	}
-	vis_expr.insert(vec);
-	return 1;
-}
-int TestVisitor::post_visit(const refBytMem &mem) {
-	fix = false;
-	vis_expr.insert(mem);
-	return 1;
-}
-int TestVisitor::post_visit(const refOperator &oper) {
-	if(oper->type == ExprOpSelect) {
-	    fix = false;
-	}
-	vis_expr.insert(oper);
-	return 1;
-}
-int TestVisitor::post_visit(const refCond &cond) {
-	return 1;
-}
-
 refBlock state_create_block(Context *ctx,const ProgCtr &pc) {
 	unsigned int i;
 	refBlock blk = ref<Block>(pc);
@@ -532,7 +483,6 @@ int state_executor(
 	refBlock cblk;
 	std::unordered_set<refCond> cons;
 	std::unordered_map<refExpr,uint64_t> var;
-	std::unordered_set<refExpr> fix;
 	refExpr next_expc;
 	refExpr next_exinsmd;
 	refExpr next_mem;
@@ -545,6 +495,8 @@ int state_executor(
 
 	auto draw = Draw();
 	bool find_flag = false;
+
+	Backward backward;
 
 	nstate = create_static_state(ctx,probe,addrsp,entry_rawpc);
 	ctx->state.push(nstate);
@@ -569,12 +521,9 @@ int state_executor(
 			cblk = blk_it->second;
 		}
 
-		TestVisitor testvis = TestVisitor();
-		expr_walk(&testvis,cblk->reg[ctx->REGIDX_PC]);
-		if(!testvis.get_fix()) {
-		    info("symbolic pc %08lx\n",cstate->pc);
-		}
-
+		//backward
+		backward.check_point(cblk->reg[ctx->REGIDX_PC]);
+		
 		//initialize
 		cons.clear();
 		var.clear();
@@ -642,7 +591,7 @@ int state_executor(
 			//Translate constraint
 			expr_iter_walk(trans_vis,cons.begin(),cons.end());
 
-			if(!solver->solve(cons,&var,&fix)) {
+			if(!solver->solve(cons,&var)) {
 				break;	
 			}
 			next_rawpc = var[next_expc];
@@ -721,8 +670,7 @@ int state_executor(
 				if(fixvis.get_fix(next_reg[i])) {
 					nstate->reg[i] = BytVec::create_imm(
 						ctx->REGSIZE,
-						var[next_reg[i]]
-					);
+						var[next_reg[i]]);
 				} else {
 					nstate->reg[i] = next_reg[i];
 				}
