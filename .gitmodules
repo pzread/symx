@@ -4,3 +4,6 @@
 [submodule "capstone"]
 	path = capstone
 	url = https://github.com/aquynh/capstone.git
+[submodule "dynamorio"]
+	path = dynamorio
+	url = https://github.com/DynamoRIO/dynamorio.git
