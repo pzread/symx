@@ -1,8 +1,8 @@
 #ifndef LINUX
 #define LINUX
 #endif
-#ifndef X86_64
-#define X86_64
+#ifndef X86_32
+#define X86_32
 #endif
 
 #include<stdint.h>
