@@ -1,49 +1,29 @@
-#include<stdint.h>
-#include<unistd.h>
-#include<vector>
 
+#include"vm.h"
 #include"context.h"
-#include"state.h"
 
 #ifndef _OPENREIL_H_
 #define _OPENREIL_H_
 
-#define OPENREIL_REG_SIZE	4
-#define OPENREIL_FLAG_NUM	6
-
-namespace arm {
-
-using namespace arm;
-
-class ARMProbe;
-typedef std::shared_ptr<ARMProbe> refARMProbe;
-
-class ARMProbe : public symx::Probe {
+namespace openreil {
+    class VirtualMachine : public symx::VirtualMachine {
 	public:
-		pid_t pid;
-		uint8_t *bin;
-		uint64_t off;
+	    uint64_t event_get_pc();
+	    int suspend();
+    };
+    class Context : public symx::Context {
+	private:
+	    const char *container_path;
+	    const char *exe_path;
 
-		ARMProbe(pid_t _pid,int fd,uint64_t _off);
-		uint64_t read_reg(const unsigned int regid,bool *symbol) const;
-		bool read_flag(const unsigned int flagid) const;
-		ssize_t read_mem(
-			const uint64_t addr,
-			const uint8_t *buf,
-			const size_t len) const;
-		int get_insmd() const;
-		std::vector<symx::MemPage> get_mem_map() const;
-};
-class ARMContext : public symx::Context {
 	public:
-		ARMContext(symx::Solver *solver);
-		symx::refBlock interpret(
-			const symx::refProbe &_probe,
-			const symx::ProgCtr &pc);
-};
-
-int initialize();
-
-};
+	    Context(const char *_exe_path) :
+		symx::Context(256,64),
+		container_path("."),
+		exe_path(_exe_path) {}
+	    VirtualMachine* create_vm();
+	    int destroy_vm(symx::VirtualMachine *vm);
+    };
+}
 
 #endif

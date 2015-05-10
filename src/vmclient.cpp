@@ -16,7 +16,7 @@ extern "C" {
 
 #include"vm.h"
 
-using namespace vm;
+using namespace symx;
 
 static char name[NAME_MAX + 1];
 static int com_evt;
@@ -95,11 +95,19 @@ static void call_basic_block(app_pc pc) {
     void *drctx = dr_get_current_drcontext();
     dr_mcontext_t ctx;
 
-    com_mem->context.pc = (uint64_t)pc;
+    com_mem->context.pc = (uint32_t)pc;
     ctx.size = sizeof(ctx);
     ctx.flags = DR_MC_CONTROL;
     if(dr_get_mcontext(drctx,&ctx)) {
-	dr_printf("%08x\n",ctx.esp);
+	com_mem->context.reg[REGIDX_EAX] = ctx.eax;
+	com_mem->context.reg[REGIDX_EBX] = ctx.ebx;
+	com_mem->context.reg[REGIDX_ECX] = ctx.ecx;
+	com_mem->context.reg[REGIDX_EDX] = ctx.edx;
+	com_mem->context.reg[REGIDX_EDI] = ctx.edi;
+	com_mem->context.reg[REGIDX_ESI] = ctx.esi;
+	com_mem->context.reg[REGIDX_EBP] = ctx.ebp;
+	com_mem->context.reg[REGIDX_ESP] = ctx.esp;
+	com_mem->context.flag = ctx.eflags;
     }
 
     com_push(VMCOM_EVT_EXECUTE);

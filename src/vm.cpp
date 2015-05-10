@@ -4,6 +4,7 @@
 #include<string.h>
 #include<stdint.h>
 #include<stddef.h>
+#include<assert.h>
 #include<unistd.h>
 #include<limits.h>
 #include<fcntl.h>
@@ -22,7 +23,7 @@ extern "C" {
 #include"utils.h"
 #include"vm.h"
 
-using namespace vm;
+using namespace symx;
 
 int VirtualMachine::create(
 	const char *container_path,
@@ -73,6 +74,7 @@ int VirtualMachine::create(
     
     this->pid = pid;
     this->data = data;
+    state = RUNNING;
     info("VM create: %d %s %s\n",this->pid,container_path,exe_path);
     return 0;
 
@@ -130,12 +132,24 @@ int VirtualMachine::destroy() {
 }
 int VirtualMachine::event_wait() {
     int evt;
+
+    assert(state == RUNNING);
+
     if(read(com_evt,&evt,sizeof(evt)) == sizeof(evt)) {
+	state = EVENT;
 	return evt;
     }
     return -1;
 }
 int VirtualMachine::event_ret() {
     int evt = VMCOM_EVT_RET;
+
+    assert(state == EVENT);
+
+    state = RUNNING;
     return write(com_evt,&evt,sizeof(evt));
+}
+int VirtualMachine::suspend() {
+    assert(state == EVENT);
+    return 0;
 }

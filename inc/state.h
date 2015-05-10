@@ -16,13 +16,12 @@
 namespace symx {
 using namespace symx;
 
-class MemRecord;
 class Block;
 class State;
-typedef std::shared_ptr<MemRecord> refMemRecord;
 typedef std::shared_ptr<Block> refBlock;
 typedef std::shared_ptr<State> refState;
 
+/*
 class MemPage : public std::enable_shared_from_this<MemPage> {
 	public:
 		const uint64_t start;
@@ -61,23 +60,22 @@ class MemRecord : public std::enable_shared_from_this<MemRecord> {
 			const unsigned int _size
 		) : oper(_oper),mem(_mem),idx(_idx),size(_size) {}
 };
+*/
 class BaseState : public std::enable_shared_from_this<BaseState> {
-	public:
-		refExpr mem;
-		refExpr reg[256];
-		refCond flag[64];
+    public:
+	refExpr mem;
+	refExpr reg[256];
+	refCond flag[64];
 };
 class State : public BaseState {
-	public:
-		const ProgCtr pc;
-		const refProbe probe;
-		std::vector<refBytVec> symbol;
-		std::unordered_set<refCond> constraint;
-		std::unordered_set<refMemRecord> select_set;
-		std::vector<refMemRecord> store_seq;
+    public:
+	const ProgCtr pc;
+	std::vector<refBytVec> symbol;
+	std::unordered_set<refCond> constraint;
+	//std::unordered_set<refMemRecord> select_set;
+	//std::vector<refMemRecord> store_seq;
 
-		State(const ProgCtr &_pc,const refProbe &_probe)
-			: pc(_pc),probe(_probe) {}
+	State(const ProgCtr &_pc) : pc(_pc) {}
 };
 class Block : public BaseState {
 	public:
@@ -86,6 +84,8 @@ class Block : public BaseState {
 		std::vector<std::string> discode;
 		Block(const ProgCtr &_pc) : pc(_pc) {};
 };
+
+/*
 class BuildVisitor : public ExprVisitor {
 	public:
 		BuildVisitor(const refState &_state) : state(_state) {}
@@ -128,7 +128,10 @@ class FixVisitor : public ExprVisitor {
 		const AddrSpace &addrsp;
 		const std::unordered_map<refExpr,uint64_t> &var;
 		std::unordered_map<refExpr,bool> fix_expr;
+*/
 };
+
+/*
 class TransVisitor : public ExprVisitor {};
 
 refBlock state_create_block(Context *ctx,const ProgCtr &pc);
@@ -137,5 +140,6 @@ int state_executor(
 	const refProbe &probe,
 	const uint64_t entry_rawpc);
 }
+*/
 
 #endif
