@@ -1,11 +1,11 @@
 #define LOG_PREFIX "state"
 
-#include<assert.h>
 #include<memory>
 #include<string>
 #include<unordered_map>
 #include<vector>
 #include<bitset>
+#include<capstone/capstone.h>
 
 #include"utils.h"
 #include"context.h"
@@ -16,8 +16,12 @@ using namespace symx;
 
 namespace symx {
     int state_executor(Context *ctx) {
+	uint64_t target_rawpc = 0x080483FB;
+
 	refSnapshot snap;
-	uint8_t code[4096];
+	std::queue<refState> worklist;
+	std::unordered_map<ProgCtr,refBlock> block;
+	refState nstate,cstate;
 
 	//Create base VM
 	VirtualMachine *vm = ctx->create_vm();
@@ -28,7 +32,7 @@ namespace symx {
 	}
 	vm->event_ret();
 	while(vm->event_wait() == VMCOM_EVT_EXECUTE) {
-	    if(vm->event_get_pc() == 0x080483FB) {
+	    if(vm->event_get_pc() == target_rawpc) {
 		info("find main entry\n");
 		break;
 	    }
@@ -36,7 +40,22 @@ namespace symx {
 	}
 	snap = vm->event_suspend();
 
-	snap->mem_read(code,0x08048000,0x1000);
+	nstate = ref<State>(
+		ProgCtr(target_rawpc,CS_MODE_32),
+		ref<AddrSpace>(ctx,snap));
+	worklist.push(nstate);
+
+	while(!worklist.empty()) {
+	    cstate = worklist.back();
+	    worklist.pop();
+	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc);
+
+	    if(block.find(cstate->pc) == block.end()) {
+		//Test BB finder
+		dbg("BB finder %016lx\n",cstate->pc.rawpc);
+	    }
+	}
+
 
 	ctx->destroy_vm(vm);
 	return 0;

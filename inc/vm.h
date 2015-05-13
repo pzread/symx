@@ -1,15 +1,23 @@
+#ifndef _VM_H_
+#define _VM_H_
+
 #include<stdint.h>
 #include<unistd.h>
 #include<limits.h>
 #include<vector>
 #include<memory>
+#include<bitset>
+#include<map>
+#include<unordered_map>
 
-#include"expr.h"
 #include"utils.h"
+#include"expr.h"
+#include"state.h"
+#include"context.h"
 
-#ifndef _VM_H_
-#define _VM_H_
-
+#ifndef PAGE_SIZE
+#define PAGE_SIZE		0x1000
+#endif
 #define UNIX_PATH_MAX		108
 #define VMCOM_EVT_ENTER		1
 #define VMCOM_EVT_EXECUTE	2
@@ -61,29 +69,12 @@ struct vmcom_frame {
 namespace symx {
     using namespace symx;
 
-    class Snapshot;
-    typedef std::shared_ptr<Snapshot> refSnapshot;
-
-    /*class AddrSpace {
-	public:
-	    std::unordered_map<uint64_t,refBytVec> mem_symbol;
-	    std::unordered_set<refCond> mem_constraint;
-	    AddrSpace(Context *ctx,const refProbe &_probe);
-	    int handle_select(const uint64_t idx,const unsigned int size);
-	    refExpr get_mem() const;
-	    std::vector<refOperator> source_select(
-		    const refOperator &sel,
-		    const std::unordered_map<refExpr,uint64_t> &var) const;
-	private:
-	    const refProbe probe;
-	    Context *ctx;
-	    refExpr mem;
-	    std::map<uint64_t,MemPage> page_map;
-    };*/
-
     class Snapshot {
 	public:
-	    virtual int mem_read(uint8_t *buf,uint64_t pos,size_t len) = 0;
+	    virtual int mem_read(
+		    uint8_t *buf,
+		    uint64_t pos,
+		    size_t len) const = 0;
 
 	    std::vector<refExpr> reg;
 	    std::vector<refCond> flag;
@@ -121,6 +112,49 @@ namespace symx {
 	    int event_wait();
 	    int event_send(int evt);
 	    int event_ret();
+    };
+
+    /*
+    class MemPage : public std::enable_shared_from_this<MemPage> {
+	public:
+	    const uint64_t start;
+	    const unsigned int prot;
+	    std::bitset<PAGE_SIZE> dirty;
+	    std::bitset<PAGE_SIZE> symbol;
+	    MemPage(const uint64_t _start,const unsigned int _prot)
+		: start(_start),prot(_prot) {}
+    };
+    class MemRecord : public std::enable_shared_from_this<MemRecord> {
+	    public:
+		    const refOperator oper;
+		    const refExpr mem;
+		    const refExpr idx;
+		    const unsigned int size;
+		    MemRecord(
+			    const refOperator _oper,
+			    const refExpr _mem,
+			    const refExpr _idx,
+			    const unsigned int _size
+		    ) : oper(_oper),mem(_mem),idx(_idx),size(_size) {}
+    };
+    */
+    class AddrSpace {
+	private:
+	    const Context *ctx;
+	    const refSnapshot snap;
+	    refExpr mem;
+
+	public:
+	    std::unordered_map<uint64_t,refBytVec> mem_symbol;
+	    std::unordered_set<refCond> mem_constr;
+
+	    AddrSpace(const Context *_ctx,const refSnapshot &_snap);
+	    int read(refState state,uint8_t *buf,uint64_t pos,size_t len);
+	    /*int handle_select(const uint64_t idx,const unsigned int size);
+	    refExpr get_mem() const;
+	    std::vector<refOperator> source_select(
+		    const refOperator &sel,
+		    const std::unordered_map<refExpr,uint64_t> &var) const;*/
     };
 }
 

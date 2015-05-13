@@ -1,3 +1,6 @@
+#ifndef _CONTEXT_H_
+#define _CONTEXT_H_
+
 #include<stdint.h>
 #include<memory>
 #include<queue>
@@ -5,33 +8,8 @@
 #include<unordered_map>
 #include<unordered_set>
 
+#include"utils.h"
 #include"vm.h"
-
-#ifndef _CONTEXT_H_
-#define _CONTEXT_H_
-
-namespace symx {
-    class ProgCtr {
-	public:
-	    uint64_t rawpc;
-	    int insmd;
-	    ProgCtr() {}
-	    ProgCtr(const uint64_t _rawpc,const int _insmd)
-		: rawpc(_rawpc),insmd(_insmd) {}
-	    bool operator==(const ProgCtr &other) const {
-		return rawpc == other.rawpc && \
-			      insmd == other.insmd;
-	    }
-    };
-}
-
-namespace std {
-    template<> struct hash<symx::ProgCtr> {
-	std::size_t operator()(const symx::ProgCtr &key) const {
-	    return (key.rawpc << 8) | key.insmd; 
-	}
-    };
-}
 
 namespace symx {
     using namespace symx;

@@ -19,4 +19,18 @@ std::shared_ptr<T> ref(Args&&... args)
 	return std::make_shared<T>(std::forward<Args>(args)...);
 }
 
+//Predefine
+namespace symx {
+    class Context;
+    class VirtualMachine;
+    class Snapshot;
+    class AddrSpace;
+    class Block;
+    class State;
+    typedef std::shared_ptr<const Snapshot> refSnapshot;
+    typedef std::shared_ptr<AddrSpace> refAddrSpace;
+    typedef std::shared_ptr<const Block> refBlock;
+    typedef std::shared_ptr<const State> refState;
+}
+
 #endif

@@ -1,66 +1,29 @@
+#ifndef _STATE_H_
+#define _STATE_H_
+
 #include<memory>
 #include<unordered_map>
 #include<unordered_set>
-#include<bitset>
-#include<map>
 #include<vector>
 #include<string>
 
 #include"utils.h"
 #include"expr.h"
-#include"context.h"
-
-#ifndef _STATE_H_
-#define _STATE_H_
+#include"vm.h"
 
 namespace symx {
     using namespace symx;
 
-    class Block;
-    class State;
-    typedef std::shared_ptr<Block> refBlock;
-    typedef std::shared_ptr<State> refState;
-
-/*
-class MemPage : public std::enable_shared_from_this<MemPage> {
+    class ProgCtr {
 	public:
-		const uint64_t start;
-		const unsigned int prot;
-		std::bitset<PAGE_SIZE> dirty;
-		std::bitset<PAGE_SIZE> symbol;
-		MemPage(const uint64_t _start,const unsigned int _prot)
-			: start(_start),prot(_prot) {}
-};
-class AddrSpace {
-	public:
-		std::unordered_map<uint64_t,refBytVec> mem_symbol;
-		std::unordered_set<refCond> mem_constraint;
-		AddrSpace(Context *ctx,const refProbe &_probe);
-		int handle_select(const uint64_t idx,const unsigned int size);
-		refExpr get_mem() const;
-		std::vector<refOperator> source_select(
-			const refOperator &sel,
-			const std::unordered_map<refExpr,uint64_t> &var) const;
-	private:
-		const refProbe probe;
-		Context *ctx;
-		refExpr mem;
-		std::map<uint64_t,MemPage> page_map;
-};
-class MemRecord : public std::enable_shared_from_this<MemRecord> {
-	public:
-		const refOperator oper;
-		const refExpr mem;
-		const refExpr idx;
-		const unsigned int size;
-		MemRecord(
-			const refOperator _oper,
-			const refExpr _mem,
-			const refExpr _idx,
-			const unsigned int _size
-		) : oper(_oper),mem(_mem),idx(_idx),size(_size) {}
-};
-*/
+	    const uint64_t rawpc;
+	    const int mode;
+	    ProgCtr(const uint64_t _rawpc,const int _mode)
+		: rawpc(_rawpc),mode(_mode) {}
+	    bool operator==(const ProgCtr &other) const {
+		return rawpc == other.rawpc && mode == other.mode;
+	    }
+    };
     class BaseState : public std::enable_shared_from_this<BaseState> {
 	public:
 	    refExpr mem;
@@ -70,12 +33,14 @@ class MemRecord : public std::enable_shared_from_this<MemRecord> {
     class State : public BaseState {
 	public:
 	    const ProgCtr pc;
+	    const refAddrSpace as;
 	    std::vector<refBytVec> symbol;
-	    std::unordered_set<refCond> constraint;
+	    std::unordered_set<refCond> constr;
 	    //std::unordered_set<refMemRecord> select_set;
 	    //std::vector<refMemRecord> store_seq;
 
-	    State(const ProgCtr &_pc) : pc(_pc) {}
+	    State(const ProgCtr &_pc,const refAddrSpace &_as)
+		: pc(_pc),as(_as) {}
     };
     class Block : public BaseState {
 	public:
@@ -132,6 +97,13 @@ class FixVisitor : public ExprVisitor {
 		std::unordered_map<refExpr,bool> fix_expr;
 */
 };
+namespace std {
+    template<> struct hash<symx::ProgCtr> {
+	std::size_t operator()(const symx::ProgCtr &key) const {
+	    return (key.rawpc << 8) | key.mode;
+	}
+    };
+}
 
 /*
 class TransVisitor : public ExprVisitor {};

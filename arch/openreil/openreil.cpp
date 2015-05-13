@@ -57,11 +57,8 @@ int VirtualMachine::mem_read(uint8_t *buf,uint64_t pos,size_t len) {
     return 0;
 }
 
-Snapshot::Snapshot(
-	VirtualMachine *_vm,
-	const uint64_t *_reg,
-	const bool *_flag
-) : vm(_vm) {
+Snapshot::Snapshot(VirtualMachine *_vm,const uint64_t *_reg,const bool *_flag)
+    : vm(_vm) {
     int i;
     for(i = 0;i < REGIDX_END;i++) {
 	reg.push_back(symx::BytVec::create_imm(32,_reg[i]));
@@ -74,6 +71,6 @@ Snapshot::Snapshot(
 	}
     }
 }
-int Snapshot::mem_read(uint8_t *buf,uint64_t pos,size_t len) {
+int Snapshot::mem_read(uint8_t *buf,uint64_t pos,size_t len) const {
     return vm->mem_read(buf,pos,len);
 }

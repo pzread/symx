@@ -163,3 +163,12 @@ int VirtualMachine::event_ret() {
     }
     return write(com_evt,&evt,sizeof(evt));
 }
+
+AddrSpace::AddrSpace(const Context *_ctx,const refSnapshot &_snap) {
+    //TODO initialize memory layout
+}
+int AddrSpace::read(refState state,uint8_t *buf,uint64_t pos,size_t len) {
+    //assume executable page is read only
+    //TODO check page
+    return snap->mem_read(buf,pos,len);
+}

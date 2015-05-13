@@ -16,7 +16,7 @@ namespace openreil {
 
 	public:
 	    Snapshot(VirtualMachine *vm,const uint64_t *_reg,const bool *_flag);
-	    int mem_read(uint8_t *buf,uint64_t pos,size_t len);
+	    int mem_read(uint8_t *buf,uint64_t pos,size_t len) const;
     };
     class VirtualMachine : public symx::VirtualMachine {
 	public:
@@ -30,8 +30,8 @@ namespace openreil {
 	    const char *exe_path;
 
 	public:
-	    Context(const char *_exe_path) :
-		symx::Context(256,64),
+	    Context(const char *_exe_path)
+		: symx::Context(256,64),
 		container_path("."),
 		exe_path(_exe_path) {}
 	    VirtualMachine* create_vm();
