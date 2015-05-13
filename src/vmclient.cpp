@@ -123,11 +123,15 @@ static int com_loop() {
     int evt;
     while(read(com_evt,&evt,sizeof(evt)) > 0) {
 	switch(evt) {
+	    case VMCOM_EVT_READMEM:
+		memcpy(
+			com_mem->membuf.buf,
+			(void*)com_mem->membuf.pos,
+			com_mem->membuf.len);
+		com_push(VMCOM_EVT_READMEM);
 	    case VMCOM_EVT_RET:
 		return 0;
 	}
     }
     return 0;
 }
-
-

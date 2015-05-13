@@ -1,6 +1,11 @@
 #include<stdint.h>
 #include<unistd.h>
 #include<limits.h>
+#include<vector>
+#include<memory>
+
+#include"expr.h"
+#include"utils.h"
 
 #ifndef _VM_H_
 #define _VM_H_
@@ -9,9 +14,55 @@
 #define VMCOM_EVT_ENTER		1
 #define VMCOM_EVT_EXECUTE	2
 #define VMCOM_EVT_RET		10
+#define VMCOM_EVT_READMEM	11
+
+//For X86_32
+enum REGIDX {
+    REGIDX_EAX = 0,
+    REGIDX_EBX,
+    REGIDX_ECX,
+    REGIDX_EDX,
+    REGIDX_EDI,
+    REGIDX_ESI,
+    REGIDX_EBP,
+    REGIDX_ESP,
+    REGIDX_END
+};
+enum FLAGIDX {
+    FLAGIDX_CF = 0,
+    FLAGIDX_PF,
+    FLAGIDX_AF,
+    FLAGIDX_ZF,
+    FLAGIDX_SF,
+    FLAGIDX_OF,
+    FLAGIDX_END
+};
+#pragma pack(push)
+#pragma pack(4)
+struct vmcom_context {
+    uint32_t pc;
+    uint32_t reg[REGIDX_END];
+    uint32_t flag;
+};
+struct vmcom_membuf {
+    uint8_t buf[4096];
+    uint32_t pos;
+    uint32_t len;
+};
+struct vmcom_frame {
+    int evt;
+    union {
+	struct vmcom_context context;    
+	struct vmcom_membuf membuf;
+    };
+};
+#pragma pack(pop)
 
 namespace symx {
     using namespace symx;
+
+    class Snapshot;
+    typedef std::shared_ptr<Snapshot> refSnapshot;
 
     /*class AddrSpace {
 	public:
@@ -30,53 +81,37 @@ namespace symx {
 	    std::map<uint64_t,MemPage> page_map;
     };*/
 
-    //For X86_32
-    enum REGIDX {
-	REGIDX_EAX = 0,
-	REGIDX_EBX,
-	REGIDX_ECX,
-	REGIDX_EDX,
-	REGIDX_EDI,
-	REGIDX_ESI,
-	REGIDX_EBP,
-	REGIDX_ESP,
-    };
-    #pragma pack(push)
-    #pragma pack(4)
-    struct vmcom_context {
-	uint32_t pc;
-	uint32_t reg[8];
-	uint32_t flag;
-    };
-    struct vmcom_frame {
-	int evt;
-	union {
-	    struct vmcom_context context;    
-	};
-    };
-    #pragma pack(pop)
+    class Snapshot {
+	public:
+	    virtual int mem_read(uint8_t *buf,uint64_t pos,size_t len) = 0;
 
+	    std::vector<refExpr> reg;
+	    std::vector<refCond> flag;
+    };
     class VirtualMachine {
 	private:
-	    enum {
-		RUNNING,
-		EVENT,
-		SUSPEND
-	    } state;
 	    void *data;
 
 	    int vmcom_create();
 	    int vmcom_accept(int listen_fd);
 
 	protected:
+	    enum VMSTATE {
+		RUNNING,
+		EVENT,
+		SUSPEND
+	    } state;
 	    char name[NAME_MAX + 1];
 	    pid_t pid;
 	    int com_evt;
 	    struct vmcom_frame *com_mem;
+	    
+	    int set_state(VMSTATE next_state);
 
 	public:
 	    virtual ~VirtualMachine() {};
 	    virtual uint64_t event_get_pc() = 0;
+	    virtual refSnapshot event_suspend() = 0;
 
 	    int create(
 		    const char *container_path,
@@ -84,8 +119,8 @@ namespace symx {
 		    const char **argv);
 	    int destroy();
 	    int event_wait();
+	    int event_send(int evt);
 	    int event_ret();
-	    int suspend();
     };
 }
 

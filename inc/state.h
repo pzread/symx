@@ -14,12 +14,12 @@
 #define _STATE_H_
 
 namespace symx {
-using namespace symx;
+    using namespace symx;
 
-class Block;
-class State;
-typedef std::shared_ptr<Block> refBlock;
-typedef std::shared_ptr<State> refState;
+    class Block;
+    class State;
+    typedef std::shared_ptr<Block> refBlock;
+    typedef std::shared_ptr<State> refState;
 
 /*
 class MemPage : public std::enable_shared_from_this<MemPage> {
@@ -61,29 +61,31 @@ class MemRecord : public std::enable_shared_from_this<MemRecord> {
 		) : oper(_oper),mem(_mem),idx(_idx),size(_size) {}
 };
 */
-class BaseState : public std::enable_shared_from_this<BaseState> {
-    public:
-	refExpr mem;
-	refExpr reg[256];
-	refCond flag[64];
-};
-class State : public BaseState {
-    public:
-	const ProgCtr pc;
-	std::vector<refBytVec> symbol;
-	std::unordered_set<refCond> constraint;
-	//std::unordered_set<refMemRecord> select_set;
-	//std::vector<refMemRecord> store_seq;
-
-	State(const ProgCtr &_pc) : pc(_pc) {}
-};
-class Block : public BaseState {
+    class BaseState : public std::enable_shared_from_this<BaseState> {
 	public:
-		const ProgCtr pc;
-		refExpr next_insmd;
-		std::vector<std::string> discode;
-		Block(const ProgCtr &_pc) : pc(_pc) {};
-};
+	    refExpr mem;
+	    std::vector<refExpr> reg;
+	    std::vector<refCond> flag;
+    };
+    class State : public BaseState {
+	public:
+	    const ProgCtr pc;
+	    std::vector<refBytVec> symbol;
+	    std::unordered_set<refCond> constraint;
+	    //std::unordered_set<refMemRecord> select_set;
+	    //std::vector<refMemRecord> store_seq;
+
+	    State(const ProgCtr &_pc) : pc(_pc) {}
+    };
+    class Block : public BaseState {
+	public:
+	    const ProgCtr pc;
+	    refExpr next_insmd;
+	    std::vector<std::string> discode;
+	    Block(const ProgCtr &_pc) : pc(_pc) {};
+    };
+
+    int state_executor(Context *ctx);
 
 /*
 class BuildVisitor : public ExprVisitor {
@@ -135,11 +137,7 @@ class FixVisitor : public ExprVisitor {
 class TransVisitor : public ExprVisitor {};
 
 refBlock state_create_block(Context *ctx,const ProgCtr &pc);
-int state_executor(
-	Context *ctx,
-	const refProbe &probe,
-	const uint64_t entry_rawpc);
-}
+
 */
 
 #endif

@@ -10,8 +10,6 @@
 #ifndef _CONTEXT_H_
 #define _CONTEXT_H_
 
-#define PAGE_SIZE 0x1000
-
 namespace symx {
     class ProgCtr {
 	public:

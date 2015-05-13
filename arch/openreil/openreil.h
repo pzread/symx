@@ -6,10 +6,23 @@
 #define _OPENREIL_H_
 
 namespace openreil {
+    using namespace openreil;
+
+    class VirtualMachine;
+
+    class Snapshot : public symx::Snapshot {
+	private:
+	    VirtualMachine *const vm;
+
+	public:
+	    Snapshot(VirtualMachine *vm,const uint64_t *_reg,const bool *_flag);
+	    int mem_read(uint8_t *buf,uint64_t pos,size_t len);
+    };
     class VirtualMachine : public symx::VirtualMachine {
 	public:
 	    uint64_t event_get_pc();
-	    int suspend();
+	    symx::refSnapshot event_suspend();
+	    int mem_read(uint8_t *buf,uint64_t pos,size_t len);
     };
     class Context : public symx::Context {
 	private:

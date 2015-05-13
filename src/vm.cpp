@@ -130,10 +130,21 @@ int VirtualMachine::destroy() {
     dr_inject_process_exit(data,true);
     return 0;
 }
+int VirtualMachine::set_state(VMSTATE next_state) {
+    if(next_state == EVENT) {
+	assert(state = RUNNING);
+    }
+    if(next_state == RUNNING) {
+	assert(state == EVENT);
+    }
+    if(next_state == SUSPEND) {
+	assert(state == EVENT);
+    }
+    state = next_state;
+    return 0;
+}
 int VirtualMachine::event_wait() {
     int evt;
-
-    assert(state == RUNNING);
 
     if(read(com_evt,&evt,sizeof(evt)) == sizeof(evt)) {
 	state = EVENT;
@@ -141,15 +152,14 @@ int VirtualMachine::event_wait() {
     }
     return -1;
 }
+int VirtualMachine::event_send(int evt) {
+    return write(com_evt,&evt,sizeof(evt));
+}
 int VirtualMachine::event_ret() {
     int evt = VMCOM_EVT_RET;
 
-    assert(state == EVENT);
-
-    state = RUNNING;
+    if(set_state(RUNNING)) {
+	return -1;
+    }
     return write(com_evt,&evt,sizeof(evt));
-}
-int VirtualMachine::suspend() {
-    assert(state == EVENT);
-    return 0;
 }

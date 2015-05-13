@@ -10,15 +10,39 @@
 #include"utils.h"
 #include"context.h"
 #include"expr.h"
-#include"draw.h"
 #include"state.h"
-#include"backward.h"
 
 using namespace symx;
 
 namespace symx {
+    int state_executor(Context *ctx) {
+	refSnapshot snap;
+	uint8_t code[4096];
 
-AddrSpace::AddrSpace(
+	//Create base VM
+	VirtualMachine *vm = ctx->create_vm();
+
+	//Get main entry snapshot
+	if(vm->event_wait() != VMCOM_EVT_ENTER) {
+	    err("unexpected event\n");
+	}
+	vm->event_ret();
+	while(vm->event_wait() == VMCOM_EVT_EXECUTE) {
+	    if(vm->event_get_pc() == 0x080483FB) {
+		info("find main entry\n");
+		break;
+	    }
+	    vm->event_ret();
+	}
+	snap = vm->event_suspend();
+
+	snap->mem_read(code,0x08048000,0x1000);
+
+	ctx->destroy_vm(vm);
+	return 0;
+    }
+
+/*AddrSpace::AddrSpace(
 	Context *_ctx,
 	const refProbe &_probe
 ) :
@@ -702,6 +726,6 @@ int state_executor(
 
 	delete trans_vis;
 	return 0;
-}
+}*/
 
 };
