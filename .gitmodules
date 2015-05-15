@@ -7,3 +7,6 @@
 [submodule "dynamorio"]
 	path = dynamorio
 	url = https://github.com/DynamoRIO/dynamorio.git
+[submodule "openreil"]
+	path = openreil
+	url = https://github.com/Cr4sh/openreil.git
