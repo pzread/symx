@@ -23,9 +23,8 @@ namespace symx {
 	    virtual VirtualMachine* create_vm() = 0;
 	    virtual int destroy_vm(VirtualMachine *vm) = 0;
 
-	    Context(const unsigned int _NUMREG,const unsigned int _NUMFLAG) :
-		NUMREG(_NUMREG),
-		NUMFLAG(_NUMFLAG) {}
+	    Context(const unsigned int _NUMREG,const unsigned int _NUMFLAG)
+		: NUMREG(_NUMREG),NUMFLAG(_NUMFLAG) {}
     };
 }
 

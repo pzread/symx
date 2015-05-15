@@ -11,6 +11,7 @@
 #include<sys/mman.h>
 #include<sys/socket.h>
 #include<sys/un.h>
+#include<capstone/capstone.h>
 
 #define LINUX
 #define X86_32
@@ -162,6 +163,55 @@ int VirtualMachine::event_ret() {
 	return -1;
     }
     return write(com_evt,&evt,sizeof(evt));
+}
+
+Snapshot::Snapshot(cs_arch arch,cs_mode mode) {
+    cs_open(arch,mode,&cs);
+    cs_option(cs,CS_OPT_DETAIL,CS_OPT_ON);
+}
+int Snapshot::translate_bb(const symx::ProgCtr &pc) const {
+    uint64_t curpc = pc.rawpc;
+    uint64_t endpc = curpc;
+    uint8_t code[8192];
+    const uint8_t *codeptr;
+    cs_insn *ins;
+    size_t remain;
+    uint8_t *block;
+
+    cs_option(cs,CS_OPT_MODE,pc.mode);
+    ins = cs_malloc(cs);
+    remain = PAGE_SIZE - (curpc & (~PAGE_MASK));
+    while(true) {
+	if(mem_read(code,curpc,remain)) {
+	    return -1;
+	}
+	codeptr = code;
+	while(remain > 0) {
+	    if(!cs_disasm_iter(cs,&codeptr,&remain,&curpc,ins)) {
+		break;
+	    }
+	    dbg("%s %s\n",ins->mnemonic,ins->op_str);
+	    if(cs_insn_group(cs,ins,CS_GRP_CALL) ||
+		    cs_insn_group(cs,ins,CS_GRP_RET) ||
+		    cs_insn_group(cs,ins,CS_GRP_IRET) ||
+		    cs_insn_group(cs,ins,CS_GRP_JUMP)) {
+		endpc = ins->address + ins->size;
+		goto out;
+	    }
+	}
+	curpc += (uint64_t)codeptr - (uint64_t)code;
+	remain += PAGE_SIZE;
+    }
+
+out:
+    
+    block = new uint8_t[endpc - pc.rawpc];
+    mem_read(block,pc.rawpc,endpc - pc.rawpc);
+    translate(block,pc,endpc - pc.rawpc);
+    delete[] block;
+
+    cs_free(ins,1);
+    return 0;
 }
 
 AddrSpace::AddrSpace(const Context *_ctx,const refSnapshot &_snap) {

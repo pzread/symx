@@ -124,11 +124,17 @@ static int com_loop() {
     while(read(com_evt,&evt,sizeof(evt)) > 0) {
 	switch(evt) {
 	    case VMCOM_EVT_READMEM:
-		memcpy(
-			com_mem->membuf.buf,
-			(void*)com_mem->membuf.pos,
-			com_mem->membuf.len);
+		if(com_mem->membuf.len > sizeof(com_mem->membuf.buf)) {
+		    dr_printf("membuf overflow\n");
+		} else {
+		    memcpy(
+			    com_mem->membuf.buf,
+			    (void*)com_mem->membuf.pos,
+			    com_mem->membuf.len);
+		}
 		com_push(VMCOM_EVT_READMEM);
+		break;
+
 	    case VMCOM_EVT_RET:
 		return 0;
 	}

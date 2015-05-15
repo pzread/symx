@@ -51,11 +51,9 @@ namespace symx {
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc);
 
 	    if(block.find(cstate->pc) == block.end()) {
-		//Test BB finder
-		dbg("BB finder %016lx\n",cstate->pc.rawpc);
+		snap->translate_bb(cstate->pc);
 	    }
 	}
-
 
 	ctx->destroy_vm(vm);
 	return 0;

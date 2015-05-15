@@ -4,6 +4,7 @@
 #include<stdint.h>
 #include<unistd.h>
 #include<limits.h>
+#include<capstone/capstone.h>
 #include<vector>
 #include<memory>
 #include<bitset>
@@ -18,6 +19,8 @@
 #ifndef PAGE_SIZE
 #define PAGE_SIZE		0x1000
 #endif
+#define PAGE_MASK		(~0xFFF)
+
 #define UNIX_PATH_MAX		108
 #define VMCOM_EVT_ENTER		1
 #define VMCOM_EVT_EXECUTE	2
@@ -53,12 +56,12 @@ struct vmcom_context {
     uint32_t flag;
 };
 struct vmcom_membuf {
-    uint8_t buf[4096];
+    uint8_t buf[16384];
     uint32_t pos;
     uint32_t len;
 };
 struct vmcom_frame {
-    int evt;
+    uint32_t evt;
     union {
 	struct vmcom_context context;    
 	struct vmcom_membuf membuf;
@@ -70,11 +73,21 @@ namespace symx {
     using namespace symx;
 
     class Snapshot {
+	private:
+	    csh cs;
+
 	public:
 	    virtual int mem_read(
 		    uint8_t *buf,
 		    uint64_t pos,
 		    size_t len) const = 0;
+	    virtual int translate(
+		    uint8_t *code,
+		    const ProgCtr &pc,
+		    size_t len) const = 0;
+
+	    Snapshot(cs_arch arch,cs_mode mode);
+	    int translate_bb(const symx::ProgCtr &pc) const;
 
 	    std::vector<refExpr> reg;
 	    std::vector<refCond> flag;
@@ -101,7 +114,7 @@ namespace symx {
 
 	public:
 	    virtual ~VirtualMachine() {};
-	    virtual uint64_t event_get_pc() = 0;
+	    virtual uint64_t event_get_pc() const = 0;
 	    virtual refSnapshot event_suspend() = 0;
 
 	    int create(

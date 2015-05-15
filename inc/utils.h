@@ -27,6 +27,7 @@ namespace symx {
     class AddrSpace;
     class Block;
     class State;
+    class ProgCtr;
     typedef std::shared_ptr<const Snapshot> refSnapshot;
     typedef std::shared_ptr<AddrSpace> refAddrSpace;
     typedef std::shared_ptr<const Block> refBlock;
