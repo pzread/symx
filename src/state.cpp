@@ -20,8 +20,9 @@ namespace symx {
 
 	refSnapshot snap;
 	std::queue<refState> worklist;
-	std::unordered_map<ProgCtr,refBlock> block;
+	std::unordered_map<ProgCtr,refBlock> block_cache;
 	refState nstate,cstate;
+	refBlock cblk;
 
 	//Create base VM
 	VirtualMachine *vm = ctx->create_vm();
@@ -50,8 +51,12 @@ namespace symx {
 	    worklist.pop();
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc);
 
-	    if(block.find(cstate->pc) == block.end()) {
-		snap->translate_bb(cstate->pc);
+	    auto blk_it = block_cache.find(cstate->pc);
+	    if(blk_it == block_cache.end()) {
+		cblk = snap->translate_bb(cstate->pc);
+		block_cache[cstate->pc] = cblk;
+	    } else {
+		cblk = blk_it->second;
 	    }
 	}
 

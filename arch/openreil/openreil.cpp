@@ -200,7 +200,8 @@ symx::refBlock Snapshot::translate(
     std::vector<symx::refExpr> reglist;
     std::unordered_map<std::string,symx::refExpr> regmap;
     symx::refExpr xra,xrb,xrc;
-    std::vector<symx::ProgCtr> nextpc;
+    std::vector<symx::refCond> cond;
+    std::vector<symx::refExpr> nextpc;
     
     //initialize openreil, translate to reil IR
     reil = reil_init(ARCH_X86,inst_handler,(void*)&translated);
@@ -309,6 +310,35 @@ symx::refBlock Snapshot::translate(
 		translate_set_arg(&regmap,ins->c,xrc);
 		break;
 
+	    case I_LDM:
+		xra = translate_get_arg(regmap,ins->a);
+		translate_set_arg(
+			&regmap,
+			ins->c,
+			symx::expr_select(mem,xra,REILSIZE[ins->a.size]));
+		break;
+
+	    case I_STM:
+		xra = translate_get_arg(regmap,ins->a);
+		mem = symx::expr_store(
+			mem,
+			translate_get_arg(regmap,ins->c),
+			translate_get_arg(regmap,ins->a));
+		break;
+
+	    case I_JCC:
+		xra = translate_get_arg(regmap,ins->a);
+		xrc = translate_get_arg(regmap,ins->c);
+
+		cond.push_back(symx::cond_eq(
+			    xra,
+			    symx::BytVec::create_imm(xra->size,0)));
+		nextpc.push_back(xrc);
+		nextpc.push_back(symx::BytVec::create_imm(
+			    32,
+			    ins->raw_info.addr + ins->raw_info.size));
+		break;
+
 	    default:
 		err("unsupport unstruction %d\n",ins->op);
 		break;
@@ -317,19 +347,28 @@ symx::refBlock Snapshot::translate(
 
     instlist.clear();
 
-    return ref<symx::Block>(nextpc);
+    return ref<symx::Block>(cond,nextpc);
 }
 symx::refExpr Snapshot::translate_get_arg(
 	const std::unordered_map<std::string,symx::refExpr> &regmap,
 	const reil_arg_t &arg) const {
+    unsigned int size = REILSIZE[arg.size];
+    symx::refExpr xrt;
 
     assert(arg.type == A_REG || arg.type == A_TEMP || arg.type == A_CONST);
 
     if(arg.type == A_REG || arg.type == A_TEMP) {
 	auto it = regmap.find(arg.name);
+
 	assert(it != regmap.end());
-	assert(it->second->size == REILSIZE[arg.size]);
-	return it->second;
+
+	xrt = it->second;
+	if(size < xrt->size) {
+	    xrt = symx::expr_extract(xrt,0,size);
+	} else if(size > xrt->size) {
+	    xrt = symx::expr_zext(xrt,size);
+	}
+	return xrt;
     } else {
 	return symx::BytVec::create_imm(REILSIZE[arg.size],arg.val);
     }
@@ -338,8 +377,8 @@ int Snapshot::translate_set_arg(
 	std::unordered_map<std::string,symx::refExpr> *regmap,
 	const reil_arg_t &arg,
 	const symx::refExpr &value) const {
-    symx::refExpr xrt;
     unsigned int size = REILSIZE[arg.size];
+    symx::refExpr xrt;
 
     assert(arg.type == A_REG || arg.type == A_TEMP);
     

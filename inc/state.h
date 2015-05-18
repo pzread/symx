@@ -44,9 +44,12 @@ namespace symx {
     };
     class Block : public BaseState {
 	public:
-	    const std::vector<ProgCtr> nextpc;
-	    Block(const std::vector<ProgCtr> &_nextpc)
-		: nextpc(_nextpc) {};
+	    const std::vector<refCond> cond; 
+	    const std::vector<refExpr> nextpc;
+	    Block(
+		    const std::vector<refCond> &_cond,
+		    const std::vector<refExpr> &_nextpc
+		    ) : cond(_cond),nextpc(_nextpc) {};
     };
 
     int state_executor(Context *ctx);
