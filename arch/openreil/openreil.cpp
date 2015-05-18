@@ -63,6 +63,8 @@ static const unsigned int REILSIZE[] = {
     32,
     64,
 };
+static symx::refExpr IMMFALSE = symx::BytVec::create_imm(1,0x0);
+static symx::refExpr IMMTRUE = symx::BytVec::create_imm(1,0x1);
 
 Context::Context(const char *_exe_path)
     : symx::Context(256,64),container_path("."),exe_path(_exe_path)
@@ -197,7 +199,7 @@ symx::refBlock Snapshot::translate(
     symx::refExpr mem;
     std::vector<symx::refExpr> reglist;
     std::unordered_map<std::string,symx::refExpr> regmap;
-    symx::refExpr exra,exrb,exrc;
+    symx::refExpr xra,xrb,xrc;
     std::vector<symx::ProgCtr> nextpc;
     
     //initialize openreil, translate to reil IR
@@ -223,14 +225,90 @@ symx::refBlock Snapshot::translate(
 			ins->c,
 			translate_get_arg(regmap,ins->a));
 		break;
+
 	    case I_ADD:
-		exra = translate_get_arg(regmap,ins->a);
-		exrb = translate_get_arg(regmap,ins->b);
-		translate_set_arg(
-			&regmap,
-			ins->c,
-			symx::expr_add(exra,exrb));
+	    case I_SUB:
+	    case I_MUL:
+	    case I_AND:
+	    case I_OR:
+	    case I_XOR:
+	    case I_SHR:
+	    case I_SHL:
+		xra = translate_get_arg(regmap,ins->a);
+		xrb = translate_get_arg(regmap,ins->b);
+		switch(ins->op) {
+		    case I_ADD:
+			xrc = symx::expr_add(xra,xrb);
+			break;
+		    case I_SUB:
+			xrc = symx::expr_sub(xra,xrb);
+			break;
+		    case I_MUL:
+			xrc = symx::expr_mul(xra,xrb);
+			break;
+		    case I_AND:
+			xrc = symx::expr_and(xra,xrb);
+			break;
+		    case I_OR:
+			xrc = symx::expr_or(xra,xrb);
+			break;
+		    case I_XOR:
+			xrc = symx::expr_xor(xra,xrb);
+			break;
+		    case I_SHR:
+			xrc = symx::expr_lshr(xra,xrb);
+			break;
+		    case I_SHL:
+			xrc = symx::expr_shl(xra,xrb);
+			break;
+		    default:
+			err("unexpected\n");
+			break;
+		}
+		translate_set_arg(&regmap,ins->c,xrc);
 		break;
+
+	    case I_NEG:
+	    case I_NOT:
+		xra = translate_get_arg(regmap,ins->a);
+		switch(ins->op) {
+		    case I_NEG:
+			xrc = symx::expr_neg(xra);
+			break;
+		    case I_NOT:
+			xrc = symx::expr_not(xra);
+			break;
+		    default:
+			err("unexpected\n");
+			break;
+		}
+		translate_set_arg(&regmap,ins->c,xrc);
+		break;
+
+	    case I_EQ:
+	    case I_LT:
+		xra = translate_get_arg(regmap,ins->a);
+		xrb = translate_get_arg(regmap,ins->b);
+		switch(ins->op) {
+		    case I_EQ:
+			xrc = symx::expr_ite(
+				symx::cond_eq(xra,xrb),
+				IMMTRUE,
+				IMMFALSE);
+			break;
+		    case I_LT:
+			xrc = symx::expr_ite(
+				symx::cond_ul(xra,xrb),
+				IMMTRUE,
+				IMMFALSE);
+			break;
+		    default:
+			err("unexpected\n");
+			break;
+		}
+		translate_set_arg(&regmap,ins->c,xrc);
+		break;
+
 	    default:
 		err("unsupport unstruction %d\n",ins->op);
 		break;
@@ -260,10 +338,19 @@ int Snapshot::translate_set_arg(
 	std::unordered_map<std::string,symx::refExpr> *regmap,
 	const reil_arg_t &arg,
 	const symx::refExpr &value) const {
+    symx::refExpr xrt;
+    unsigned int size = REILSIZE[arg.size];
 
     assert(arg.type == A_REG || arg.type == A_TEMP);
-
-    regmap->insert(std::make_pair(arg.name,value));
+    
+    if(size == value->size) {
+	xrt = value;
+    } else if(size < value->size) {
+	xrt = symx::expr_extract(value,0,size);
+    } else if(size > value->size) {
+	xrt = symx::expr_zext(value,size);
+    }
+    regmap->insert(std::make_pair(arg.name,xrt));
     return 0;
 }
 
