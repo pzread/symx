@@ -41,9 +41,13 @@ namespace symx {
 	}
 	snap = vm->event_suspend();
 
+	auto base_as = ref<AddrSpace>(ctx,snap);
 	nstate = ref<State>(
 		ProgCtr(target_rawpc,CS_MODE_32),
-		ref<AddrSpace>(ctx,snap));
+		base_as,
+		base_as->mem,
+		snap->reg,
+		snap->flag);
 	worklist.push(nstate);
 
 	while(!worklist.empty()) {

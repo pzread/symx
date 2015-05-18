@@ -26,9 +26,15 @@ namespace symx {
     };
     class BaseState : public std::enable_shared_from_this<BaseState> {
 	public:
-	    refExpr mem;
-	    std::vector<refExpr> reg;
-	    std::vector<refCond> flag;
+	    const refExpr mem;
+	    const std::vector<refExpr> reg;
+	    const std::vector<refCond> flag;
+
+	    BaseState(
+		    const refExpr &_mem,
+		    const std::vector<refExpr> _reg,
+		    const std::vector<refCond> _flag)
+		: mem(_mem),reg(_reg),flag(_flag) {}
     };
     class State : public BaseState {
 	public:
@@ -39,17 +45,28 @@ namespace symx {
 	    //std::unordered_set<refMemRecord> select_set;
 	    //std::vector<refMemRecord> store_seq;
 
-	    State(const ProgCtr &_pc,const refAddrSpace &_as)
-		: pc(_pc),as(_as) {}
+	    State(
+		    const ProgCtr &_pc,
+		    const refAddrSpace &_as,
+		    const refExpr &_mem,
+		    const std::vector<refExpr> &_reg,
+		    const std::vector<refCond> &_flag
+		    ) : BaseState(_mem,_reg,_flag),pc(_pc),as(_as) {}
     };
     class Block : public BaseState {
 	public:
 	    const std::vector<refCond> cond; 
 	    const std::vector<refExpr> nextpc;
 	    Block(
+		    const refExpr &_mem,
+		    const std::vector<refExpr> &_reg,
+		    const std::vector<refCond> &_flag,
 		    const std::vector<refCond> &_cond,
 		    const std::vector<refExpr> &_nextpc
-		    ) : cond(_cond),nextpc(_nextpc) {};
+		    ) :
+		BaseState(_mem,_reg,_flag),
+		cond(_cond),
+		nextpc(_nextpc) {};
     };
 
     int state_executor(Context *ctx);

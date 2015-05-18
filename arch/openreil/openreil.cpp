@@ -66,10 +66,6 @@ static const unsigned int REILSIZE[] = {
 static symx::refExpr IMMFALSE = symx::BytVec::create_imm(1,0x0);
 static symx::refExpr IMMTRUE = symx::BytVec::create_imm(1,0x1);
 
-Context::Context(const char *_exe_path)
-    : symx::Context(256,64),container_path("."),exe_path(_exe_path)
-{}
-
 VirtualMachine* Context::create_vm() {
     VirtualMachine *vm = new VirtualMachine();
     const char *argv[] = {exe_path,NULL};
@@ -198,6 +194,7 @@ symx::refBlock Snapshot::translate(
 
     symx::refExpr mem;
     std::vector<symx::refExpr> reglist;
+    std::vector<symx::refCond> flaglist;
     std::unordered_map<std::string,symx::refExpr> regmap;
     symx::refExpr xra,xrb,xrc;
     std::vector<symx::refCond> cond;
@@ -346,8 +343,7 @@ symx::refBlock Snapshot::translate(
     }
 
     instlist.clear();
-
-    return ref<symx::Block>(cond,nextpc);
+    return ref<symx::Block>(mem,reglist,flaglist,cond,nextpc);
 }
 symx::refExpr Snapshot::translate_get_arg(
 	const std::unordered_map<std::string,symx::refExpr> &regmap,

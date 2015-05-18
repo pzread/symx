@@ -15,16 +15,18 @@ namespace symx {
     using namespace symx;
 
     class Context {
-	public:
-	    const unsigned int NUMREG;
-	    const unsigned int NUMFLAG;
+	private:
+	    int last_varid;
 
+	public:
 	    virtual ~Context() {};
 	    virtual VirtualMachine* create_vm() = 0;
 	    virtual int destroy_vm(VirtualMachine *vm) = 0;
-
-	    Context(const unsigned int _NUMREG,const unsigned int _NUMFLAG)
-		: NUMREG(_NUMREG),NUMFLAG(_NUMFLAG) {}
+	    
+	    int get_next_varid() {
+		last_varid += 1;
+		return last_varid;
+	    }
     };
 }
 
