@@ -81,13 +81,13 @@ namespace symx {
 		    uint8_t *buf,
 		    uint64_t pos,
 		    size_t len) const = 0;
-	    virtual int translate(
+	    virtual refBlock translate(
 		    uint8_t *code,
 		    const ProgCtr &pc,
 		    size_t len) const = 0;
 
 	    Snapshot(cs_arch arch,cs_mode mode);
-	    int translate_bb(const symx::ProgCtr &pc) const;
+	    refBlock translate_bb(const symx::ProgCtr &pc) const;
 
 	    std::vector<refExpr> reg;
 	    std::vector<refCond> flag;

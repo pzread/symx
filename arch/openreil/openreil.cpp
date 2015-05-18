@@ -4,14 +4,38 @@
 #include<string.h>
 #include<stdint.h>
 #include<assert.h>
+#include<string>
+#include<vector>
+#include<unordered_map>
 #include<libopenreil.h>
 
 #include"utils.h"
-#include"vm.h"
 #include"expr.h"
+#include"vm.h"
+#include"state.h"
 #include"arch/openreil/openreil.h"
 
 using namespace openreil;
+
+static std::vector<reil_inst_t> instlist;
+static const char *REGNAME[] = {
+    "R_EAX",
+    "R_EBX",
+    "R_ECX",
+    "R_EDX",
+    "R_EDI",
+    "R_ESI",
+    "R_EBP",
+    "R_ESP",
+};
+static const char *FLAGNAME[] = {
+    "R_CF",
+    "R_PF",
+    "R_AF",
+    "R_ZF",
+    "R_SF",
+    "R_OF",
+};
 
 Context::Context(const char *_exe_path)
     : symx::Context(256,64),container_path("."),exe_path(_exe_path)
@@ -120,7 +144,7 @@ char *arg_print(reil_arg_t *arg,char *arg_str) {
     }
     return arg_str;
 }
-void inst_print(reil_inst_t *inst) {
+void inst_print(const std::vector<reil_inst_t>::iterator &inst) {
     char arg_str[3][MAX_ARG_STR];
     arg_print(&inst->a, arg_str[0]);
     arg_print(&inst->b, arg_str[1]);
@@ -134,21 +158,58 @@ void inst_print(reil_inst_t *inst) {
 	    arg_str[2]);
 }
 int Snapshot::inst_handler(reil_inst_t *inst,void *ctx) {
-    inst_print(inst);
+    instlist.push_back(*inst);
     return 0;
 }
-int Snapshot::translate(
+symx::refBlock Snapshot::translate(
 	uint8_t *code,
 	const symx::ProgCtr &pc,
 	size_t len
 ) const {
+    int i;
     uint64_t rawpc = pc.rawpc;
     reil_t reil;
     int translated;
+
+    symx::refExpr mem;
+    std::vector<symx::refExpr> reglist;
+    std::vector<symx::refCond> flaglist;
+    std::unordered_map<std::string,symx::refExpr> regmap;
+    std::unordered_map<std::string,symx::refCond> flagmap;
+    std::vector<symx::ProgCtr> nextpc;
     
+    //initialize openreil, translate to reil IR
     reil = reil_init(ARCH_X86,inst_handler,(void*)&translated);
+    instlist.clear();
     reil_translate(reil,rawpc,code,len);
     reil_close(reil);
 
-    return 0;
+    //initialize dangle memory, register, flag
+    mem = symx::BytMem::create_dangle(-1);
+    for(i = 0;i < REGIDX_END;i++) {
+	auto reg = symx::BytVec::create_dangle(32,i);
+	reglist.push_back(reg);
+	regmap[REGNAME[i]] = reg;
+    }
+    for(i = 0;i < FLAGIDX_END;i++) {
+	auto flag = symx::Cond::create_dangle(i);
+	flaglist.push_back(flag);
+	flagmap[FLAGNAME[i]] = flag;
+    }
+
+    for(auto ins = instlist.begin();ins != instlist.end();ins++) {
+	inst_print(ins);
+	switch(ins->op) {
+	    case I_STR:
+		info("%s\n",ins->a.name);
+		break;
+	    default:
+		err("unsupport unstruction %d\n",ins->op);
+		break;
+	}
+    }
+
+    instlist.clear();
+
+    return ref<symx::Block>(nextpc);
 }

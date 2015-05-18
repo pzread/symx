@@ -169,7 +169,7 @@ Snapshot::Snapshot(cs_arch arch,cs_mode mode) {
     cs_open(arch,mode,&cs);
     cs_option(cs,CS_OPT_DETAIL,CS_OPT_ON);
 }
-int Snapshot::translate_bb(const symx::ProgCtr &pc) const {
+refBlock Snapshot::translate_bb(const symx::ProgCtr &pc) const {
     uint64_t curpc = pc.rawpc;
     uint64_t endpc = curpc;
     uint8_t code[8192];
@@ -183,7 +183,7 @@ int Snapshot::translate_bb(const symx::ProgCtr &pc) const {
     remain = PAGE_SIZE - (curpc & (~PAGE_MASK));
     while(true) {
 	if(mem_read(code,curpc,remain)) {
-	    return -1;
+	    return nullptr;
 	}
 	codeptr = code;
 	while(remain > 0) {

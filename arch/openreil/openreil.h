@@ -1,6 +1,9 @@
+#include<vector>
 #include<libopenreil.h>
-#include"vm.h"
+
+#include"utils.h"
 #include"context.h"
+#include"vm.h"
 
 #ifndef _OPENREIL_H_
 #define _OPENREIL_H_
@@ -15,7 +18,7 @@ namespace openreil {
 	    VirtualMachine *const vm;
 
 	    static int inst_handler(reil_inst_t *inst,void *ctx);
-	    int translate(
+	    symx::refBlock translate(
 		    uint8_t *code,
 		    const symx::ProgCtr &pc,
 		    size_t len) const;

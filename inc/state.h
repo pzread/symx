@@ -44,10 +44,9 @@ namespace symx {
     };
     class Block : public BaseState {
 	public:
-	    const ProgCtr pc;
-	    refExpr next_insmd;
-	    std::vector<std::string> discode;
-	    Block(const ProgCtr &_pc) : pc(_pc) {};
+	    const std::vector<ProgCtr> nextpc;
+	    Block(const std::vector<ProgCtr> &_nextpc)
+		: nextpc(_nextpc) {};
     };
 
     int state_executor(Context *ctx);
