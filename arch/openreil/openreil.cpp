@@ -27,14 +27,41 @@ static const char *REGNAME[] = {
     "R_ESI",
     "R_EBP",
     "R_ESP",
-};
-static const char *FLAGNAME[] = {
+
+    "R_EFLAGS",
+    "R_DFLAG",
+
     "R_CF",
     "R_PF",
     "R_AF",
     "R_ZF",
     "R_SF",
     "R_OF",
+};
+static const unsigned int REGSIZE[] = {
+    32,
+    32,
+    32,
+    32,
+    32,
+    32,
+    32,
+    32,
+    32,
+    32,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+};
+static const unsigned int REILSIZE[] = {
+    1,
+    8,
+    16,
+    32,
+    64,
 };
 
 Context::Context(const char *_exe_path)
@@ -61,23 +88,26 @@ uint64_t VirtualMachine::event_get_pc() const {
 symx::refSnapshot VirtualMachine::event_suspend() {
     int i;
     uint64_t reg[REGIDX_END];
-    bool flag[FLAGIDX_END];
 
     if(set_state(SUSPEND)) {
 	return nullptr;
     }
 
-    for(i = 0;i < REGIDX_END;i++) {
+    for(i = 0;i < REGIDX_EFLAGS;i++) {
 	reg[i] = com_mem->context.reg[i];
     }
-    flag[FLAGIDX_CF] = (com_mem->context.flag >> 0) & 0x1;
-    flag[FLAGIDX_PF] = (com_mem->context.flag >> 2) & 0x1;
-    flag[FLAGIDX_AF] = (com_mem->context.flag >> 4) & 0x1;
-    flag[FLAGIDX_ZF] = (com_mem->context.flag >> 6) & 0x1;
-    flag[FLAGIDX_SF] = (com_mem->context.flag >> 7) & 0x1;
-    flag[FLAGIDX_OF] = (com_mem->context.flag >> 11) & 0x1;
 
-    return ref<Snapshot>(this,reg,flag);
+    reg[REGIDX_EFLAGS] = com_mem->context.flag;
+    reg[REGIDX_DFLAG] = (com_mem->context.flag >> 10) & 0x1;
+
+    reg[REGIDX_CF] = (com_mem->context.flag >> 0) & 0x1;
+    reg[REGIDX_PF] = (com_mem->context.flag >> 2) & 0x1;
+    reg[REGIDX_AF] = (com_mem->context.flag >> 4) & 0x1;
+    reg[REGIDX_ZF] = (com_mem->context.flag >> 6) & 0x1;
+    reg[REGIDX_SF] = (com_mem->context.flag >> 7) & 0x1;
+    reg[REGIDX_OF] = (com_mem->context.flag >> 11) & 0x1;
+
+    return ref<Snapshot>(this,reg);
 }
 int VirtualMachine::mem_read(uint8_t *buf,uint64_t pos,size_t len) {
     assert(len < sizeof(com_mem->membuf.buf));
@@ -91,19 +121,12 @@ int VirtualMachine::mem_read(uint8_t *buf,uint64_t pos,size_t len) {
     return 0;
 }
 
-Snapshot::Snapshot(VirtualMachine *_vm,const uint64_t *_reg,const bool *_flag)
+Snapshot::Snapshot(VirtualMachine *_vm,const uint64_t *_reg)
     : symx::Snapshot(CS_ARCH_X86,CS_MODE_32),vm(_vm)
 {
     int i;
     for(i = 0;i < REGIDX_END;i++) {
-	reg.push_back(symx::BytVec::create_imm(32,_reg[i]));
-    }
-    for(i = 0;i < FLAGIDX_END;i++) {
-	if(_flag[i]) {
-	    flag.push_back(symx::Cond::create_true());
-	} else {
-	    flag.push_back(symx::Cond::create_false());
-	}
+	reg.push_back(symx::BytVec::create_imm(REGSIZE[i],_reg[i]));
     }
 }
 int Snapshot::mem_read(uint8_t *buf,uint64_t pos,size_t len) const {
@@ -173,9 +196,8 @@ symx::refBlock Snapshot::translate(
 
     symx::refExpr mem;
     std::vector<symx::refExpr> reglist;
-    std::vector<symx::refCond> flaglist;
     std::unordered_map<std::string,symx::refExpr> regmap;
-    std::unordered_map<std::string,symx::refCond> flagmap;
+    symx::refExpr exra,exrb,exrc;
     std::vector<symx::ProgCtr> nextpc;
     
     //initialize openreil, translate to reil IR
@@ -184,24 +206,30 @@ symx::refBlock Snapshot::translate(
     reil_translate(reil,rawpc,code,len);
     reil_close(reil);
 
-    //initialize dangle memory, register, flag
+    //initialize dangle memory, register
     mem = symx::BytMem::create_dangle(-1);
     for(i = 0;i < REGIDX_END;i++) {
-	auto reg = symx::BytVec::create_dangle(32,i);
+	auto reg = symx::BytVec::create_dangle(REGSIZE[i],i);
 	reglist.push_back(reg);
 	regmap[REGNAME[i]] = reg;
-    }
-    for(i = 0;i < FLAGIDX_END;i++) {
-	auto flag = symx::Cond::create_dangle(i);
-	flaglist.push_back(flag);
-	flagmap[FLAGNAME[i]] = flag;
     }
 
     for(auto ins = instlist.begin();ins != instlist.end();ins++) {
 	inst_print(ins);
 	switch(ins->op) {
 	    case I_STR:
-		info("%s\n",ins->a.name);
+		translate_set_arg(
+			&regmap,
+			ins->c,
+			translate_get_arg(regmap,ins->a));
+		break;
+	    case I_ADD:
+		exra = translate_get_arg(regmap,ins->a);
+		exrb = translate_get_arg(regmap,ins->b);
+		translate_set_arg(
+			&regmap,
+			ins->c,
+			symx::expr_add(exra,exrb));
 		break;
 	    default:
 		err("unsupport unstruction %d\n",ins->op);
@@ -213,3 +241,29 @@ symx::refBlock Snapshot::translate(
 
     return ref<symx::Block>(nextpc);
 }
+symx::refExpr Snapshot::translate_get_arg(
+	const std::unordered_map<std::string,symx::refExpr> &regmap,
+	const reil_arg_t &arg) const {
+
+    assert(arg.type == A_REG || arg.type == A_TEMP || arg.type == A_CONST);
+
+    if(arg.type == A_REG || arg.type == A_TEMP) {
+	auto it = regmap.find(arg.name);
+	assert(it != regmap.end());
+	assert(it->second->size == REILSIZE[arg.size]);
+	return it->second;
+    } else {
+	return symx::BytVec::create_imm(REILSIZE[arg.size],arg.val);
+    }
+}
+int Snapshot::translate_set_arg(
+	std::unordered_map<std::string,symx::refExpr> *regmap,
+	const reil_arg_t &arg,
+	const symx::refExpr &value) const {
+
+    assert(arg.type == A_REG || arg.type == A_TEMP);
+
+    regmap->insert(std::make_pair(arg.name,value));
+    return 0;
+}
+

@@ -37,16 +37,18 @@ enum REGIDX {
     REGIDX_ESI,
     REGIDX_EBP,
     REGIDX_ESP,
+
+    REGIDX_EFLAGS,
+    REGIDX_DFLAG,
+
+    REGIDX_CF,
+    REGIDX_PF,
+    REGIDX_AF,
+    REGIDX_ZF,
+    REGIDX_SF,
+    REGIDX_OF,
+
     REGIDX_END
-};
-enum FLAGIDX {
-    FLAGIDX_CF = 0,
-    FLAGIDX_PF,
-    FLAGIDX_AF,
-    FLAGIDX_ZF,
-    FLAGIDX_SF,
-    FLAGIDX_OF,
-    FLAGIDX_END
 };
 #pragma pack(push)
 #pragma pack(4)

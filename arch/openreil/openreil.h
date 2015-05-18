@@ -1,4 +1,6 @@
 #include<vector>
+#include<string>
+#include<unordered_map>
 #include<libopenreil.h>
 
 #include"utils.h"
@@ -18,13 +20,20 @@ namespace openreil {
 	    VirtualMachine *const vm;
 
 	    static int inst_handler(reil_inst_t *inst,void *ctx);
+	    symx::refExpr translate_get_arg(
+		    const std::unordered_map<std::string,symx::refExpr> &regmap,
+		    const reil_arg_t &arg) const;
+	    int translate_set_arg(
+		    std::unordered_map<std::string,symx::refExpr> *regmap,
+		    const reil_arg_t &arg,
+		    const symx::refExpr &value) const;
 	    symx::refBlock translate(
 		    uint8_t *code,
 		    const symx::ProgCtr &pc,
 		    size_t len) const;
 
 	public:
-	    Snapshot(VirtualMachine *vm,const uint64_t *_reg,const bool *_flag);
+	    Snapshot(VirtualMachine *vm,const uint64_t *_reg);
 	    int mem_read(uint8_t *buf,uint64_t pos,size_t len) const;
     };
     class VirtualMachine : public symx::VirtualMachine {

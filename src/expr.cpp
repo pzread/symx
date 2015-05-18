@@ -61,6 +61,7 @@ namespace symx {
 	}
 	return cond->post_accept(visitor);
     }
+    /*
     static uint64_t get_next_varid(Context *ctx) {
 	ctx->last_var_id += 1;
 	return ctx->last_var_id;
@@ -69,6 +70,7 @@ namespace symx {
 	Expr(ExprVar,_size),
 	id(get_next_varid(ctx)) {}
     BytMem::BytMem(Context *ctx) : Expr(ExprMem,0),id(get_next_varid(ctx)) {}
+    */
 
     refExpr expr_store(const refExpr &mem,const refExpr &idx,const refExpr &val) {
 	return ref<Operator>(mem,idx,val);
