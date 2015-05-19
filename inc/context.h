@@ -14,17 +14,29 @@
 namespace symx {
     using namespace symx;
 
-    class Context {
+    class Solver {
 	public:
-	    const unsigned int NUMREG;
-	    const unsigned int NUMFLAG;
+	    virtual ExprVisitor* create_translator() = 0;
+	    virtual bool solve(
+		    const std::unordered_set<refCond> &cons,
+		    std::unordered_map<refExpr,uint64_t> *var) = 0;
+    };
+    class Context {
+	private:
+	    int last_varid = 0;
+
+	public:
+	    Solver *solver;
 
 	    virtual ~Context() {};
 	    virtual VirtualMachine* create_vm() = 0;
 	    virtual int destroy_vm(VirtualMachine *vm) = 0;
 
-	    Context(const unsigned int _NUMREG,const unsigned int _NUMFLAG)
-		: NUMREG(_NUMREG),NUMFLAG(_NUMFLAG) {}
+	    Context(Solver *_solver) : solver(_solver) {}
+	    int get_next_varid() {
+		last_varid += 1;
+		return last_varid;
+	    }
     };
 }
 

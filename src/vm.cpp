@@ -169,7 +169,8 @@ Snapshot::Snapshot(cs_arch arch,cs_mode mode) {
     cs_open(arch,mode,&cs);
     cs_option(cs,CS_OPT_DETAIL,CS_OPT_ON);
 }
-int Snapshot::translate_bb(const symx::ProgCtr &pc) const {
+refBlock Snapshot::translate_bb(const symx::ProgCtr &pc) const {
+    refBlock ret;
     uint64_t curpc = pc.rawpc;
     uint64_t endpc = curpc;
     uint8_t code[8192];
@@ -183,7 +184,7 @@ int Snapshot::translate_bb(const symx::ProgCtr &pc) const {
     remain = PAGE_SIZE - (curpc & (~PAGE_MASK));
     while(true) {
 	if(mem_read(code,curpc,remain)) {
-	    return -1;
+	    return nullptr;
 	}
 	codeptr = code;
 	while(remain > 0) {
@@ -207,14 +208,18 @@ out:
     
     block = new uint8_t[endpc - pc.rawpc];
     mem_read(block,pc.rawpc,endpc - pc.rawpc);
-    translate(block,pc,endpc - pc.rawpc);
-    delete[] block;
 
+    ret = translate(block,pc,endpc - pc.rawpc);
+
+    delete[] block;
     cs_free(ins,1);
-    return 0;
+    return ret;
 }
 
-AddrSpace::AddrSpace(const Context *_ctx,const refSnapshot &_snap) {
+AddrSpace::AddrSpace(Context *_ctx,const refSnapshot &_snap)
+    : ctx(_ctx),snap(_snap)
+{
+    mem = BytMem::create_var(ctx);
     //TODO initialize memory layout
 }
 int AddrSpace::read(refState state,uint8_t *buf,uint64_t pos,size_t len) {

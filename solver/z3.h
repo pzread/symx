@@ -21,7 +21,7 @@ class Z3SolvCond;
 typedef std::shared_ptr<Z3SolvExpr> refZ3SolvExpr;
 typedef std::shared_ptr<Z3SolvCond> refZ3SolvCond;
 
-class Z3TransVisitor : public symx::TransVisitor {
+class Z3TransVisitor : public symx::ExprVisitor {
 	public:
 		Z3TransVisitor(const Z3Solver *_solver);
 		int pre_visit(const symx::refBytVec &vec);
@@ -47,7 +47,7 @@ class Z3Solver : public symx::Solver {
 		Z3_solver solver;
 
 		Z3Solver();
-		symx::TransVisitor* create_translator();
+		symx::ExprVisitor* create_translator();
 		symx::refSolvExpr reduce(const symx::refSolvExpr &expr);
 		symx::refSolvCond reduce(const symx::refSolvCond &cond);
 		bool solve(

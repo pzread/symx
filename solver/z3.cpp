@@ -53,33 +53,31 @@ Z3TransVisitor::Z3TransVisitor(const Z3Solver *_solver) : solver(_solver) {
 		Z3_TRUE);
 }
 Z3_ast Z3TransVisitor::expr_to_ast(const refExpr &expr) {
-	if(expr->solver_expr == nullptr) {
+	if(expr->solvexpr == nullptr) {
 		err("expr hasn't been translated\n");
 	}
-	return std::static_pointer_cast<Z3SolvExpr>
-		(expr->solver_expr)->ast;
+	return std::static_pointer_cast<Z3SolvExpr>(expr->solvexpr)->ast;
 }
 Z3_ast Z3TransVisitor::cond_to_ast(const refCond &cond) {
 	if(cond->solver_cond == nullptr) {
 		err("cond hasn't been translated\n");
 	}
-	return std::static_pointer_cast<Z3SolvCond>
-		(cond->solver_cond)->ast;
+	return std::static_pointer_cast<Z3SolvCond>(cond->solver_cond)->ast;
 }
 int Z3TransVisitor::pre_visit(const refBytVec &vec) {
-	if(vec->solver_expr != nullptr) {
+	if(vec->solvexpr != nullptr) {
 		return 0;
 	}
 	return 1;
 }
 int Z3TransVisitor::pre_visit(const refBytMem &mem) {
-	if(mem->solver_expr != nullptr) {
+	if(mem->solvexpr != nullptr) {
 		return 0;
 	}
 	return 1;
 }
 int Z3TransVisitor::pre_visit(const refOperator &oper) {
-	if(oper->solver_expr != nullptr) {
+	if(oper->solvexpr != nullptr) {
 		return 0;
 	}
 	return 1;
@@ -97,7 +95,7 @@ int Z3TransVisitor::post_visit(const refBytVec &vec) {
 		res_ast = Z3_mk_unsigned_int64(
 			solver->context,
 			vec->data,
-			Z3_mk_bv_sort(solver->context,vec->size * 8));
+			Z3_mk_bv_sort(solver->context,vec->size));
 		INCREF(res_ast);
 		break;
 	case ExprVar:
@@ -106,14 +104,14 @@ int Z3TransVisitor::post_visit(const refBytVec &vec) {
 			Z3_mk_int_symbol(
 				solver->context,
 				vec->id),
-			Z3_mk_bv_sort(solver->context,vec->size * 8));
+			Z3_mk_bv_sort(solver->context,vec->size));
 		INCREF(res_ast);
 		break;
 	default:
 		err("illegal case\n");
 		return -1;
 	}
-	vec->solver_expr = ref<Z3SolvExpr>(solver->context,res_ast);
+	vec->solvexpr = ref<Z3SolvExpr>(solver->context,res_ast);
 	DECREF(res_ast);
 	return 0;
 }
@@ -136,7 +134,7 @@ int Z3TransVisitor::post_visit(const refBytMem &mem) {
 		err("illegal case\n");
 		return -1;
 	}
-	mem->solver_expr = ref<Z3SolvExpr>(solver->context,res_ast);
+	mem->solvexpr = ref<Z3SolvExpr>(solver->context,res_ast);
 	DECREF(res_ast);
 	return 0;
 }
@@ -153,13 +151,16 @@ int Z3TransVisitor::post_visit(const refOperator &oper) {
 		Z3_ast old_mem_ast,old_idx_ast;
 
 		size = oper->operand[2]->size;
+
+		assert(size % 8 == 0);
+
 		INCREF(mem_ast);
 		INCREF(idx_ast);
-		for(i = 0;i < size;i++) {
+		for(i = 0;i < size / 8;i++) {
 			Z3_ast tmp_ast = Z3_mk_extract(
 					solver->context,
-					i * 8 + 7,
-					i * 8,
+					i + 7,
+					i,
 					val_ast);
 			INCREF(tmp_ast);
 			old_mem_ast = mem_ast;
@@ -194,10 +195,13 @@ int Z3TransVisitor::post_visit(const refOperator &oper) {
 		if((size = oper->size) == 0){
 			err("illegal size\n");
 		}
+
+		assert(size % 8 == 0);
+
 		res_ast = Z3_mk_select(solver->context,mem_ast,idx_ast);
 		INCREF(res_ast);
 		INCREF(idx_ast);
-		for(i = 1;i < size;i++) {
+		for(i = 1;i < size / 8;i++) {
 			old_idx_ast = idx_ast;
 			idx_ast = Z3_mk_bvadd(
 					solver->context,
@@ -225,8 +229,8 @@ int Z3TransVisitor::post_visit(const refOperator &oper) {
 	case ExprOpExtract:
 		res_ast = Z3_mk_extract(
 			solver->context,
-			(oper->start + oper->size) * 8 - 1,
-			oper->start * 8,
+			(oper->start + oper->size) - 1,
+			oper->start,
 			expr_to_ast(oper->operand[0]));
 		INCREF(res_ast);
 		break;
@@ -344,14 +348,14 @@ int Z3TransVisitor::post_visit(const refOperator &oper) {
 	case ExprOpSext:
 		res_ast = Z3_mk_sign_ext(
 			solver->context,
-			(oper->size - oper->operand[0]->size) * 8,
+			(oper->size - oper->operand[0]->size),
 			expr_to_ast(oper->operand[0]));
 		INCREF(res_ast);
 		break;
 	case ExprOpZext:
 		res_ast = Z3_mk_zero_ext(
 			solver->context,
-			(oper->size - oper->operand[0]->size) * 8,
+			(oper->size - oper->operand[0]->size),
 			expr_to_ast(oper->operand[0]));
 		INCREF(res_ast);
 		break;
@@ -366,8 +370,10 @@ int Z3TransVisitor::post_visit(const refOperator &oper) {
 		simplify_param);
 	INCREF(res_ast);
 	DECREF(old_ast);
-	assert(oper->solver_expr == nullptr);
-	oper->solver_expr = ref<Z3SolvExpr>(solver->context,res_ast);
+
+	assert(oper->solvexpr == nullptr);
+
+	oper->solvexpr = ref<Z3SolvExpr>(solver->context,res_ast);
 	DECREF(res_ast);
 	return 0;
 }
@@ -497,7 +503,9 @@ int Z3TransVisitor::post_visit(const refCond &cond) {
 		simplify_param);
 	INCREF(res_ast);
 	DECREF(old_ast);
+
 	assert(cond->solver_cond == nullptr);
+
 	cond->solver_cond = ref<Z3SolvCond>(solver->context,res_ast);
 	DECREF(res_ast);
 	return 0;
@@ -511,7 +519,7 @@ Z3Solver::Z3Solver() {
 	solver = Z3_mk_solver(context);
 	Z3_solver_inc_ref(context,solver);
 }
-symx::TransVisitor* Z3Solver::create_translator() {
+symx::ExprVisitor* Z3Solver::create_translator() {
 	return new Z3TransVisitor(this);
 }
 bool Z3Solver::solve(
@@ -537,7 +545,7 @@ bool Z3Solver::solve(
 	Z3_model_inc_ref(context,model);
 	for(auto it = var->begin(); it != var->end(); it++) {
 		expr = std::static_pointer_cast<Z3SolvExpr>
-			(it->first->solver_expr);
+			(it->first->solvexpr);
 		if(Z3_model_eval(
 			context,
 			model,

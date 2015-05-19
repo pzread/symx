@@ -37,16 +37,18 @@ enum REGIDX {
     REGIDX_ESI,
     REGIDX_EBP,
     REGIDX_ESP,
+
+    REGIDX_EFLAGS,
+    REGIDX_DFLAG,
+
+    REGIDX_CF,
+    REGIDX_PF,
+    REGIDX_AF,
+    REGIDX_ZF,
+    REGIDX_SF,
+    REGIDX_OF,
+
     REGIDX_END
-};
-enum FLAGIDX {
-    FLAGIDX_CF = 0,
-    FLAGIDX_PF,
-    FLAGIDX_AF,
-    FLAGIDX_ZF,
-    FLAGIDX_SF,
-    FLAGIDX_OF,
-    FLAGIDX_END
 };
 #pragma pack(push)
 #pragma pack(4)
@@ -81,13 +83,13 @@ namespace symx {
 		    uint8_t *buf,
 		    uint64_t pos,
 		    size_t len) const = 0;
-	    virtual int translate(
+	    virtual refBlock translate(
 		    uint8_t *code,
 		    const ProgCtr &pc,
 		    size_t len) const = 0;
 
 	    Snapshot(cs_arch arch,cs_mode mode);
-	    int translate_bb(const symx::ProgCtr &pc) const;
+	    refBlock translate_bb(const symx::ProgCtr &pc) const;
 
 	    std::vector<refExpr> reg;
 	    std::vector<refCond> flag;
@@ -109,7 +111,7 @@ namespace symx {
 	    pid_t pid;
 	    int com_evt;
 	    struct vmcom_frame *com_mem;
-	    
+
 	    int set_state(VMSTATE next_state);
 
 	public:
@@ -128,46 +130,34 @@ namespace symx {
     };
 
     /*
-    class MemPage : public std::enable_shared_from_this<MemPage> {
-	public:
-	    const uint64_t start;
-	    const unsigned int prot;
-	    std::bitset<PAGE_SIZE> dirty;
-	    std::bitset<PAGE_SIZE> symbol;
-	    MemPage(const uint64_t _start,const unsigned int _prot)
-		: start(_start),prot(_prot) {}
-    };
-    class MemRecord : public std::enable_shared_from_this<MemRecord> {
-	    public:
-		    const refOperator oper;
-		    const refExpr mem;
-		    const refExpr idx;
-		    const unsigned int size;
-		    MemRecord(
-			    const refOperator _oper,
-			    const refExpr _mem,
-			    const refExpr _idx,
-			    const unsigned int _size
-		    ) : oper(_oper),mem(_mem),idx(_idx),size(_size) {}
-    };
-    */
+       class MemPage : public std::enable_shared_from_this<MemPage> {
+       public:
+       const uint64_t start;
+       const unsigned int prot;
+       std::bitset<PAGE_SIZE> dirty;
+       std::bitset<PAGE_SIZE> symbol;
+       MemPage(const uint64_t _start,const unsigned int _prot)
+       : start(_start),prot(_prot) {}
+       };
+       */
+
     class AddrSpace {
 	private:
-	    const Context *ctx;
+	    Context *ctx;
 	    const refSnapshot snap;
-	    refExpr mem;
 
 	public:
+	    refExpr mem;
 	    std::unordered_map<uint64_t,refBytVec> mem_symbol;
 	    std::unordered_set<refCond> mem_constr;
 
-	    AddrSpace(const Context *_ctx,const refSnapshot &_snap);
+	    AddrSpace(Context *_ctx,const refSnapshot &_snap);
 	    int read(refState state,uint8_t *buf,uint64_t pos,size_t len);
 	    /*int handle_select(const uint64_t idx,const unsigned int size);
-	    refExpr get_mem() const;
-	    std::vector<refOperator> source_select(
-		    const refOperator &sel,
-		    const std::unordered_map<refExpr,uint64_t> &var) const;*/
+	      refExpr get_mem() const;
+	      std::vector<refOperator> source_select(
+	      const refOperator &sel,
+	      const std::unordered_map<refExpr,uint64_t> &var) const;*/
     };
 }
 
