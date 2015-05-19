@@ -214,8 +214,6 @@ symx::refBlock Snapshot::translate(
     }
 
     for(auto ins = instlist.begin();ins != instlist.end();ins++) {
-	assert(next_pc == nullptr);
-
 	inst_print(ins);
 	switch(ins->op) {
 	    case I_STR:
@@ -332,10 +330,10 @@ symx::refBlock Snapshot::translate(
 			symx::cond_eq(
 			    xra,
 			    symx::BytVec::create_imm(xra->size,0)),
-			xrc,
 			symx::BytVec::create_imm(
 			    32,
-			    ins->raw_info.addr + ins->raw_info.size));
+			    ins->raw_info.addr + ins->raw_info.size),
+			xrc);
 		break;
 
 	    default:

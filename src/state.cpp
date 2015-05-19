@@ -222,7 +222,7 @@ namespace symx {
 	while(!worklist.empty()) {
 	    cstate = worklist.back();
 	    worklist.pop();
-	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc);
+	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
 
 	    //initialize environment
 	    cas = cstate->as;
@@ -240,6 +240,8 @@ namespace symx {
 	    } else {
 		cblk = blk_it->second;
 	    }
+
+	    getchar();
 
 	    BuildVisitor *build_vis = new BuildVisitor(cstate);
 
@@ -265,7 +267,6 @@ namespace symx {
 
 	    //initialize reg, flag, constraint
 	    trans_vis->walk(next_exrpc);
-	    trans_vis->walk(next_strseq[0]->oper);
 	    expr_iter_walk(trans_vis,next_reg.begin(),next_reg.end());
 	    expr_iter_walk(trans_vis,next_flag.begin(),next_flag.end());
 	    constr.insert(cstate->constr.begin(),cstate->constr.end());
@@ -312,6 +313,13 @@ namespace symx {
 		
 		dbg("%016lx\n",next_rawpc);
 
+		nstate = ref<State>(
+			ProgCtr(next_rawpc,CS_MODE_32),
+			cas,
+			next_mem,
+			next_reg,
+			next_flag);
+		worklist.push(nstate);
 		constr.insert(cond_not(condition_pc(next_exrpc,next_rawpc)));
 	    }
 	}
