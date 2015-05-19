@@ -81,7 +81,7 @@ namespace symx {
 	public:
 	    const enum ExprType type;
 	    const unsigned int size;
-	    refSolvExpr solver_expr = nullptr;
+	    refSolvExpr solvexpr = nullptr;
 	    Expr(const enum ExprType _type,const unsigned int _size)
 		:type(_type),size(_size) {}
 	    virtual int pre_accept(ExprVisitor *visitor) = 0;

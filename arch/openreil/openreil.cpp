@@ -197,8 +197,7 @@ symx::refBlock Snapshot::translate(
     std::vector<symx::refCond> flaglist;
     std::unordered_map<std::string,symx::refExpr> regmap;
     symx::refExpr xra,xrb,xrc;
-    std::vector<symx::refCond> cond;
-    std::vector<symx::refExpr> nextpc;
+    symx::refExpr next_pc = nullptr;
     
     //initialize openreil, translate to reil IR
     reil = reil_init(ARCH_X86,inst_handler,(void*)&translated);
@@ -215,6 +214,8 @@ symx::refBlock Snapshot::translate(
     }
 
     for(auto ins = instlist.begin();ins != instlist.end();ins++) {
+	assert(next_pc == nullptr);
+
 	inst_print(ins);
 	switch(ins->op) {
 	    case I_STR:
@@ -327,11 +328,12 @@ symx::refBlock Snapshot::translate(
 		xra = translate_get_arg(regmap,ins->a);
 		xrc = translate_get_arg(regmap,ins->c);
 
-		cond.push_back(symx::cond_eq(
+		next_pc = symx::expr_ite(
+			symx::cond_eq(
 			    xra,
-			    symx::BytVec::create_imm(xra->size,0)));
-		nextpc.push_back(xrc);
-		nextpc.push_back(symx::BytVec::create_imm(
+			    symx::BytVec::create_imm(xra->size,0)),
+			xrc,
+			symx::BytVec::create_imm(
 			    32,
 			    ins->raw_info.addr + ins->raw_info.size));
 		break;
@@ -343,7 +345,7 @@ symx::refBlock Snapshot::translate(
     }
 
     instlist.clear();
-    return ref<symx::Block>(mem,reglist,flaglist,cond,nextpc);
+    return ref<symx::Block>(mem,reglist,flaglist,next_pc);
 }
 symx::refExpr Snapshot::translate_get_arg(
 	const std::unordered_map<std::string,symx::refExpr> &regmap,

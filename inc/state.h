@@ -39,10 +39,10 @@ namespace symx {
 	public:
 	    const ProgCtr pc;
 	    const refAddrSpace as;
-	    std::vector<refBytVec> symbol;
 	    std::unordered_set<refCond> constr;
-	    //std::unordered_set<refMemRecord> select_set;
-	    //std::vector<refMemRecord> store_seq;
+	    std::unordered_set<refMemRecord> select_set;
+	    std::vector<refMemRecord> store_seq;
+	    std::vector<refBytVec> symbol;
 
 	    State(
 		    const ProgCtr &_pc,
@@ -54,15 +54,13 @@ namespace symx {
     };
     class Block : public BaseState {
 	public:
-	    const std::vector<refCond> cond; 
-	    const std::vector<refExpr> nextpc;
+	    const refExpr nextpc;
 	    Block(
 		    const refExpr &_mem,
 		    const std::vector<refExpr> &_reg,
 		    const std::vector<refCond> &_flag,
-		    const std::vector<refCond> &_cond,
-		    const std::vector<refExpr> &_nextpc
-		 ) : BaseState(_mem,_reg,_flag),cond(_cond),nextpc(_nextpc) {};
+		    const refExpr &_nextpc
+		 ) : BaseState(_mem,_reg,_flag),nextpc(_nextpc) {};
     };
     class MemRecord : public std::enable_shared_from_this<MemRecord> {
 	public:
@@ -101,8 +99,13 @@ namespace symx {
 	    int post_visit(const refOperator &oper);
 	    int post_visit(const refCond &cond);
     };
+    class Executor {
+	private:
+	    refCond condition_pc(const refExpr &exrpc,const uint64_t rawpc);
 
-    int state_executor(Context *ctx);
+	public:
+	    int execute(Context *ctx);
+    };
 
     /*
        class FixVisitor : public ExprVisitor {

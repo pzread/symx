@@ -12,6 +12,7 @@ void internal_err(const char *prefix,const char *fmt,...) {
 	cfmt = "\e[1;31m[" + std::to_string(getpid()) + "][" + prefix + "]\e[m\t\t" + fmt;
 	va_start(args,fmt);
 	vfprintf(stderr,cfmt.c_str(),args);
+	fflush(stderr);
 	va_end(args);
 	while(1);
 }
@@ -22,6 +23,7 @@ void internal_info(const char *prefix,const char *fmt,...) {
 	cfmt = "[" + std::to_string(getpid()) + "][" + prefix + "]\t\t" + fmt;
 	va_start(args,fmt);
 	vfprintf(stderr,cfmt.c_str(),args);
+	fflush(stderr);
 	va_end(args);
 }
 void internal_dbg(const char *prefix,const char *fmt,...) {
@@ -31,5 +33,6 @@ void internal_dbg(const char *prefix,const char *fmt,...) {
 	cfmt = "\e[1;33m[" + std::to_string(getpid()) + "][" + prefix + "]\e[m\t\t" + fmt;
 	va_start(args,fmt);
 	vfprintf(stderr,cfmt.c_str(),args);
+	fflush(stderr);
 	va_end(args);
 }

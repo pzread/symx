@@ -220,7 +220,6 @@ AddrSpace::AddrSpace(Context *_ctx,const refSnapshot &_snap)
     : ctx(_ctx),snap(_snap)
 {
     mem = BytMem::create_var(ctx);
-
     //TODO initialize memory layout
 }
 int AddrSpace::read(refState state,uint8_t *buf,uint64_t pos,size_t len) {

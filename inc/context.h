@@ -23,7 +23,7 @@ namespace symx {
     };
     class Context {
 	private:
-	    int last_varid;
+	    int last_varid = 0;
 
 	public:
 	    Solver *solver;

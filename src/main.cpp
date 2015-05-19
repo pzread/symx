@@ -24,7 +24,10 @@ int main() {
 
     Solver *solver = new z3_solver::Z3Solver();
     Context *context = new openreil::Context(solver,"./sample");
-    state_executor(context);
+    Executor engine;
+
+    engine.execute(context);
+
     delete context;
     return 0;
 }

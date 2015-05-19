@@ -9,6 +9,7 @@
 #include"context.h"
 #include"expr.h"
 #include"state.h"
+#include"solver/z3.h"
 
 using namespace symx;
 
@@ -97,11 +98,11 @@ namespace symx {
 		auto idx = expr_map[oper->operand[1]];
 		auto val = expr_map[oper->operand[2]];
 		expr_map[oper] = expr_store(mem,idx,val);
-		store_seq.push_back(ref<MemRecord>
-			(std::static_pointer_cast<Operator>(expr_map[oper]),
-			 mem,
-			 idx,
-			 oper->size));
+		store_seq.push_back(ref<MemRecord>(
+			    std::static_pointer_cast<Operator>(expr_map[oper]),
+			    mem,
+			    idx,
+			    oper->size));
 		break;
 	    }
 	    case ExprOpExtract:
@@ -169,7 +170,10 @@ namespace symx {
 	return 1;
     }
 
-    int state_executor(Context *ctx) {
+    refCond Executor::condition_pc(const refExpr &exrpc,const uint64_t rawpc) {
+	return cond_eq(exrpc,BytVec::create_imm(exrpc->size,rawpc));
+    }
+    int Executor::execute(Context *ctx) {
 	uint64_t target_rawpc = 0x080483FB;
 
 	refSnapshot snap;
@@ -177,6 +181,17 @@ namespace symx {
 	std::unordered_map<ProgCtr,refBlock> block_cache;
 	refState nstate,cstate;
 	refBlock cblk;
+	refAddrSpace cas;
+
+	refExpr next_exrpc;
+	uint64_t next_rawpc;
+	refExpr next_mem;
+	std::vector<refExpr> next_reg;
+	std::vector<refCond> next_flag;
+	std::unordered_set<refMemRecord> next_selset;
+	std::vector<refMemRecord> next_strseq;
+	std::unordered_set<refCond> constr;
+	std::unordered_map<refExpr,uint64_t> concrete;
 
 	//Create base VM
 	VirtualMachine *vm = ctx->create_vm();
@@ -209,6 +224,15 @@ namespace symx {
 	    worklist.pop();
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc);
 
+	    //initialize environment
+	    cas = cstate->as;
+	    next_reg.clear();
+	    next_flag.clear();
+	    next_selset.clear();
+	    next_strseq.clear();
+	    constr.clear();
+	    concrete.clear();
+
 	    auto blk_it = block_cache.find(cstate->pc);
 	    if(blk_it == block_cache.end()) {
 		cblk = snap->translate_bb(cstate->pc);
@@ -217,10 +241,79 @@ namespace symx {
 		cblk = blk_it->second;
 	    }
 
-	    BuildVisitor *buildvis = new BuildVisitor(cstate);
-	    expr_iter_walk(buildvis,cblk->reg.begin(),cblk->reg.end());
-	    expr_iter_walk(buildvis,cblk->flag.begin(),cblk->flag.end());
-	    delete buildvis;
+	    BuildVisitor *build_vis = new BuildVisitor(cstate);
+
+	    build_vis->walk(cblk->nextpc);
+	    next_exrpc = build_vis->get_expr(cblk->nextpc);
+	    build_vis->walk(cblk->mem);
+	    next_mem = build_vis->get_expr(cblk->mem);
+	    for(auto it = cblk->reg.begin();it != cblk->reg.end();it++) {
+		build_vis->walk(*it);
+		next_reg.push_back(build_vis->get_expr(*it));
+	    }
+	    for(auto it = cblk->flag.begin();it != cblk->flag.end();it++) {
+		build_vis->walk(*it);
+		next_flag.push_back(build_vis->get_cond(*it));
+	    }
+	    next_selset = cstate->select_set;
+	    next_strseq = cstate->store_seq;
+	    build_vis->get_mem_record(&next_selset,&next_strseq);   
+
+	    delete build_vis;
+
+	    auto trans_vis = ctx->solver->create_translator();
+
+	    //initialize reg, flag, constraint
+	    trans_vis->walk(next_exrpc);
+	    trans_vis->walk(next_strseq[0]->oper);
+	    expr_iter_walk(trans_vis,next_reg.begin(),next_reg.end());
+	    expr_iter_walk(trans_vis,next_flag.begin(),next_flag.end());
+	    constr.insert(cstate->constr.begin(),cstate->constr.end());
+	    constr.insert(cas->mem_constr.begin(),cas->mem_constr.end());
+
+	    //initialize solver variable
+	    concrete[next_exrpc] = 0;
+	    //TODO support instruction mode
+
+	    /*
+	    for(i = 0; i < cstate->symbol.size(); i++) {
+		expr_walk(trans_vis,cstate->symbol[i]);
+		var[cstate->symbol[i]] = 0;
+	    }
+	    for(
+		    auto it = addrsp.mem_symbol.begin();
+		    it != addrsp.mem_symbol.end();
+		    it++
+	       ) {
+		expr_walk(trans_vis,it->second);
+		var[it->second] = 0;
+	    }
+	    for(auto it = selset.begin(); it != selset.end(); it++) {
+		var[(*it)->oper] = 0;
+		var[(*it)->idx] = 0;
+	    }
+	    for(auto it = strseq.begin(); it != strseq.end(); it++) {
+		var[(*it)->idx] = 0;
+	    }
+	    for(i = 0; i < ctx->NUMREG; i++) {
+		var[next_reg[i]] = 0;
+	    }
+	    */
+
+	    while(true) {
+		//translate constraint
+		expr_iter_walk(trans_vis,constr.begin(),constr.end());
+
+		//solve
+		if(!ctx->solver->solve(constr,&concrete)) {
+		    break;	
+		}
+		next_rawpc = concrete[next_exrpc];
+		
+		dbg("%016lx\n",next_rawpc);
+
+		constr.insert(cond_not(condition_pc(next_exrpc,next_rawpc)));
+	    }
 	}
 
 	ctx->destroy_vm(vm);
@@ -479,27 +572,6 @@ static refState create_static_state(
     delete vis;
     return nstate;
 }
-static refCond create_pc_cond(
-	const Context *ctx,
-	const refExpr &expc,
-	const refExpr &exinsmd,
-	const uint64_t rawpc,
-	const uint64_t insmd
-	) {
-    return cond_and(
-	    cond_eq(expc,BytVec::create_imm(ctx->REGSIZE,rawpc)),
-	    cond_eq(exinsmd,BytVec::create_imm(ctx->REGSIZE,insmd)));
-}
-static void exclude_pc(
-	const Context *ctx,
-	std::unordered_set<refCond> *cons,
-	const refExpr &expc,
-	const refExpr &exinsmd,
-	const uint64_t rawpc,
-	const int insmd
-	) {
-    cons->insert(cond_not(create_pc_cond(ctx,expc,exinsmd,rawpc,insmd)));
-}
 static int show_message(
 	const uint64_t rawpc,
 	std::unordered_map<refExpr,uint64_t> &var,
@@ -537,7 +609,7 @@ int state_executor(
     refBlock cblk;
     std::unordered_set<refCond> cons;
     std::unordered_map<refExpr,uint64_t> var;
-    refExpr next_expc;
+    refExpr next_exrpc;
     refExpr next_exinsmd;
     refExpr next_mem;
     refExpr next_reg[256];
@@ -601,54 +673,9 @@ int state_executor(
 	build_vis->get_mem_record(&selset,&strseq);
 	delete build_vis;
 
-	//initialize reg, flag, constraint
-	expr_walk(trans_vis,next_exinsmd);
-	expr_walk(trans_vis,next_mem);
-	expr_iter_walk(trans_vis,next_reg,next_reg + ctx->NUMREG);
-	expr_iter_walk(trans_vis,next_flag,next_flag + ctx->NUMFLAG);
-	cons.insert(
-		cstate->constraint.begin(),
-		cstate->constraint.end());
-	cons.insert(
-		addrsp.mem_constraint.begin(),
-		addrsp.mem_constraint.end());
-
-	//initialize solver variable
-	next_expc = next_reg[ctx->REGIDX_PC];
-	var[next_expc] = 0;
-	var[next_exinsmd] = 0;
-
-	for(i = 0; i < cstate->symbol.size(); i++) {
-	    expr_walk(trans_vis,cstate->symbol[i]);
-	    var[cstate->symbol[i]] = 0;
-	}
-	for(
-		auto it = addrsp.mem_symbol.begin();
-		it != addrsp.mem_symbol.end();
-		it++
-	   ) {
-	    expr_walk(trans_vis,it->second);
-	    var[it->second] = 0;
-	}
-	for(auto it = selset.begin(); it != selset.end(); it++) {
-	    var[(*it)->oper] = 0;
-	    var[(*it)->idx] = 0;
-	}
-	for(auto it = strseq.begin(); it != strseq.end(); it++) {
-	    var[(*it)->idx] = 0;
-	}
-	for(i = 0; i < ctx->NUMREG; i++) {
-	    var[next_reg[i]] = 0;
-	}
 
 	while(true) {
-	    //Translate constraint
-	    expr_iter_walk(trans_vis,cons.begin(),cons.end());
-
-	    if(!solver->solve(cons,&var)) {
-		break;	
-	    }
-	    next_rawpc = var[next_expc];
+	    next_rawpc = var[next_exrpc];
 	    next_insmd = var[next_exinsmd];
 
 	    //update address space
@@ -689,7 +716,7 @@ int state_executor(
 		exclude_pc(
 			ctx,
 			&cons,
-			next_expc,
+			next_exrpc,
 			next_exinsmd,
 			next_rawpc,
 			next_insmd);
@@ -733,7 +760,7 @@ int state_executor(
 	    nstate->constraint = cstate->constraint;
 	    nstate->constraint.insert(create_pc_cond(
 			ctx,
-			next_expc,
+			next_exrpc,
 			next_exinsmd,
 			next_rawpc,
 			next_insmd));
@@ -744,7 +771,7 @@ int state_executor(
 	    exclude_pc(
 		    ctx,
 		    &cons,
-		    next_expc,
+		    next_exrpc,
 		    next_exinsmd,
 		    next_rawpc,
 		    next_insmd);
