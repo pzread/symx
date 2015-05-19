@@ -511,7 +511,7 @@ Z3Solver::Z3Solver() {
 	solver = Z3_mk_solver(context);
 	Z3_solver_inc_ref(context,solver);
 }
-symx::TransVisitor* Z3Solver::create_translator() {
+symx::ExprVisitor* Z3Solver::create_translator() {
 	return new Z3TransVisitor(this);
 }
 bool Z3Solver::solve(

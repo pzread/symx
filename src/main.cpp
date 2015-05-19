@@ -5,6 +5,7 @@
 
 #include"utils.h"
 #include"state.h"
+#include"solver/z3.h"
 #include"arch/openreil/openreil.h"
 
 using namespace symx;
@@ -21,7 +22,8 @@ int main() {
 
     delete vm;*/
 
-    Context *context = new openreil::Context("./sample");
+    Solver *solver = new z3_solver::Z3Solver();
+    Context *context = new openreil::Context(solver,"./sample");
     state_executor(context);
     delete context;
     return 0;

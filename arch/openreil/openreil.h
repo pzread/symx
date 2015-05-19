@@ -48,8 +48,10 @@ namespace openreil {
 	    const char *exe_path;
 
 	public:
-	    Context(const char *_exe_path)
-		: container_path("."),exe_path(_exe_path) {}
+	    Context(symx::Solver *_solver,const char *_exe_path)
+		: symx::Context(_solver),
+		container_path("."),
+		exe_path(_exe_path) {}
 	    VirtualMachine* create_vm();
 	    int destroy_vm(symx::VirtualMachine *vm);
     };
