@@ -7,7 +7,6 @@
 #define _EXPR_H_
 
 namespace symx {
-
     using namespace symx;
 
     class Context;
@@ -28,6 +27,10 @@ namespace symx {
     typedef std::shared_ptr<SolvCond> refSolvCond;
 
     class ExprVisitor {
+	private:
+	    std::unordered_set<refExpr> vis_expr;
+	    std::unordered_set<refCond> vis_cond;
+
 	public:
 	    virtual ~ExprVisitor() {};
 	    virtual int pre_visit(const refBytVec &vec) = 0;
@@ -38,6 +41,9 @@ namespace symx {
 	    virtual int post_visit(const refBytMem &mem) = 0;
 	    virtual int post_visit(const refOperator &oper) = 0;
 	    virtual int post_visit(const refCond &cond) = 0;
+
+	    int walk(refExpr expr);
+	    int walk(refCond cond);
     };
     class SolvExpr {};
     class SolvCond {};
@@ -306,18 +312,15 @@ namespace symx {
 	    static refCond create_true() {
 		return ref<Cond>(CondTrue);
 	    }
-	private:
     };
 
-    int expr_walk(ExprVisitor *visitor,refExpr expr);
-    int expr_walk(ExprVisitor *visitor,refCond cond);
     template<class refIt>
-	int expr_iter_walk(ExprVisitor *vis,refIt begin,refIt end) {
-	    for(auto it = begin; it != end; it++) {
-		expr_walk(vis,*it);
-	    }
-	    return 0;
+    int expr_iter_walk(ExprVisitor *vis,refIt begin,refIt end) {
+	for(auto it = begin; it != end; it++) {
+	    vis->walk(*it);
 	}
+	return 0;
+    }
 
     refExpr expr_store(const refExpr &mem,const refExpr &idx,const refExpr &val);
     refExpr expr_select(

@@ -111,7 +111,7 @@ namespace symx {
 	    pid_t pid;
 	    int com_evt;
 	    struct vmcom_frame *com_mem;
-	    
+
 	    int set_state(VMSTATE next_state);
 
 	public:
@@ -130,29 +130,17 @@ namespace symx {
     };
 
     /*
-    class MemPage : public std::enable_shared_from_this<MemPage> {
-	public:
-	    const uint64_t start;
-	    const unsigned int prot;
-	    std::bitset<PAGE_SIZE> dirty;
-	    std::bitset<PAGE_SIZE> symbol;
-	    MemPage(const uint64_t _start,const unsigned int _prot)
-		: start(_start),prot(_prot) {}
-    };
-    class MemRecord : public std::enable_shared_from_this<MemRecord> {
-	    public:
-		    const refOperator oper;
-		    const refExpr mem;
-		    const refExpr idx;
-		    const unsigned int size;
-		    MemRecord(
-			    const refOperator _oper,
-			    const refExpr _mem,
-			    const refExpr _idx,
-			    const unsigned int _size
-		    ) : oper(_oper),mem(_mem),idx(_idx),size(_size) {}
-    };
-    */
+       class MemPage : public std::enable_shared_from_this<MemPage> {
+       public:
+       const uint64_t start;
+       const unsigned int prot;
+       std::bitset<PAGE_SIZE> dirty;
+       std::bitset<PAGE_SIZE> symbol;
+       MemPage(const uint64_t _start,const unsigned int _prot)
+       : start(_start),prot(_prot) {}
+       };
+       */
+
     class AddrSpace {
 	private:
 	    Context *ctx;
@@ -166,10 +154,10 @@ namespace symx {
 	    AddrSpace(Context *_ctx,const refSnapshot &_snap);
 	    int read(refState state,uint8_t *buf,uint64_t pos,size_t len);
 	    /*int handle_select(const uint64_t idx,const unsigned int size);
-	    refExpr get_mem() const;
-	    std::vector<refOperator> source_select(
-		    const refOperator &sel,
-		    const std::unordered_map<refExpr,uint64_t> &var) const;*/
+	      refExpr get_mem() const;
+	      std::vector<refOperator> source_select(
+	      const refOperator &sel,
+	      const std::unordered_map<refExpr,uint64_t> &var) const;*/
     };
 }
 

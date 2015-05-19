@@ -170,6 +170,7 @@ Snapshot::Snapshot(cs_arch arch,cs_mode mode) {
     cs_option(cs,CS_OPT_DETAIL,CS_OPT_ON);
 }
 refBlock Snapshot::translate_bb(const symx::ProgCtr &pc) const {
+    refBlock ret;
     uint64_t curpc = pc.rawpc;
     uint64_t endpc = curpc;
     uint8_t code[8192];
@@ -207,11 +208,12 @@ out:
     
     block = new uint8_t[endpc - pc.rawpc];
     mem_read(block,pc.rawpc,endpc - pc.rawpc);
-    translate(block,pc,endpc - pc.rawpc);
-    delete[] block;
 
+    ret = translate(block,pc,endpc - pc.rawpc);
+
+    delete[] block;
     cs_free(ins,1);
-    return 0;
+    return ret;
 }
 
 AddrSpace::AddrSpace(Context *_ctx,const refSnapshot &_snap)

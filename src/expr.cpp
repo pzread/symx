@@ -11,11 +11,10 @@
 using namespace symx;
 
 namespace symx {
-
-    int expr_walk(ExprVisitor *visitor,refExpr expr) {
+    int ExprVisitor::walk(refExpr expr) {
 	unsigned int i;
 
-	if(expr->pre_accept(visitor) == 0) {
+	if(expr->pre_accept(this) == 0) {
 	    return 0;
 	}
 	switch(expr->type) {
@@ -25,26 +24,27 @@ namespace symx {
 	    case ExprMem:
 		break;
 	    case ExprOpIte:
-		{
-		    auto oper = std::static_pointer_cast<Operator>(expr);
-		    expr_walk(visitor,oper->cond);
-		    expr_walk(visitor,oper->operand[0]);
-		    expr_walk(visitor,oper->operand[1]);
-		    break;
-		}
+	    {
+		auto oper = std::static_pointer_cast<Operator>(expr);
+		walk(oper->cond);
+		walk(oper->operand[0]);
+		walk(oper->operand[1]);
+		break;
+	    }
 	    default:
 		auto oper = std::static_pointer_cast<Operator>(expr);
 		for(i = 0; i < oper->op_count; i++) {
-		    expr_walk(visitor,oper->operand[i]);
+		    walk(oper->operand[i]);
 		}
 		break;
 	}
-	return expr->post_accept(visitor);
+
+	return expr->post_accept(this);
     }
-    int expr_walk(ExprVisitor *visitor,refCond cond) {
+    int ExprVisitor::walk(refCond cond) {
 	unsigned int i;
 
-	if(cond->pre_accept(visitor) == 0){
+	if(cond->pre_accept(this) == 0){
 	    return 0;
 	}
 	switch(cond->type) {
@@ -52,15 +52,16 @@ namespace symx {
 		break;
 	    default:
 		for(i = 0; i < cond->cond_count; i++) {
-		    expr_walk(visitor,cond->cond[i]);
+		    walk(cond->cond[i]);
 		}
 		for(i = 0; i < cond->expr_count; i++) {
-		    expr_walk(visitor,cond->expr[i]);
+		    walk(cond->expr[i]);
 		}
 		break;
 	}
-	return cond->post_accept(visitor);
+	return cond->post_accept(this);
     }
+
     BytVec::BytVec(const unsigned int _size,Context *ctx)
 	: Expr(ExprVar,_size),
 	id(ctx->get_next_varid()) {}
