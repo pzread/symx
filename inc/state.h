@@ -93,29 +93,27 @@ namespace symx {
 	public:
 	    int execute(Context *ctx);
     };
-
-    /*
-       class FixVisitor : public ExprVisitor {
-       public:
-       FixVisitor(
-       const AddrSpace &_addrsp,
-       const std::unordered_map<refExpr,uint64_t> &_var
-       ) : addrsp(_addrsp),var(_var) {}
-       bool get_fix(const refExpr &expr);
-       int pre_visit(const refBytVec &vec);
-       int pre_visit(const refBytMem &mem);
-       int pre_visit(const refOperator &oper);
-       int pre_visit(const refCond &cond);
-       int post_visit(const refBytVec &vec);
-       int post_visit(const refBytMem &mem);
-       int post_visit(const refOperator &oper);
-       int post_visit(const refCond &cond);
-       private:
-       const AddrSpace &addrsp;
-       const std::unordered_map<refExpr,uint64_t> &var;
-       std::unordered_map<refExpr,bool> fix_expr;
-       */
-};
+    class FixVisitor : public ExprVisitor {
+	private:
+	    const AddrSpace &addrsp;
+	    const std::unordered_map<refExpr,uint64_t> &var;
+	    std::unordered_map<refExpr,bool> fix_expr;
+	public:
+	    FixVisitor(
+		    const AddrSpace &_addrsp,
+		    const std::unordered_map<refExpr,uint64_t> &_var
+		    ) : addrsp(_addrsp),var(_var) {}
+	    bool get_fix(const refExpr &expr);
+	    int pre_visit(const refBytVec &vec);
+	    int pre_visit(const refBytMem &mem);
+	    int pre_visit(const refOperator &oper);
+	    int pre_visit(const refCond &cond);
+	    int post_visit(const refBytVec &vec);
+	    int post_visit(const refBytMem &mem);
+	    int post_visit(const refOperator &oper);
+	    int post_visit(const refCond &cond);
+    };
+}
 namespace std {
     template<> struct hash<symx::ProgCtr> {
 	std::size_t operator()(const symx::ProgCtr &key) const {

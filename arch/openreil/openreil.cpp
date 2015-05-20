@@ -239,8 +239,16 @@ symx::refBlock Snapshot::translate(
 	    case I_XOR:
 	    case I_SHR:
 	    case I_SHL:
+	    {
 		xra = translate_get_arg(regmap,ins->a);
 		xrb = translate_get_arg(regmap,ins->b);
+
+		if(xra->size < xrb->size) {
+		    xra = symx::expr_zext(xra,xrb->size);
+		} else if(xra->size > xrb->size) {
+		    xra = symx::expr_extract(xra,0,xrb->size);
+		}
+
 		switch(ins->op) {
 		    case I_ADD:
 			xrc = symx::expr_add(xra,xrb);
@@ -272,7 +280,7 @@ symx::refBlock Snapshot::translate(
 		}
 		translate_set_arg(&regmap,ins->c,xrc);
 		break;
-
+	    }
 	    case I_NEG:
 	    case I_NOT:
 		xra = translate_get_arg(regmap,ins->a);
@@ -344,6 +352,9 @@ symx::refBlock Snapshot::translate(
 			xrc);
 		break;
 
+	    case I_NONE:
+		break;
+
 	    default:
 		err("unsupport unstruction %d\n",ins->op);
 		break;
@@ -371,7 +382,10 @@ symx::refExpr Snapshot::translate_get_arg(
     if(arg.type == A_REG || arg.type == A_TEMP) {
 	auto it = regmap.find(arg.name);
 
-	assert(it != regmap.end());
+	//assert(it != regmap.end());
+	if(it == regmap.end()) {
+	    return symx::BytVec::create_imm(REILSIZE[arg.size],0);
+	}
 
 	xrt = it->second;
 	if(size < xrt->size) {

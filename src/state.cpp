@@ -170,6 +170,97 @@ namespace symx {
 	return 1;
     }
 
+    /*
+    bool FixVisitor::get_fix(const refExpr &expr) {
+	auto log_it = fix_expr.find(expr);
+	assert(log_it != fix_expr.end());
+	return log_it->second;
+    }
+    int FixVisitor::pre_visit(const refBytVec &vec) {
+	if(fix_expr.find(vec) != fix_expr.end()) {
+	    return 0;
+	}
+	return 1;
+    }
+    int FixVisitor::pre_visit(const refBytMem &mem) {
+	if(fix_expr.find(mem) != fix_expr.end()) {
+	    return 0;
+	}
+	return 1;
+    }
+    int FixVisitor::pre_visit(const refOperator &oper) {
+	if(fix_expr.find(oper) != fix_expr.end()) {
+	    return 0;
+	}
+	return 1;
+    }
+    int FixVisitor::pre_visit(const refCond &cond) {
+	return 0;
+    }
+    int FixVisitor::post_visit(const refBytVec &vec) {
+	if(vec->type == ExprVar) {
+	    fix_expr[vec] = false;
+	    return 1;
+	}
+	fix_expr[vec] = true;
+	return 1;
+    }
+    int FixVisitor::post_visit(const refBytMem &mem) {
+	fix_expr[mem] = true;
+	return 1;
+    }
+    int FixVisitor::post_visit(const refOperator &oper) {
+	switch(oper->type) {
+	    case ExprOpSelect:
+		{
+		    bool fix = fix_expr[oper->operand[1]];
+		    if(fix) {
+			auto strseq = addrsp.source_select(oper,var);
+			if(strseq.size() == 0) {
+			    auto idx_it = var.find(oper->operand[1]);
+			    assert(idx_it != var.end());
+			    if(addrsp.mem_symbol.find(
+					idx_it->second
+					) != addrsp.mem_symbol.end()) {
+				fix = false;
+			    }
+			} else {
+			    for(
+				    auto it = strseq.begin();
+				    it == strseq.end();
+				    it++
+			    ) {
+				walk((*it)->operand[1]);
+				walk((*it)->operand[2]);
+				fix = fix_expr[(*it)->operand[1]] |
+				    fix_expr[(*it)->operand[2]];
+			    }
+			}
+		    }
+		    fix_expr[oper] = fix;
+		    break;
+		}
+	    case ExprOpIte:
+		fix_expr[oper] = false;
+		break;
+	    default:
+		{
+		    unsigned int i;
+		    bool fix = true;
+		    for(i = 0; i < oper->op_count; i++) {
+			fix &= fix_expr[oper->operand[i]];
+		    }
+		    fix_expr[oper] = fix;
+		    break;
+		}
+	}
+	return 1;
+    }
+    int FixVisitor::post_visit(const refCond &cond) {
+	return 1;
+    }
+    */
+
     refCond Executor::condition_pc(const refExpr &exrpc,const uint64_t rawpc) {
 	return cond_eq(exrpc,BytVec::create_imm(exrpc->size,rawpc));
     }
@@ -296,6 +387,9 @@ namespace symx {
 		concrete[(*it)->oper->operand[2]] = 0;
 		concrete[(*it)->idx] = 0;
 	    }
+	    for(auto it = next_reg.begin(); it != next_reg.end(); it++) {
+		concrete[*it] = 0;
+	    }
 
 	    concrete[next_reg[REGIDX_EAX]] = 0;
 	    concrete[next_reg[REGIDX_ESP]] = 0;
@@ -346,6 +440,10 @@ namespace symx {
 		for(auto it = next_strseq.begin(); it != next_strseq.end(); it++) {
 		    dbg("str idx %016lx val %016lx\n",concrete[(*it)->idx],concrete[(*it)->oper->operand[2]]);
 		}
+		
+		for(auto it = next_reg.begin(); it != next_reg.end(); it++) {
+		    *it = BytVec::create_imm((*it)->size,concrete[*it]);
+		}
 
 		nstate = ref<State>(
 			ProgCtr(next_rawpc,CS_MODE_32),
@@ -369,94 +467,6 @@ namespace symx {
 
     /*
 
-bool FixVisitor::get_fix(const refExpr &expr) {
-    auto log_it = fix_expr.find(expr);
-    assert(log_it != fix_expr.end());
-    return log_it->second;
-}
-int FixVisitor::pre_visit(const refBytVec &vec) {
-    if(fix_expr.find(vec) != fix_expr.end()) {
-	return 0;
-    }
-    return 1;
-}
-int FixVisitor::pre_visit(const refBytMem &mem) {
-    if(fix_expr.find(mem) != fix_expr.end()) {
-	return 0;
-    }
-    return 1;
-}
-int FixVisitor::pre_visit(const refOperator &oper) {
-    if(fix_expr.find(oper) != fix_expr.end()) {
-	return 0;
-    }
-    return 1;
-}
-int FixVisitor::pre_visit(const refCond &cond) {
-    return 0;
-}
-int FixVisitor::post_visit(const refBytVec &vec) {
-    if(vec->type == ExprVar) {
-	fix_expr[vec] = false;
-	return 1;
-    }
-    fix_expr[vec] = true;
-    return 1;
-}
-int FixVisitor::post_visit(const refBytMem &mem) {
-    fix_expr[mem] = true;
-    return 1;
-}
-int FixVisitor::post_visit(const refOperator &oper) {
-    switch(oper->type) {
-	case ExprOpSelect:
-	    {
-		bool fix = fix_expr[oper->operand[1]];
-		if(fix) {
-		    auto strseq = addrsp.source_select(oper,var);
-		    if(strseq.size() == 0) {
-			auto idx_it = var.find(oper->operand[1]);
-			assert(idx_it != var.end());
-			if(addrsp.mem_symbol.find(
-				    idx_it->second
-				    ) != addrsp.mem_symbol.end()) {
-			    fix = false;
-			}
-		    } else {
-			for(
-				auto it = strseq.begin();
-				it == strseq.end();
-				it++
-			   ) {
-			    expr_walk(this,(*it)->operand[1]);
-			    expr_walk(this,(*it)->operand[2]);
-			    fix = fix_expr[(*it)->operand[1]] |
-				fix_expr[(*it)->operand[2]];
-			}
-		    }
-		}
-		fix_expr[oper] = fix;
-		break;
-	    }
-	case ExprOpIte:
-	    fix_expr[oper] = false;
-	    break;
-	default:
-	    {
-		unsigned int i;
-		bool fix = true;
-		for(i = 0; i < oper->op_count; i++) {
-		    fix &= fix_expr[oper->operand[i]];
-		}
-		fix_expr[oper] = fix;
-		break;
-	    }
-    }
-    return 1;
-}
-int FixVisitor::post_visit(const refCond &cond) {
-    return 1;
-}
 
 refBlock state_create_block(Context *ctx,const ProgCtr &pc) {
     unsigned int i;
