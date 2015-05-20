@@ -44,6 +44,14 @@ namespace symx {
 
 	    int walk(refExpr expr);
 	    int walk(refCond cond);
+
+	    template<class refIt>
+	    int iter_walk(refIt begin,refIt end) {
+		for(auto it = begin; it != end; it++) {
+		    walk(*it);
+		}
+		return 0;
+	    }
     };
     class SolvExpr {};
     class SolvCond {};
@@ -313,14 +321,6 @@ namespace symx {
 		return ref<Cond>(CondTrue);
 	    }
     };
-
-    template<class refIt>
-    int expr_iter_walk(ExprVisitor *vis,refIt begin,refIt end) {
-	for(auto it = begin; it != end; it++) {
-	    vis->walk(*it);
-	}
-	return 0;
-    }
 
     refExpr expr_store(const refExpr &mem,const refExpr &idx,const refExpr &val);
     refExpr expr_select(

@@ -2,6 +2,6 @@
 #include<stdlib.h>
 
 int main() {
-    printf("ok\n");
+    puts("hello world\n");
     return 0;
 }

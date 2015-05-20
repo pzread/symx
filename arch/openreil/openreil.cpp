@@ -28,6 +28,9 @@ static const char *REGNAME[] = {
     "R_EBP",
     "R_ESP",
 
+    "R_GS",
+    "R_GS_BASE",
+
     "R_EFLAGS",
     "R_DFLAG",
 
@@ -46,6 +49,8 @@ static const unsigned int REGSIZE[] = {
     32,
     32,
     32,
+    32,
+    16,
     32,
     32,
     32,
@@ -91,7 +96,7 @@ symx::refSnapshot VirtualMachine::event_suspend() {
 	return nullptr;
     }
 
-    for(i = 0;i < REGIDX_EFLAGS;i++) {
+    for(i = 0; i < REGIDX_EFLAGS; i++) {
 	reg[i] = com_mem->context.reg[i];
     }
 
@@ -115,6 +120,10 @@ int VirtualMachine::mem_read(uint8_t *buf,uint64_t pos,size_t len) {
     event_send(VMCOM_EVT_READMEM);   
     event_wait();
 
+    if(com_mem->membuf.len == 0) {
+	return -1;
+    }
+
     memcpy(buf,com_mem->membuf.buf,len);
     return 0;
 }
@@ -123,7 +132,7 @@ Snapshot::Snapshot(VirtualMachine *_vm,const uint64_t *_reg)
     : symx::Snapshot(CS_ARCH_X86,CS_MODE_32),vm(_vm)
 {
     int i;
-    for(i = 0;i < REGIDX_END;i++) {
+    for(i = 0; i < REGIDX_END; i++) {
 	reg.push_back(symx::BytVec::create_imm(REGSIZE[i],_reg[i]));
     }
 }
@@ -207,13 +216,12 @@ symx::refBlock Snapshot::translate(
 
     //initialize dangle memory, register
     mem = symx::BytMem::create_dangle(-1);
-    for(i = 0;i < REGIDX_END;i++) {
+    for(i = 0; i < REGIDX_END; i++) {
 	auto reg = symx::BytVec::create_dangle(REGSIZE[i],i);
-	reglist.push_back(reg);
 	regmap[REGNAME[i]] = reg;
     }
 
-    for(auto ins = instlist.begin();ins != instlist.end();ins++) {
+    for(auto ins = instlist.begin(); ins != instlist.end(); ins++) {
 	inst_print(ins);
 	switch(ins->op) {
 	    case I_STR:
@@ -340,6 +348,13 @@ symx::refBlock Snapshot::translate(
 		err("unsupport unstruction %d\n",ins->op);
 		break;
 	}
+	if(next_pc != nullptr) {
+	    break;
+	}
+    }
+
+    for(i = 0; i < REGIDX_END; i++) {
+	reglist.push_back(regmap[REGNAME[i]]);
     }
 
     instlist.clear();
@@ -385,7 +400,11 @@ int Snapshot::translate_set_arg(
     } else if(size > value->size) {
 	xrt = symx::expr_zext(value,size);
     }
-    regmap->insert(std::make_pair(arg.name,xrt));
+
+    auto ret = regmap->insert(std::make_pair(std::string(arg.name),xrt));
+    if(!ret.second) {
+	regmap->find(arg.name)->second = xrt;
+    }
     return 0;
 }
 

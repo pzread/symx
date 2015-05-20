@@ -30,7 +30,7 @@ static dr_emit_flags_t event_basic_block(
 	instrlist_t *bb,
 	bool for_trace,
 	bool translating);
-static void call_basic_block(app_pc pc);
+static void call_basic_block(app_pc pc,unsigned long gs_base);
 static int com_push(int evt);
 static int com_loop();
 
@@ -81,17 +81,27 @@ static dr_emit_flags_t event_basic_block(
 	bool for_trace,
 	bool translating
 ) {
+    instr_t *where = instrlist_first(bb);
+    dr_save_arith_flags(drctx,bb,where,SPILL_SLOT_1);
+    dr_insert_get_seg_base(
+	    drctx,
+	    bb,
+	    where,
+	    DR_SEG_GS,
+	    DR_REG_EAX);
     dr_insert_clean_call(
 	    drctx,
 	    bb,
-	    instrlist_first(bb),
+	    where,
 	    (void*)call_basic_block,
 	    false,
-	    1,
-	    OPND_CREATE_INT32(dr_fragment_app_pc(tag)));
+	    2,
+	    OPND_CREATE_INT32(dr_fragment_app_pc(tag)),
+	    opnd_create_reg(DR_REG_EAX));
+    dr_restore_arith_flags(drctx,bb,where,SPILL_SLOT_1);
     return DR_EMIT_DEFAULT;
 }
-static void call_basic_block(app_pc pc) {
+static void call_basic_block(app_pc pc,unsigned long gs_base) {
     void *drctx = dr_get_current_drcontext();
     dr_mcontext_t ctx;
 
@@ -107,6 +117,8 @@ static void call_basic_block(app_pc pc) {
 	com_mem->context.reg[REGIDX_ESI] = ctx.esi;
 	com_mem->context.reg[REGIDX_EBP] = ctx.ebp;
 	com_mem->context.reg[REGIDX_ESP] = ctx.esp;
+	com_mem->context.reg[REGIDX_GS] = 0x0;
+	com_mem->context.reg[REGIDX_GS_BASE] = gs_base;
 	com_mem->context.flag = ctx.eflags;
     }
 
@@ -121,16 +133,23 @@ static int com_push(int evt) {
 }
 static int com_loop() {
     int evt;
+    dr_mem_info_t meminfo;
+
     while(read(com_evt,&evt,sizeof(evt)) > 0) {
 	switch(evt) {
 	    case VMCOM_EVT_READMEM:
-		if(com_mem->membuf.len > sizeof(com_mem->membuf.buf)) {
-		    dr_printf("membuf overflow\n");
+		if(!dr_query_memory_ex((byte*)com_mem->membuf.pos,&meminfo) ||
+			!(meminfo.prot & DR_MEMPROT_READ)) {
+		    com_mem->membuf.len = 0;
 		} else {
-		    memcpy(
-			    com_mem->membuf.buf,
-			    (void*)com_mem->membuf.pos,
-			    com_mem->membuf.len);
+		    if(com_mem->membuf.len > sizeof(com_mem->membuf.buf)) {
+			dr_printf("membuf overflow\n");
+		    } else {
+			memcpy(
+				com_mem->membuf.buf,
+				(void*)com_mem->membuf.pos,
+				com_mem->membuf.len);
+		    }
 		}
 		com_push(VMCOM_EVT_READMEM);
 		break;

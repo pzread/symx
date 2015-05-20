@@ -156,7 +156,7 @@ int Z3TransVisitor::post_visit(const refOperator &oper) {
 
 		INCREF(mem_ast);
 		INCREF(idx_ast);
-		for(i = 0;i < size / 8;i++) {
+		for(i = 0; i < size; i += 8) {
 			Z3_ast tmp_ast = Z3_mk_extract(
 					solver->context,
 					i + 7,
@@ -201,7 +201,7 @@ int Z3TransVisitor::post_visit(const refOperator &oper) {
 		res_ast = Z3_mk_select(solver->context,mem_ast,idx_ast);
 		INCREF(res_ast);
 		INCREF(idx_ast);
-		for(i = 1;i < size / 8;i++) {
+		for(i = 8; i < size; i += 8) {
 			old_idx_ast = idx_ast;
 			idx_ast = Z3_mk_bvadd(
 					solver->context,

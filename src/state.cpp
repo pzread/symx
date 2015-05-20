@@ -174,7 +174,8 @@ namespace symx {
 	return cond_eq(exrpc,BytVec::create_imm(exrpc->size,rawpc));
     }
     int Executor::execute(Context *ctx) {
-	uint64_t target_rawpc = 0x080483FB;
+	unsigned int i;
+	uint64_t target_rawpc = 0x08048aac;
 
 	refSnapshot snap;
 	std::queue<refState> worklist;
@@ -241,19 +242,17 @@ namespace symx {
 		cblk = blk_it->second;
 	    }
 
-	    getchar();
-
-	    BuildVisitor *build_vis = new BuildVisitor(cstate);
+	    auto *build_vis = new BuildVisitor(cstate);
 
 	    build_vis->walk(cblk->nextpc);
 	    next_exrpc = build_vis->get_expr(cblk->nextpc);
 	    build_vis->walk(cblk->mem);
 	    next_mem = build_vis->get_expr(cblk->mem);
-	    for(auto it = cblk->reg.begin();it != cblk->reg.end();it++) {
+	    for(auto it = cblk->reg.begin(); it != cblk->reg.end(); it++) {
 		build_vis->walk(*it);
 		next_reg.push_back(build_vis->get_expr(*it));
 	    }
-	    for(auto it = cblk->flag.begin();it != cblk->flag.end();it++) {
+	    for(auto it = cblk->flag.begin(); it != cblk->flag.end(); it++) {
 		build_vis->walk(*it);
 		next_flag.push_back(build_vis->get_cond(*it));
 	    }
@@ -267,51 +266,86 @@ namespace symx {
 
 	    //initialize reg, flag, constraint
 	    trans_vis->walk(next_exrpc);
-	    expr_iter_walk(trans_vis,next_reg.begin(),next_reg.end());
-	    expr_iter_walk(trans_vis,next_flag.begin(),next_flag.end());
+	    trans_vis->walk(next_mem);
+	    trans_vis->iter_walk(next_reg.begin(),next_reg.end());
+	    trans_vis->iter_walk(next_flag.begin(),next_flag.end());
 	    constr.insert(cstate->constr.begin(),cstate->constr.end());
 	    constr.insert(cas->mem_constr.begin(),cas->mem_constr.end());
 
 	    //initialize solver variable
-	    concrete[next_exrpc] = 0;
 	    //TODO support instruction mode
-
-	    /*
+	    
+	    concrete[next_exrpc] = 0;
 	    for(i = 0; i < cstate->symbol.size(); i++) {
-		expr_walk(trans_vis,cstate->symbol[i]);
-		var[cstate->symbol[i]] = 0;
+		trans_vis->walk(cstate->symbol[i]);
+		concrete[cstate->symbol[i]] = 0;
 	    }
 	    for(
-		    auto it = addrsp.mem_symbol.begin();
-		    it != addrsp.mem_symbol.end();
+		    auto it = cas->mem_symbol.begin();
+		    it != cas->mem_symbol.end();
 		    it++
-	       ) {
-		expr_walk(trans_vis,it->second);
-		var[it->second] = 0;
+	    ) {
+		trans_vis->walk(it->second);
+		concrete[it->second] = 0;
 	    }
-	    for(auto it = selset.begin(); it != selset.end(); it++) {
-		var[(*it)->oper] = 0;
-		var[(*it)->idx] = 0;
+	    for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
+		concrete[(*it)->oper] = 0;
+		concrete[(*it)->idx] = 0;
 	    }
-	    for(auto it = strseq.begin(); it != strseq.end(); it++) {
-		var[(*it)->idx] = 0;
+	    for(auto it = next_strseq.begin(); it != next_strseq.end(); it++) {
+		concrete[(*it)->oper->operand[2]] = 0;
+		concrete[(*it)->idx] = 0;
 	    }
-	    for(i = 0; i < ctx->NUMREG; i++) {
-		var[next_reg[i]] = 0;
-	    }
-	    */
+
+	    concrete[next_reg[REGIDX_EAX]] = 0;
+	    concrete[next_reg[REGIDX_ESP]] = 0;
 
 	    while(true) {
 		//translate constraint
-		expr_iter_walk(trans_vis,constr.begin(),constr.end());
+		trans_vis->iter_walk(constr.begin(),constr.end());
 
 		//solve
 		if(!ctx->solver->solve(constr,&concrete)) {
 		    break;	
 		}
 		next_rawpc = concrete[next_exrpc];
+
+		//update address space
+		bool as_update = false;
+		for(
+			auto it = next_selset.begin();
+			it != next_selset.end();
+			it++
+		) {
+		    auto selidx = concrete[(*it)->idx];
+		    if(cas->handle_select(selidx,(*it)->size) > 0) {
+			as_update = true;	
+		    }
+		}
+		if(as_update) {
+		    constr.insert(
+			    cas->mem_constr.begin(),
+			    cas->mem_constr.end());
+		    for(
+			    auto it = cas->mem_symbol.begin();
+			    it != cas->mem_symbol.end();
+			    it++
+		    ) {
+			trans_vis->walk(it->second);
+			concrete[it->second] = 0;
+		    }
+		    continue;
+		}
 		
 		dbg("%016lx\n",next_rawpc);
+		dbg("eax %016lx\n",concrete[next_reg[REGIDX_EAX]]);
+		dbg("esp %016lx\n",concrete[next_reg[REGIDX_ESP]]);
+		for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
+		    dbg("ldr idx %016lx val %016lx\n",concrete[(*it)->idx],concrete[(*it)->oper]);
+		}
+		for(auto it = next_strseq.begin(); it != next_strseq.end(); it++) {
+		    dbg("str idx %016lx val %016lx\n",concrete[(*it)->idx],concrete[(*it)->oper->operand[2]]);
+		}
 
 		nstate = ref<State>(
 			ProgCtr(next_rawpc,CS_MODE_32),
@@ -319,120 +353,21 @@ namespace symx {
 			next_mem,
 			next_reg,
 			next_flag);
+		nstate->constr = constr;
+		nstate->select_set = next_selset;
+		nstate->store_seq = next_strseq;
 		worklist.push(nstate);
 		constr.insert(cond_not(condition_pc(next_exrpc,next_rawpc)));
 	    }
+
+	    delete trans_vis;
 	}
 
 	ctx->destroy_vm(vm);
 	return 0;
     }
 
-    /*AddrSpace::AddrSpace(
-      Context *_ctx,
-      const refProbe &_probe
-      ) :
-      probe(_probe),
-      ctx(_ctx)
-      {
-      mem = BytMem::create_var(ctx);
-      auto mem_map = probe->get_mem_map();
-      for(auto it = mem_map.begin(); it != mem_map.end(); it++) {
-      page_map.insert(
-      std::make_pair(it->start,MemPage(it->start,it->prot)));
-      }
-      }
-      refExpr AddrSpace::get_mem() const {
-      return mem;
-      }
-      int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
-      int ret = 0;
-      uint64_t pos,base;
-      unsigned int off;
-      uint8_t buf[1];
-      refBytVec val;
-      std::map<uint64_t,MemPage>::iterator page_it;
-
-      pos = idx;
-      while(pos < (idx + size)) {
-      base = pos & ~(PAGE_SIZE - 1);
-      off = pos & (PAGE_SIZE - 1);
-
-      page_it = page_map.find(base);
-      if(page_it == page_map.end()) {
-//err("page out bound\n");
-//for test
-auto page = MemPage(base,PAGE_READ | PAGE_WRITE);
-page_it = page_map.insert(
-std::make_pair(base,page)).first;
-}
-
-auto &page = page_it->second;
-for(; off < PAGE_SIZE && pos < (idx + size); off++,pos++) {
-if(page.dirty.test(off)) {
-continue;
-}
-
-if(page.prot & PAGE_PROBE) {
-if(probe->read_mem(pos,buf,sizeof(*buf)) != 1) {
-err("read page failed\n");
-}
-val = BytVec::create_imm(1,buf[0]);
-page.symbol.reset(off);
-} else {
-    //for test
-    //val = BytVec::create_imm(1,1);
-    val = BytVec::create_var(1,ctx);
-    mem_symbol[pos] = val;
-    page.symbol.set(off);
-    }
-
-    auto byte = expr_select(
-    mem,
-    BytVec::create_imm(ctx->REGSIZE,pos),
-    1);
-    mem_constraint.insert(cond_eq(byte,val));
-
-    page.dirty.set(off);
-    ret = 1;
-    }
-    }
-
-    return ret;
-}
-std::vector<refOperator> AddrSpace::source_select(
-	const refOperator &sel,
-	const std::unordered_map<refExpr,uint64_t> &var
-	) const {
-    std::vector<refOperator> retseq;
-    refExpr mem;
-    uint64_t base;
-    uint64_t idx;
-
-    assert(sel->type == ExprOpSelect);
-
-    auto base_it = var.find(sel->operand[1]);
-    assert(base_it != var.end());
-    mem = sel->operand[0];
-    base = base_it->second;
-
-    while(mem->type != ExprMem) {
-	assert(mem->type == ExprOpStore);
-	auto str = std::static_pointer_cast<Operator>(mem);
-	auto idx_it = var.find(str->operand[1]);
-	assert(idx_it != var.end());
-	idx = idx_it->second;
-
-	if(idx == base) {
-	    retseq.push_back(str);
-	    break;
-	}
-
-	mem = str->operand[0];
-    }
-
-    return retseq;
-}
+    /*
 
 bool FixVisitor::get_fix(const refExpr &expr) {
     auto log_it = fix_expr.find(expr);
@@ -686,35 +621,6 @@ int state_executor(
 	    next_rawpc = var[next_exrpc];
 	    next_insmd = var[next_exinsmd];
 
-	    //update address space
-	    bool addrsp_update = false;
-	    for(
-		    auto it = selset.begin();
-		    it != selset.end();
-		    it++
-	       ) {
-		auto selidx = var[(*it)->idx];
-		if(addrsp.handle_select(
-			    selidx,
-			    (*it)->size
-			    ) == 1) {
-		    addrsp_update = true;	
-		}
-	    }
-	    if(addrsp_update) {
-		cons.insert(
-			addrsp.mem_constraint.begin(),
-			addrsp.mem_constraint.end());
-		for(
-			auto it = addrsp.mem_symbol.begin();
-			it != addrsp.mem_symbol.end();
-			it++
-		   ) {
-		    expr_walk(trans_vis,it->second);
-		    var[it->second] = 0;
-		}
-		continue;
-	    }
 
 	    draw.update_link(cstate->pc.rawpc,next_rawpc);
 

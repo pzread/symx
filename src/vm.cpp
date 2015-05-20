@@ -11,6 +11,8 @@
 #include<sys/mman.h>
 #include<sys/socket.h>
 #include<sys/un.h>
+#include<map>
+#include<unordered_map>
 #include<capstone/capstone.h>
 
 #define LINUX
@@ -227,3 +229,94 @@ int AddrSpace::read(refState state,uint8_t *buf,uint64_t pos,size_t len) {
     //TODO check page
     return snap->mem_read(buf,pos,len);
 }
+int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
+    int ret = 0;
+    uint64_t pos,base;
+    unsigned int off;
+    uint8_t buf[1];
+    refBytVec val;
+    std::map<uint64_t,MemPage>::iterator page_it;
+
+    assert(size % 8 == 0);
+
+    dbg("read idx %016lx\n",idx);
+
+    pos = idx;
+    while(pos < (idx + size / 8)) {
+	base = pos & ~(PAGE_SIZE - 1);
+	off = pos & (PAGE_SIZE - 1);
+
+	page_it = page_map.find(base);
+	if(page_it == page_map.end()) {
+	    //err("page out bound\n");
+	    //for test
+	    auto page = MemPage(base,PROT_READ | PROT_WRITE);
+	    page_it = page_map.insert(std::make_pair(base,page)).first;
+	}
+
+	auto &page = page_it->second;
+	for(; off < PAGE_SIZE && pos < (idx + size / 8); off++,pos++) {
+	    if(page.dirty.test(off)) {
+		continue;
+	    }
+
+	    if(true) {
+		if(snap->mem_read(buf,pos,sizeof(*buf))) {
+		    info("read page failed\n");
+		    //TODO return read error
+		    continue;
+		}
+		val = BytVec::create_imm(8,buf[0]);
+		page.symbol.reset(off);
+	    } else {
+		//for test
+		val = BytVec::create_var(8,ctx);
+		mem_symbol[pos] = val;
+		page.symbol.set(off);
+	    }
+
+	    mem_constr.insert(cond_eq(
+			expr_select(mem,BytVec::create_imm(32,pos),8),
+			val));
+
+	    page.dirty.set(off);
+	    ret += 1;
+	}
+    }
+    return ret;
+}
+/*
+std::vector<refOperator> AddrSpace::source_select(
+	const refOperator &sel,
+	const std::unordered_map<refExpr,uint64_t> &var
+	) const {
+    std::vector<refOperator> retseq;
+    refExpr mem;
+    uint64_t base;
+    uint64_t idx;
+
+    assert(sel->type == ExprOpSelect);
+
+    auto base_it = var.find(sel->operand[1]);
+    assert(base_it != var.end());
+    mem = sel->operand[0];
+    base = base_it->second;
+
+    while(mem->type != ExprMem) {
+	assert(mem->type == ExprOpStore);
+	auto str = std::static_pointer_cast<Operator>(mem);
+	auto idx_it = var.find(str->operand[1]);
+	assert(idx_it != var.end());
+	idx = idx_it->second;
+
+	if(idx == base) {
+	    retseq.push_back(str);
+	    break;
+	}
+
+	mem = str->operand[0];
+    }
+
+    return retseq;
+}
+*/

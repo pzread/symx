@@ -62,19 +62,6 @@ namespace symx {
 		    const refExpr &_nextpc
 		 ) : BaseState(_mem,_reg,_flag),nextpc(_nextpc) {};
     };
-    class MemRecord : public std::enable_shared_from_this<MemRecord> {
-	public:
-	    const refOperator oper;
-	    const refExpr mem;
-	    const refExpr idx;
-	    const unsigned int size;
-	    MemRecord(
-		    const refOperator &_oper,
-		    const refExpr &_mem,
-		    const refExpr &_idx,
-		    const unsigned int _size
-		    ) : oper(_oper),mem(_mem),idx(_idx),size(_size) {}
-    };
     class BuildVisitor : public ExprVisitor {
 	private:
 	    const refState state;
@@ -136,12 +123,5 @@ namespace std {
 	}
     };
 }
-
-/*
-   class TransVisitor : public ExprVisitor {};
-
-   refBlock state_create_block(Context *ctx,const ProgCtr &pc);
-
-*/
 
 #endif
