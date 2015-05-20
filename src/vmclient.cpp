@@ -71,6 +71,24 @@ static void event_exit() {
     close(com_evt);
 }
 static void event_thread_init(void *drctx) {
+    /*module_data_t *main_mod;
+    module_handle_t main_modh;
+    dr_symbol_export_iterator_t *export_it;
+    dr_symbol_export_t *export_sym;
+
+    main_mod = dr_lookup_module_by_name("sample");
+    main_modh = main_mod->handle;
+
+    export_it = dr_symbol_export_iterator_start(main_modh);
+    while(dr_symbol_export_iterator_hasnext(export_it)) {
+	export_sym = dr_symbol_export_iterator_next(export_it);
+    }
+    dr_symbol_export_iterator_start(main_modh);
+
+    dr_free_module_data(main_mod);*/
+
+    //com_mem->enter.entrypc = (uint32_t)main_mod->entry_point;
+
     com_push(VMCOM_EVT_ENTER);
     com_loop();
 }

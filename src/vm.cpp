@@ -201,6 +201,9 @@ refBlock Snapshot::translate_bb(const symx::ProgCtr &pc) const {
 		endpc = ins->address + ins->size;
 		goto out;
 	    }
+	    if(ins->id == X86_INS_INT3) {
+		return nullptr;
+	    }
 	}
 	curpc += (uint64_t)codeptr - (uint64_t)code;
 	remain += PAGE_SIZE;
@@ -260,7 +263,14 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 		continue;
 	    }
 
-	    if(true) {
+	    if(pos < 0x3000) {
+		//for test
+		//val = BytVec::create_imm(8,0xb);
+		//page.symbol.reset(off);
+		val = BytVec::create_var(8,ctx);
+		mem_symbol[pos] = val;
+		page.symbol.set(off);
+	    } else {
 		if(snap->mem_read(buf,pos,sizeof(*buf))) {
 		    info("read page failed\n");
 		    //TODO return read error
@@ -268,11 +278,6 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 		}
 		val = BytVec::create_imm(8,buf[0]);
 		page.symbol.reset(off);
-	    } else {
-		//for test
-		val = BytVec::create_var(8,ctx);
-		mem_symbol[pos] = val;
-		page.symbol.set(off);
 	    }
 
 	    mem_constr.insert(cond_eq(

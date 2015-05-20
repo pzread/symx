@@ -55,6 +55,10 @@ enum REGIDX {
 };
 #pragma pack(push)
 #pragma pack(4)
+struct vmcom_enter {
+    uint32_t entrypc;
+    uint32_t endpc;
+};
 struct vmcom_context {
     uint32_t pc;
     uint32_t reg[REGIDX_END];
@@ -68,6 +72,7 @@ struct vmcom_membuf {
 struct vmcom_frame {
     uint32_t evt;
     union {
+	struct vmcom_enter enter;
 	struct vmcom_context context;    
 	struct vmcom_membuf membuf;
     };

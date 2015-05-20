@@ -196,7 +196,7 @@ symx::refBlock Snapshot::translate(
 	const symx::ProgCtr &pc,
 	size_t len
 ) const {
-    int i;
+    unsigned int i;
     uint64_t rawpc = pc.rawpc;
     reil_t reil;
     int translated;
@@ -205,7 +205,8 @@ symx::refBlock Snapshot::translate(
     std::vector<symx::refExpr> reglist;
     std::vector<symx::refCond> flaglist;
     std::unordered_map<std::string,symx::refExpr> regmap;
-    symx::refExpr xra,xrb,xrc;
+    symx::refExpr xra,xrb,xrc,xrt;
+    std::vector<reil_inst_t> pend_nextpc;
     symx::refExpr next_pc = nullptr;
     
     //initialize openreil, translate to reil IR
@@ -221,8 +222,13 @@ symx::refBlock Snapshot::translate(
 	regmap[REGNAME[i]] = reg;
     }
 
+    pend_nextpc.clear();
+
     for(auto ins = instlist.begin(); ins != instlist.end(); ins++) {
 	inst_print(ins);
+
+	assert(ins->op == I_JCC || pend_nextpc.size() == 0);
+
 	switch(ins->op) {
 	    case I_STR:
 		translate_set_arg(
@@ -327,7 +333,7 @@ symx::refBlock Snapshot::translate(
 		translate_set_arg(
 			&regmap,
 			ins->c,
-			symx::expr_select(mem,xra,REILSIZE[ins->a.size]));
+			symx::expr_select(mem,xra,REILSIZE[ins->c.size]));
 		break;
 
 	    case I_STM:
@@ -339,17 +345,7 @@ symx::refBlock Snapshot::translate(
 		break;
 
 	    case I_JCC:
-		xra = translate_get_arg(regmap,ins->a);
-		xrc = translate_get_arg(regmap,ins->c);
-
-		next_pc = symx::expr_ite(
-			symx::cond_eq(
-			    xra,
-			    symx::BytVec::create_imm(xra->size,0)),
-			symx::BytVec::create_imm(
-			    32,
-			    ins->raw_info.addr + ins->raw_info.size),
-			xrc);
+		pend_nextpc.push_back(*ins);
 		break;
 
 	    case I_NONE:
@@ -359,10 +355,22 @@ symx::refBlock Snapshot::translate(
 		err("unsupport unstruction %d\n",ins->op);
 		break;
 	}
-	if(next_pc != nullptr) {
-	    break;
-	}
     }
+
+    xrt = symx::BytVec::create_imm(32,pc.rawpc + len);
+    for(i = pend_nextpc.size(); i > 0; i--) {
+	auto ins = &pend_nextpc[i - 1];
+
+	xra = translate_get_arg(regmap,ins->a);
+	xrc = translate_get_arg(regmap,ins->c);
+	xrt = symx::expr_ite(
+		symx::cond_eq(
+		    xra,
+		    symx::BytVec::create_imm(xra->size,0)),
+		xrt,
+		xrc);
+    }
+    next_pc = xrt;
 
     for(i = 0; i < REGIDX_END; i++) {
 	reglist.push_back(regmap[REGNAME[i]]);

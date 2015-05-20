@@ -294,6 +294,7 @@ namespace symx {
 	}
 	vm->event_ret();
 	while(vm->event_wait() == VMCOM_EVT_EXECUTE) {
+	    dbg("%08lx\n",vm->event_get_pc());
 	    if(vm->event_get_pc() == target_rawpc) {
 		info("find main entry\n");
 		break;
@@ -312,7 +313,7 @@ namespace symx {
 	worklist.push(nstate);
 
 	while(!worklist.empty()) {
-	    cstate = worklist.back();
+	    cstate = worklist.front();
 	    worklist.pop();
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
 
@@ -328,6 +329,9 @@ namespace symx {
 	    auto blk_it = block_cache.find(cstate->pc);
 	    if(blk_it == block_cache.end()) {
 		cblk = snap->translate_bb(cstate->pc);
+		if(cblk == nullptr) {
+		    continue;
+		}
 		block_cache[cstate->pc] = cblk;
 	    } else {
 		cblk = blk_it->second;
@@ -431,9 +435,10 @@ namespace symx {
 		    continue;
 		}
 		
-		dbg("%016lx\n",next_rawpc);
+		dbg("eip %016lx\n",next_rawpc);
 		dbg("eax %016lx\n",concrete[next_reg[REGIDX_EAX]]);
 		dbg("esp %016lx\n",concrete[next_reg[REGIDX_ESP]]);
+		dbg("zf %016lx\n",concrete[next_reg[REGIDX_ZF]]);
 		for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
 		    dbg("ldr idx %016lx val %016lx\n",concrete[(*it)->idx],concrete[(*it)->oper]);
 		}
@@ -441,9 +446,9 @@ namespace symx {
 		    dbg("str idx %016lx val %016lx\n",concrete[(*it)->idx],concrete[(*it)->oper->operand[2]]);
 		}
 		
-		for(auto it = next_reg.begin(); it != next_reg.end(); it++) {
+		/*for(auto it = next_reg.begin(); it != next_reg.end(); it++) {
 		    *it = BytVec::create_imm((*it)->size,concrete[*it]);
-		}
+		}*/
 
 		nstate = ref<State>(
 			ProgCtr(next_rawpc,CS_MODE_32),
@@ -466,65 +471,6 @@ namespace symx {
     }
 
     /*
-
-
-refBlock state_create_block(Context *ctx,const ProgCtr &pc) {
-    unsigned int i;
-    refBlock blk = ref<Block>(pc);
-
-    blk->mem = BytMem::create_dangle(-1);
-    for(i = 0; i < ctx->NUMREG; i++) {
-	blk->reg[i] = BytVec::create_dangle(ctx->REGSIZE,i);
-    }
-    for(i = 0;i < ctx->NUMFLAG; i++) {
-	blk->flag[i] = Cond::create_dangle(i);
-    }
-    return blk;
-}
-static refState create_static_state(
-	Context *ctx,
-	const refProbe &probe,
-	const AddrSpace &addrsp,
-	uint64_t rawpc
-	) {
-    unsigned int i;
-    uint64_t value;
-    bool symbol;
-    int insmd;
-    refState nstate;
-
-    insmd = probe->get_insmd();
-    nstate = ref<State>(ProgCtr(rawpc,insmd),probe);
-
-    auto vis = ctx->solver->create_translator();
-
-    nstate->mem = addrsp.get_mem();
-    expr_walk(vis,nstate->mem);
-    for(i = 0; i < ctx->NUMREG; i++) {
-	value = probe->read_reg(i,&symbol);
-	if(symbol) {
-	    auto vec = BytVec::create_var(ctx->REGSIZE,ctx);
-	    nstate->reg[i] = vec;
-	    nstate->symbol.push_back(vec);
-	} else {
-	    nstate->reg[i] = BytVec::create_imm(
-		    ctx->REGSIZE,
-		    value);
-	}
-	expr_walk(vis,nstate->reg[i]);
-    }
-    for(i = 0; i < ctx->NUMFLAG; i++) {
-	if(probe->read_flag(i)) {
-	    nstate->flag[i] = Cond::create_true();
-	} else {
-	    nstate->flag[i] = Cond::create_false();
-	}
-	expr_walk(vis,nstate->flag[i]);
-    }
-
-    delete vis;
-    return nstate;
-}
 static int show_message(
 	const uint64_t rawpc,
 	std::unordered_map<refExpr,uint64_t> &var,
