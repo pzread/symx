@@ -395,7 +395,7 @@ namespace symx {
 		concrete[*it] = 0;
 	    }
 
-	    concrete[next_reg[REGIDX_EAX]] = 0;
+	    concrete[next_reg[REGIDX_ECX]] = 0;
 	    concrete[next_reg[REGIDX_ESP]] = 0;
 
 	    while(true) {
@@ -436,7 +436,7 @@ namespace symx {
 		}
 		
 		dbg("eip %016lx\n",next_rawpc);
-		dbg("eax %016lx\n",concrete[next_reg[REGIDX_EAX]]);
+		dbg("ecx %016lx\n",concrete[next_reg[REGIDX_ECX]]);
 		dbg("esp %016lx\n",concrete[next_reg[REGIDX_ESP]]);
 		dbg("zf %016lx\n",concrete[next_reg[REGIDX_ZF]]);
 		for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
@@ -450,6 +450,7 @@ namespace symx {
 		    *it = BytVec::create_imm((*it)->size,concrete[*it]);
 		}*/
 
+		auto cond_pc = condition_pc(next_exrpc,next_rawpc);
 		nstate = ref<State>(
 			ProgCtr(next_rawpc,CS_MODE_32),
 			cas,
@@ -457,10 +458,11 @@ namespace symx {
 			next_reg,
 			next_flag);
 		nstate->constr = constr;
+		nstate->constr.insert(cond_pc);
 		nstate->select_set = next_selset;
 		nstate->store_seq = next_strseq;
 		worklist.push(nstate);
-		constr.insert(cond_not(condition_pc(next_exrpc,next_rawpc)));
+		constr.insert(cond_not(cond_pc));
 	    }
 
 	    delete trans_vis;

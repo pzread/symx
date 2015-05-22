@@ -196,7 +196,7 @@ symx::refBlock Snapshot::translate(
 	const symx::ProgCtr &pc,
 	size_t len
 ) const {
-    unsigned int i;
+    unsigned int i,j;
     uint64_t rawpc = pc.rawpc;
     reil_t reil;
     int translated;
@@ -205,8 +205,12 @@ symx::refBlock Snapshot::translate(
     std::vector<symx::refExpr> reglist;
     std::vector<symx::refCond> flaglist;
     std::unordered_map<std::string,symx::refExpr> regmap;
-    symx::refExpr xra,xrb,xrc,xrt;
-    std::vector<reil_inst_t> pend_nextpc;
+    symx::refExpr xra,xrb,xrc;
+
+    std::vector<std::pair<symx::refExpr,symx::refExpr> > pend_jcc;
+    std::vector<symx::refExpr> pend_mem;
+    std::vector<std::vector<symx::refExpr> > pend_reglist;
+
     symx::refExpr next_pc = nullptr;
     
     //initialize openreil, translate to reil IR
@@ -222,12 +226,14 @@ symx::refBlock Snapshot::translate(
 	regmap[REGNAME[i]] = reg;
     }
 
-    pend_nextpc.clear();
+    pend_jcc.clear();
+    pend_mem.clear();
+    pend_reglist.clear();
 
     for(auto ins = instlist.begin(); ins != instlist.end(); ins++) {
 	inst_print(ins);
 
-	assert(ins->op == I_JCC || pend_nextpc.size() == 0);
+	//assert(ins->op == I_JCC || pend_nextpc.size() == 0);
 
 	switch(ins->op) {
 	    case I_STR:
@@ -345,7 +351,16 @@ symx::refBlock Snapshot::translate(
 		break;
 
 	    case I_JCC:
-		pend_nextpc.push_back(*ins);
+		xra = translate_get_arg(regmap,ins->a);
+		xrc = translate_get_arg(regmap,ins->c);
+		pend_jcc.push_back(std::make_pair(xra,xrc));
+
+		reglist.clear();
+		for(i = 0; i < REGIDX_END; i++) {
+		    reglist.push_back(regmap[REGNAME[i]]);
+		}
+		pend_mem.push_back(mem);
+		pend_reglist.push_back(reglist);
 		break;
 
 	    case I_NONE:
@@ -357,27 +372,29 @@ symx::refBlock Snapshot::translate(
 	}
     }
 
-    xrt = symx::BytVec::create_imm(32,pc.rawpc + len);
-    for(i = pend_nextpc.size(); i > 0; i--) {
-	auto ins = &pend_nextpc[i - 1];
+    next_pc = symx::BytVec::create_imm(32,pc.rawpc + len);
+    for(i = pend_jcc.size(); i > 0; i--) {
+	auto jcc = &pend_jcc[i - 1];
 
-	xra = translate_get_arg(regmap,ins->a);
-	xrc = translate_get_arg(regmap,ins->c);
-	xrt = symx::expr_ite(
-		symx::cond_eq(
-		    xra,
-		    symx::BytVec::create_imm(xra->size,0)),
-		xrt,
-		xrc);
-    }
-    next_pc = xrt;
+	xra = jcc->first;
+	xrc = jcc->second;
 
-    for(i = 0; i < REGIDX_END; i++) {
-	reglist.push_back(regmap[REGNAME[i]]);
+	auto cond = symx::cond_eq(xra,symx::BytVec::create_imm(xra->size,0));
+	next_pc = symx::expr_ite(cond,next_pc,xrc);
+
+	if(i < pend_jcc.size()) {
+	    pend_mem[i - 1] = symx::expr_ite(cond,pend_mem[i],pend_mem[i - 1]);
+	    for(j = 0; j < REGIDX_END; j++) {
+		pend_reglist[i - 1][j] = symx::expr_ite(
+			cond,
+			pend_reglist[i][j],
+			pend_reglist[i - 1][j]);
+	    }
+	}
     }
 
     instlist.clear();
-    return ref<symx::Block>(mem,reglist,flaglist,next_pc);
+    return ref<symx::Block>(pend_mem[0],pend_reglist[0],flaglist,next_pc);
 }
 symx::refExpr Snapshot::translate_get_arg(
 	const std::unordered_map<std::string,symx::refExpr> &regmap,
