@@ -91,13 +91,13 @@ namespace symx {
 		    uint8_t *buf,
 		    uint64_t pos,
 		    size_t len) const = 0;
-	    virtual refBlock translate(
+	    virtual std::vector<refBlock> translate(
 		    uint8_t *code,
 		    const ProgCtr &pc,
 		    size_t len) const = 0;
 
 	    Snapshot(cs_arch arch,cs_mode mode);
-	    refBlock translate_bb(const symx::ProgCtr &pc) const;
+	    std::vector<refBlock> translate_bb(const symx::ProgCtr &pc) const;
 
 	    std::vector<refExpr> reg;
 	    std::vector<refCond> flag;
@@ -160,9 +160,9 @@ namespace symx {
 	    AddrSpace(Context *_ctx,const refSnapshot &_snap);
 	    int read(refState state,uint8_t *buf,uint64_t pos,size_t len);
 	    int handle_select(const uint64_t idx,const unsigned int size);
-	    /*std::vector<refOperator> source_select(
-	      const refOperator &sel,
-	      const std::unordered_map<refExpr,uint64_t> &var) const;*/
+	    std::vector<refOperator> source_select(
+		    const refOperator &sel,
+		    const std::unordered_map<refExpr,uint64_t> &var) const;
     };
     class MemRecord : public std::enable_shared_from_this<MemRecord> {
 	public:

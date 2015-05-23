@@ -27,7 +27,7 @@ namespace openreil {
 		    std::unordered_map<std::string,symx::refExpr> *regmap,
 		    const reil_arg_t &arg,
 		    const symx::refExpr &value) const;
-	    symx::refBlock translate(
+	    std::vector<symx::refBlock> translate(
 		    uint8_t *code,
 		    const symx::ProgCtr &pc,
 		    size_t len) const;

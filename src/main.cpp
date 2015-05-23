@@ -24,9 +24,9 @@ int main() {
 
     Solver *solver = new z3_solver::Z3Solver();
     Context *context = new openreil::Context(solver,"./sample");
-    Executor engine;
+    Executor *engine = new Executor(context);
 
-    engine.execute(context);
+    engine->execute();
 
     delete context;
     return 0;

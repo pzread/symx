@@ -14,7 +14,7 @@ int main() {
 		if(input[3] == 0x0) {
 		    off = 4;
 		    if(input[off] == 0x4) {
-			if(input[off + 1] > 0x10 && input[off + 1] < 0x12) {
+			if(input[off + 1] < 0x23) {
 			    memcpy(output,input + off + 2,input[off + 1]);
 			}
 		    }

@@ -5,6 +5,7 @@
 #include<unordered_set>
 #include<vector>
 #include<memory>
+#include<queue>
 
 #include"utils.h"
 #include"expr.h"
@@ -54,13 +55,16 @@ namespace symx {
     };
     class Block : public BaseState {
 	public:
+	    const refCond cond;
 	    const refExpr nextpc;
+
 	    Block(
 		    const refExpr &_mem,
 		    const std::vector<refExpr> &_reg,
 		    const std::vector<refCond> &_flag,
+		    const refCond &_cond,
 		    const refExpr &_nextpc
-		 ) : BaseState(_mem,_reg,_flag),nextpc(_nextpc) {};
+		 ) : BaseState(_mem,_reg,_flag),cond(_cond),nextpc(_nextpc) {};
     };
     class BuildVisitor : public ExprVisitor {
 	private:
@@ -88,21 +92,30 @@ namespace symx {
     };
     class Executor {
 	private:
+	    Context *ctx;
+	    ExprVisitor *trans_vis;
+
 	    refCond condition_pc(const refExpr &exrpc,const uint64_t rawpc);
+	    std::vector<refState> solve_state(
+		    const refState cstate,
+		    BuildVisitor *build_vis,
+		    const refBlock cblk);
 
 	public:
-	    int execute(Context *ctx);
+	    Executor(Context *_ctx);
+	    ~Executor();
+	    int execute();
     };
     class FixVisitor : public ExprVisitor {
 	private:
-	    const AddrSpace &addrsp;
+	    const refAddrSpace &addrsp;
 	    const std::unordered_map<refExpr,uint64_t> &var;
 	    std::unordered_map<refExpr,bool> fix_expr;
 	public:
 	    FixVisitor(
-		    const AddrSpace &_addrsp,
-		    const std::unordered_map<refExpr,uint64_t> &_var
-		    ) : addrsp(_addrsp),var(_var) {}
+		    const refAddrSpace &_addrsp,
+		    const std::unordered_map<refExpr,uint64_t> &_var)
+		: addrsp(_addrsp),var(_var) {}
 	    bool get_fix(const refExpr &expr);
 	    int pre_visit(const refBytVec &vec);
 	    int pre_visit(const refBytMem &mem);

@@ -171,8 +171,7 @@ Snapshot::Snapshot(cs_arch arch,cs_mode mode) {
     cs_open(arch,mode,&cs);
     cs_option(cs,CS_OPT_DETAIL,CS_OPT_ON);
 }
-refBlock Snapshot::translate_bb(const symx::ProgCtr &pc) const {
-    refBlock ret;
+std::vector<refBlock> Snapshot::translate_bb(const symx::ProgCtr &pc) const {
     uint64_t curpc = pc.rawpc;
     uint64_t endpc = curpc;
     uint8_t code[8192];
@@ -186,7 +185,7 @@ refBlock Snapshot::translate_bb(const symx::ProgCtr &pc) const {
     remain = PAGE_SIZE - (curpc & (~PAGE_MASK));
     while(true) {
 	if(mem_read(code,curpc,remain)) {
-	    return nullptr;
+	    return {};
 	}
 	codeptr = code;
 	while(remain > 0) {
@@ -202,7 +201,7 @@ refBlock Snapshot::translate_bb(const symx::ProgCtr &pc) const {
 		goto out;
 	    }
 	    if(ins->id == X86_INS_INT3) {
-		return nullptr;
+		return {};
 	    }
 	}
 	curpc += (uint64_t)codeptr - (uint64_t)code;
@@ -214,7 +213,7 @@ out:
     block = new uint8_t[endpc - pc.rawpc];
     mem_read(block,pc.rawpc,endpc - pc.rawpc);
 
-    ret = translate(block,pc,endpc - pc.rawpc);
+    auto ret = translate(block,pc,endpc - pc.rawpc);
 
     delete[] block;
     cs_free(ins,1);
@@ -290,11 +289,10 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
     }
     return ret;
 }
-/*
 std::vector<refOperator> AddrSpace::source_select(
 	const refOperator &sel,
 	const std::unordered_map<refExpr,uint64_t> &var
-	) const {
+) const {
     std::vector<refOperator> retseq;
     refExpr mem;
     uint64_t base;
@@ -303,15 +301,21 @@ std::vector<refOperator> AddrSpace::source_select(
     assert(sel->type == ExprOpSelect);
 
     auto base_it = var.find(sel->operand[1]);
+
     assert(base_it != var.end());
+
     mem = sel->operand[0];
     base = base_it->second;
 
     while(mem->type != ExprMem) {
+
 	assert(mem->type == ExprOpStore);
+
 	auto str = std::static_pointer_cast<Operator>(mem);
 	auto idx_it = var.find(str->operand[1]);
+
 	assert(idx_it != var.end());
+	
 	idx = idx_it->second;
 
 	if(idx == base) {
@@ -324,4 +328,3 @@ std::vector<refOperator> AddrSpace::source_select(
 
     return retseq;
 }
-*/

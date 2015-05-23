@@ -1,5 +1,6 @@
 #define LOG_PREFIX "state"
 
+#include<assert.h>
 #include<vector>
 #include<memory>
 #include<unordered_map>
@@ -170,7 +171,6 @@ namespace symx {
 	return 1;
     }
 
-    /*
     bool FixVisitor::get_fix(const refExpr &expr) {
 	auto log_it = fix_expr.find(expr);
 	assert(log_it != fix_expr.end());
@@ -212,69 +212,73 @@ namespace symx {
     int FixVisitor::post_visit(const refOperator &oper) {
 	switch(oper->type) {
 	    case ExprOpSelect:
-		{
-		    bool fix = fix_expr[oper->operand[1]];
-		    if(fix) {
-			auto strseq = addrsp.source_select(oper,var);
-			if(strseq.size() == 0) {
-			    auto idx_it = var.find(oper->operand[1]);
-			    assert(idx_it != var.end());
-			    if(addrsp.mem_symbol.find(
-					idx_it->second
-					) != addrsp.mem_symbol.end()) {
-				fix = false;
-			    }
-			} else {
-			    for(
-				    auto it = strseq.begin();
-				    it == strseq.end();
-				    it++
-			    ) {
-				walk((*it)->operand[1]);
-				walk((*it)->operand[2]);
-				fix = fix_expr[(*it)->operand[1]] |
-				    fix_expr[(*it)->operand[2]];
-			    }
+	    {
+		bool fix = fix_expr[oper->operand[1]];
+		if(fix) {
+		    auto strseq = addrsp->source_select(oper,var);
+		    if(strseq.size() == 0) {
+			auto idx_it = var.find(oper->operand[1]);
+			assert(idx_it != var.end());
+			if(addrsp->mem_symbol.find(
+				    idx_it->second
+			) != addrsp->mem_symbol.end()) {
+			    fix = false;
+			}
+		    } else {
+			for(
+				auto it = strseq.begin();
+				it == strseq.end();
+				it++
+			) {
+			    walk((*it)->operand[1]);
+			    walk((*it)->operand[2]);
+			    fix = fix_expr[(*it)->operand[1]] |
+				fix_expr[(*it)->operand[2]];
 			}
 		    }
-		    fix_expr[oper] = fix;
-		    break;
 		}
+		fix_expr[oper] = fix;
+		break;
+	    }
 	    case ExprOpIte:
-		fix_expr[oper] = false;
+		fix_expr[oper] = true;
 		break;
 	    default:
-		{
-		    unsigned int i;
-		    bool fix = true;
-		    for(i = 0; i < oper->op_count; i++) {
-			fix &= fix_expr[oper->operand[i]];
-		    }
-		    fix_expr[oper] = fix;
-		    break;
+	    {
+		unsigned int i;
+		bool fix = true;
+		for(i = 0; i < oper->op_count; i++) {
+		    fix &= fix_expr[oper->operand[i]];
 		}
+		fix_expr[oper] = fix;
+		break;
+	    }
 	}
 	return 1;
     }
     int FixVisitor::post_visit(const refCond &cond) {
 	return 1;
     }
-    */
 
+    Executor::Executor(Context *_ctx) : ctx(_ctx) {
+	trans_vis = ctx->solver->create_translator();
+    }
+    Executor::~Executor() {
+	delete trans_vis;
+    }
     refCond Executor::condition_pc(const refExpr &exrpc,const uint64_t rawpc) {
 	return cond_eq(exrpc,BytVec::create_imm(exrpc->size,rawpc));
     }
-    int Executor::execute(Context *ctx) {
+    std::vector<refState> Executor::solve_state(
+	    const refState cstate,
+	    BuildVisitor *build_vis,
+	    const refBlock cblk
+    ) {
 	unsigned int i;
-	uint64_t target_rawpc = 0x08048aac;
+	std::vector<refState> statelist;
 
-	refSnapshot snap;
-	std::queue<refState> worklist;
-	std::unordered_map<ProgCtr,refBlock> block_cache;
-	refState nstate,cstate;
-	refBlock cblk;
 	refAddrSpace cas;
-
+	refCond jmp_cond;
 	refExpr next_exrpc;
 	uint64_t next_rawpc;
 	refExpr next_mem;
@@ -284,8 +288,160 @@ namespace symx {
 	std::vector<refMemRecord> next_strseq;
 	std::unordered_set<refCond> constr;
 	std::unordered_map<refExpr,uint64_t> concrete;
+	refState nstate;
+	
+	//initialize environment
+	statelist.clear();
+	cas = cstate->as;
+	next_reg.clear();
+	next_flag.clear();
+	next_selset.clear();
+	next_strseq.clear();
+	constr.clear();
+	concrete.clear();
 
-	//Create base VM
+	build_vis->walk(cblk->cond);
+	jmp_cond = build_vis->get_cond(cblk->cond);
+	build_vis->walk(cblk->nextpc);
+	next_exrpc = build_vis->get_expr(cblk->nextpc);
+	build_vis->walk(cblk->mem);
+	next_mem = build_vis->get_expr(cblk->mem);
+	for(auto it = cblk->reg.begin(); it != cblk->reg.end(); it++) {
+	    build_vis->walk(*it);
+	    next_reg.push_back(build_vis->get_expr(*it));
+	}
+	for(auto it = cblk->flag.begin(); it != cblk->flag.end(); it++) {
+	    build_vis->walk(*it);
+	    next_flag.push_back(build_vis->get_cond(*it));
+	}
+	next_selset = cstate->select_set;
+	next_strseq = cstate->store_seq;
+	build_vis->get_mem_record(&next_selset,&next_strseq);   
+
+	//initialize reg, flag, constraint
+	trans_vis->walk(jmp_cond);
+	trans_vis->walk(next_exrpc);
+	trans_vis->walk(next_mem);
+	trans_vis->iter_walk(next_reg.begin(),next_reg.end());
+	trans_vis->iter_walk(next_flag.begin(),next_flag.end());
+	constr.insert(jmp_cond);
+	constr.insert(cstate->constr.begin(),cstate->constr.end());
+	constr.insert(cas->mem_constr.begin(),cas->mem_constr.end());
+
+	//initialize solver variable
+	//TODO support instruction mode
+
+	concrete[next_exrpc] = 0;
+	for(i = 0; i < cstate->symbol.size(); i++) {
+	    trans_vis->walk(cstate->symbol[i]);
+	    concrete[cstate->symbol[i]] = 0;
+	}
+	for(
+		auto it = cas->mem_symbol.begin();
+		it != cas->mem_symbol.end();
+		it++
+	   ) {
+	    trans_vis->walk(it->second);
+	    concrete[it->second] = 0;
+	}
+	for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
+	    concrete[(*it)->oper] = 0;
+	    concrete[(*it)->idx] = 0;
+	}
+	for(auto it = next_strseq.begin(); it != next_strseq.end(); it++) {
+	    concrete[(*it)->oper->operand[2]] = 0;
+	    concrete[(*it)->idx] = 0;
+	}
+	for(auto it = next_reg.begin(); it != next_reg.end(); it++) {
+	    concrete[*it] = 0;
+	}
+
+	concrete[next_reg[REGIDX_ECX]] = 0;
+	concrete[next_reg[REGIDX_ESP]] = 0;
+
+	while(true) {
+	    //translate constraint
+	    trans_vis->iter_walk(constr.begin(),constr.end());
+
+	    //solve
+	    if(!ctx->solver->solve(constr,&concrete)) {
+		break;	
+	    }
+	    next_rawpc = concrete[next_exrpc];
+
+	    //update address space
+	    bool as_update = false;
+	    for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
+		auto selidx = concrete[(*it)->idx];
+		if(cas->handle_select(selidx,(*it)->size) > 0) {
+		    as_update = true;	
+		}
+	    }
+	    if(as_update) {
+		constr.insert(cas->mem_constr.begin(),cas->mem_constr.end());
+		for(
+			auto it = cas->mem_symbol.begin();
+			it != cas->mem_symbol.end();
+			it++
+		) {
+		    trans_vis->walk(it->second);
+		    concrete[it->second] = 0;
+		}
+		continue;
+	    }
+
+	    dbg("eip %016lx\n",next_rawpc);
+	    dbg("ecx %016lx\n",concrete[next_reg[REGIDX_ECX]]);
+	    dbg("esp %016lx\n",concrete[next_reg[REGIDX_ESP]]);
+	    dbg("zf %016lx\n",concrete[next_reg[REGIDX_ZF]]);
+	    for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
+		dbg("ldr idx %016lx val %016lx\n",concrete[(*it)->idx],concrete[(*it)->oper]);
+	    }
+	    for(auto it = next_strseq.begin(); it != next_strseq.end(); it++) {
+		dbg("str idx %016lx val %016lx\n",concrete[(*it)->idx],concrete[(*it)->oper->operand[2]]);
+	    }
+
+	    /*
+	    auto fix_vis = new FixVisitor(cas,concrete);
+	    for(auto it = next_reg.begin(); it != next_reg.end(); it++) {
+		fix_vis->walk(*it);
+		if(fix_vis->get_fix(*it)) {
+		    err("fix\n");
+		    *it = BytVec::create_imm((*it)->size,concrete[*it]);
+		}
+	    }
+	    delete fix_vis;
+	    */
+
+	    auto cond_pc = condition_pc(next_exrpc,next_rawpc);
+	    nstate = ref<State>(
+		    ProgCtr(next_rawpc,CS_MODE_32),
+		    cas,
+		    next_mem,
+		    next_reg,
+		    next_flag);
+	    nstate->constr = constr;
+	    nstate->constr.insert(cond_pc);
+	    nstate->select_set = next_selset;
+	    nstate->store_seq = next_strseq;
+
+	    statelist.push_back(nstate);
+	    constr.insert(cond_not(cond_pc));
+	}
+
+	return statelist;
+    }
+    int Executor::execute() {
+	uint64_t target_rawpc = 0x08048aac;
+
+	refSnapshot snap;
+	std::queue<refState> worklist;
+	std::unordered_map<ProgCtr,std::vector<refBlock> > block_cache;
+	refState nstate,cstate;
+	std::vector<refBlock> blklist;
+	refBlock cblk;
+	
+	//Create base component
 	VirtualMachine *vm = ctx->create_vm();
 
 	//Get main entry snapshot
@@ -317,155 +473,27 @@ namespace symx {
 	    worklist.pop();
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
 
-	    //initialize environment
-	    cas = cstate->as;
-	    next_reg.clear();
-	    next_flag.clear();
-	    next_selset.clear();
-	    next_strseq.clear();
-	    constr.clear();
-	    concrete.clear();
-
-	    auto blk_it = block_cache.find(cstate->pc);
-	    if(blk_it == block_cache.end()) {
-		cblk = snap->translate_bb(cstate->pc);
-		if(cblk == nullptr) {
+	    auto blklist_it = block_cache.find(cstate->pc);
+	    if(blklist_it == block_cache.end()) {
+		blklist = snap->translate_bb(cstate->pc);
+		if(blklist.size() == 0) {
 		    continue;
 		}
-		block_cache[cstate->pc] = cblk;
+		block_cache[cstate->pc] = blklist;
 	    } else {
-		cblk = blk_it->second;
+		blklist = blklist_it->second;
 	    }
 
-	    auto *build_vis = new BuildVisitor(cstate);
+	    auto build_vis = new BuildVisitor(cstate);
 
-	    build_vis->walk(cblk->nextpc);
-	    next_exrpc = build_vis->get_expr(cblk->nextpc);
-	    build_vis->walk(cblk->mem);
-	    next_mem = build_vis->get_expr(cblk->mem);
-	    for(auto it = cblk->reg.begin(); it != cblk->reg.end(); it++) {
-		build_vis->walk(*it);
-		next_reg.push_back(build_vis->get_expr(*it));
+	    for(auto blkit = blklist.begin(); blkit != blklist.end(); blkit++) {
+		auto statelist = solve_state(cstate,build_vis,*blkit);
+		for(auto it = statelist.begin(); it != statelist.end(); it++) {
+		    worklist.push(*it);
+		}
 	    }
-	    for(auto it = cblk->flag.begin(); it != cblk->flag.end(); it++) {
-		build_vis->walk(*it);
-		next_flag.push_back(build_vis->get_cond(*it));
-	    }
-	    next_selset = cstate->select_set;
-	    next_strseq = cstate->store_seq;
-	    build_vis->get_mem_record(&next_selset,&next_strseq);   
 
 	    delete build_vis;
-
-	    auto trans_vis = ctx->solver->create_translator();
-
-	    //initialize reg, flag, constraint
-	    trans_vis->walk(next_exrpc);
-	    trans_vis->walk(next_mem);
-	    trans_vis->iter_walk(next_reg.begin(),next_reg.end());
-	    trans_vis->iter_walk(next_flag.begin(),next_flag.end());
-	    constr.insert(cstate->constr.begin(),cstate->constr.end());
-	    constr.insert(cas->mem_constr.begin(),cas->mem_constr.end());
-
-	    //initialize solver variable
-	    //TODO support instruction mode
-	    
-	    concrete[next_exrpc] = 0;
-	    for(i = 0; i < cstate->symbol.size(); i++) {
-		trans_vis->walk(cstate->symbol[i]);
-		concrete[cstate->symbol[i]] = 0;
-	    }
-	    for(
-		    auto it = cas->mem_symbol.begin();
-		    it != cas->mem_symbol.end();
-		    it++
-	    ) {
-		trans_vis->walk(it->second);
-		concrete[it->second] = 0;
-	    }
-	    for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
-		concrete[(*it)->oper] = 0;
-		concrete[(*it)->idx] = 0;
-	    }
-	    for(auto it = next_strseq.begin(); it != next_strseq.end(); it++) {
-		concrete[(*it)->oper->operand[2]] = 0;
-		concrete[(*it)->idx] = 0;
-	    }
-	    for(auto it = next_reg.begin(); it != next_reg.end(); it++) {
-		concrete[*it] = 0;
-	    }
-
-	    concrete[next_reg[REGIDX_ECX]] = 0;
-	    concrete[next_reg[REGIDX_ESP]] = 0;
-
-	    while(true) {
-		//translate constraint
-		trans_vis->iter_walk(constr.begin(),constr.end());
-
-		//solve
-		if(!ctx->solver->solve(constr,&concrete)) {
-		    break;	
-		}
-		next_rawpc = concrete[next_exrpc];
-
-		//update address space
-		bool as_update = false;
-		for(
-			auto it = next_selset.begin();
-			it != next_selset.end();
-			it++
-		) {
-		    auto selidx = concrete[(*it)->idx];
-		    if(cas->handle_select(selidx,(*it)->size) > 0) {
-			as_update = true;	
-		    }
-		}
-		if(as_update) {
-		    constr.insert(
-			    cas->mem_constr.begin(),
-			    cas->mem_constr.end());
-		    for(
-			    auto it = cas->mem_symbol.begin();
-			    it != cas->mem_symbol.end();
-			    it++
-		    ) {
-			trans_vis->walk(it->second);
-			concrete[it->second] = 0;
-		    }
-		    continue;
-		}
-		
-		dbg("eip %016lx\n",next_rawpc);
-		dbg("ecx %016lx\n",concrete[next_reg[REGIDX_ECX]]);
-		dbg("esp %016lx\n",concrete[next_reg[REGIDX_ESP]]);
-		dbg("zf %016lx\n",concrete[next_reg[REGIDX_ZF]]);
-		for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
-		    dbg("ldr idx %016lx val %016lx\n",concrete[(*it)->idx],concrete[(*it)->oper]);
-		}
-		for(auto it = next_strseq.begin(); it != next_strseq.end(); it++) {
-		    dbg("str idx %016lx val %016lx\n",concrete[(*it)->idx],concrete[(*it)->oper->operand[2]]);
-		}
-		
-		/*for(auto it = next_reg.begin(); it != next_reg.end(); it++) {
-		    *it = BytVec::create_imm((*it)->size,concrete[*it]);
-		}*/
-
-		auto cond_pc = condition_pc(next_exrpc,next_rawpc);
-		nstate = ref<State>(
-			ProgCtr(next_rawpc,CS_MODE_32),
-			cas,
-			next_mem,
-			next_reg,
-			next_flag);
-		nstate->constr = constr;
-		nstate->constr.insert(cond_pc);
-		nstate->select_set = next_selset;
-		nstate->store_seq = next_strseq;
-		worklist.push(nstate);
-		constr.insert(cond_not(cond_pc));
-	    }
-
-	    delete trans_vis;
 	}
 
 	ctx->destroy_vm(vm);

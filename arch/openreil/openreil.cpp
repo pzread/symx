@@ -191,27 +191,23 @@ int Snapshot::inst_handler(reil_inst_t *inst,void *ctx) {
     instlist.push_back(*inst);
     return 0;
 }
-symx::refBlock Snapshot::translate(
+std::vector<symx::refBlock> Snapshot::translate(
 	uint8_t *code,
 	const symx::ProgCtr &pc,
 	size_t len
 ) const {
-    unsigned int i,j;
+    unsigned int i;
     uint64_t rawpc = pc.rawpc;
     reil_t reil;
     int translated;
 
+    std::vector<symx::refBlock> blklist;
+    symx::refCond prevcond = nullptr;
     symx::refExpr mem;
     std::vector<symx::refExpr> reglist;
     std::vector<symx::refCond> flaglist;
     std::unordered_map<std::string,symx::refExpr> regmap;
     symx::refExpr xra,xrb,xrc;
-
-    std::vector<std::pair<symx::refExpr,symx::refExpr> > pend_jcc;
-    std::vector<symx::refExpr> pend_mem;
-    std::vector<std::vector<symx::refExpr> > pend_reglist;
-
-    symx::refExpr next_pc = nullptr;
     
     //initialize openreil, translate to reil IR
     reil = reil_init(ARCH_X86,inst_handler,(void*)&translated);
@@ -226,14 +222,10 @@ symx::refBlock Snapshot::translate(
 	regmap[REGNAME[i]] = reg;
     }
 
-    pend_jcc.clear();
-    pend_mem.clear();
-    pend_reglist.clear();
+    blklist.clear();
 
     for(auto ins = instlist.begin(); ins != instlist.end(); ins++) {
 	inst_print(ins);
-
-	//assert(ins->op == I_JCC || pend_nextpc.size() == 0);
 
 	switch(ins->op) {
 	    case I_STR:
@@ -351,18 +343,41 @@ symx::refBlock Snapshot::translate(
 		break;
 
 	    case I_JCC:
+	    {
 		xra = translate_get_arg(regmap,ins->a);
 		xrc = translate_get_arg(regmap,ins->c);
-		pend_jcc.push_back(std::make_pair(xra,xrc));
 
 		reglist.clear();
 		for(i = 0; i < REGIDX_END; i++) {
 		    reglist.push_back(regmap[REGNAME[i]]);
 		}
-		pend_mem.push_back(mem);
-		pend_reglist.push_back(reglist);
-		break;
 
+		auto cond = symx::cond_eq(
+			xra,
+			symx::BytVec::create_imm(xra->size,0));
+
+		
+
+		if(prevcond == nullptr) {
+		    blklist.push_back(ref<symx::Block>(
+				mem,
+				reglist,
+				flaglist,
+				symx::cond_not(cond),
+				xrc));
+		    prevcond = cond;
+		} else {
+		    blklist.push_back(ref<symx::Block>(
+				mem,
+				reglist,
+				flaglist,
+				symx::cond_and(prevcond,symx::cond_not(cond)),
+				xrc));
+		    prevcond = symx::cond_and(prevcond,cond);
+		}
+
+		break;
+	    }
 	    case I_NONE:
 		break;
 
@@ -372,29 +387,13 @@ symx::refBlock Snapshot::translate(
 	}
     }
 
-    next_pc = symx::BytVec::create_imm(32,pc.rawpc + len);
-    for(i = pend_jcc.size(); i > 0; i--) {
-	auto jcc = &pend_jcc[i - 1];
-
-	xra = jcc->first;
-	xrc = jcc->second;
-
-	auto cond = symx::cond_eq(xra,symx::BytVec::create_imm(xra->size,0));
-	next_pc = symx::expr_ite(cond,next_pc,xrc);
-
-	if(i < pend_jcc.size()) {
-	    pend_mem[i - 1] = symx::expr_ite(cond,pend_mem[i],pend_mem[i - 1]);
-	    for(j = 0; j < REGIDX_END; j++) {
-		pend_reglist[i - 1][j] = symx::expr_ite(
-			cond,
-			pend_reglist[i][j],
-			pend_reglist[i - 1][j]);
-	    }
-	}
-    }
-
     instlist.clear();
-    return ref<symx::Block>(pend_mem[0],pend_reglist[0],flaglist,next_pc);
+
+    //assume openreil always has JCC jumping to next block
+    //something like this at the end of the block
+    //JCC	1:1	    ,	    0xDEADBEEF
+
+    return blklist;
 }
 symx::refExpr Snapshot::translate_get_arg(
 	const std::unordered_map<std::string,symx::refExpr> &regmap,
