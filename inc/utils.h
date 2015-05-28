@@ -31,7 +31,7 @@ namespace symx {
     class MemRecord;
     typedef std::shared_ptr<const Snapshot> refSnapshot;
     typedef std::shared_ptr<AddrSpace> refAddrSpace;
-    typedef std::shared_ptr<const Block> refBlock;
+    typedef std::shared_ptr<Block> refBlock;
     typedef std::shared_ptr<State> refState;
     typedef std::shared_ptr<const MemRecord> refMemRecord;
 }

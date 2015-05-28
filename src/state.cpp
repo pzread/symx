@@ -4,6 +4,7 @@
 #include<vector>
 #include<memory>
 #include<unordered_map>
+#include<algorithm>
 #include<capstone/capstone.h>
 
 #include"utils.h"
@@ -14,7 +15,14 @@
 
 using namespace symx;
 
+int count = 0;
+
 namespace symx {
+
+    bool Block::operator<(const Block& other) const {
+	return length > other.length;
+    }
+
     refExpr BuildVisitor::get_expr(const refExpr &expr) {
 	auto it = expr_map.find(expr);
 	if(it == expr_map.end()) {
@@ -219,20 +227,18 @@ namespace symx {
 		    if(strseq.size() == 0) {
 			auto idx_it = var.find(oper->operand[1]);
 			assert(idx_it != var.end());
-			if(addrsp->mem_symbol.find(
-				    idx_it->second
-			) != addrsp->mem_symbol.end()) {
+			if(addrsp->mem_symbol.find(idx_it->second) != addrsp->mem_symbol.end()) {
 			    fix = false;
 			}
 		    } else {
 			for(
 				auto it = strseq.begin();
-				it == strseq.end();
+				it != strseq.end();
 				it++
 			) {
 			    walk((*it)->operand[1]);
 			    walk((*it)->operand[2]);
-			    fix = fix_expr[(*it)->operand[1]] |
+			    fix = fix_expr[(*it)->operand[1]] &
 				fix_expr[(*it)->operand[2]];
 			}
 		    }
@@ -241,7 +247,7 @@ namespace symx {
 		break;
 	    }
 	    case ExprOpIte:
-		fix_expr[oper] = true;
+		fix_expr[oper] = false;
 		break;
 	    default:
 	    {
@@ -406,7 +412,6 @@ namespace symx {
 	    for(auto it = next_reg.begin(); it != next_reg.end(); it++) {
 		fix_vis->walk(*it);
 		if(fix_vis->get_fix(*it)) {
-		    err("fix\n");
 		    *it = BytVec::create_imm((*it)->size,concrete[*it]);
 		}
 	    }
@@ -425,6 +430,13 @@ namespace symx {
 	    nstate->select_set = next_selset;
 	    nstate->store_seq = next_strseq;
 
+	    nstate->path = cstate->path;
+	    nstate->path.push_back(cblk);
+
+	    if(nstate->path.size() > 40) {
+		//err("long path %d\n",count);
+	    }
+
 	    statelist.push_back(nstate);
 	    constr.insert(cond_not(cond_pc));
 	}
@@ -432,11 +444,13 @@ namespace symx {
 	return statelist;
     }
     int Executor::execute() {
+	unsigned int i;
 	uint64_t target_rawpc = 0x08048aac;
 
 	refSnapshot snap;
-	std::queue<refState> worklist;
 	std::unordered_map<ProgCtr,std::vector<refBlock> > block_cache;
+	//std::priority_queue<refState> worklist;
+	std::queue<refState> worklist;
 	refState nstate,cstate;
 	std::vector<refBlock> blklist;
 	refBlock cblk;
@@ -473,6 +487,8 @@ namespace symx {
 	    worklist.pop();
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
 
+	    count++;
+
 	    auto blklist_it = block_cache.find(cstate->pc);
 	    if(blklist_it == block_cache.end()) {
 		blklist = snap->translate_bb(cstate->pc);
@@ -488,8 +504,18 @@ namespace symx {
 
 	    for(auto blkit = blklist.begin(); blkit != blklist.end(); blkit++) {
 		auto statelist = solve_state(cstate,build_vis,*blkit);
-		for(auto it = statelist.begin(); it != statelist.end(); it++) {
-		    worklist.push(*it);
+
+		if(statelist.size() == 0) {
+		    for(i = 0; i < cstate->path.size(); i++) {
+			auto blk = cstate->path[i];
+			blk->length = std::max(
+				blk->length,
+				(int)(cstate->path.size() - i));
+		    }
+		} else {
+		    for(auto it = statelist.begin(); it != statelist.end(); it++) {
+			worklist.push(*it);
+		    }
 		}
 	    }
 

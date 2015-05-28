@@ -7,9 +7,6 @@ int main() {
     unsigned char *input = (unsigned char*)0x1000;
     unsigned char *output = (unsigned char*)0x2000;
 
-    x = a;
-    printf("%08lx\n",x);
-
     off = 0;
     if(input[0] == 0x30) {
 	if(input[1] <= 0x7f) {
@@ -17,7 +14,7 @@ int main() {
 		if(input[3] == 0x0) {
 		    off = 4;
 		    if(input[off] == 0x4) {
-			if(input[off + 1] < 10) {
+			if(input[off + 1] < 80) {
 			    memcpy(output,input + off + 2,input[off + 1]);
 			}
 		    }

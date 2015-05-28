@@ -24,6 +24,15 @@ namespace symx {
 		return rawpc == other.rawpc && mode == other.mode;
 	    }
     };
+}
+namespace std {
+    template<> struct hash<symx::ProgCtr> {
+	std::size_t operator()(const symx::ProgCtr &key) const {
+	    return (key.rawpc << 8) | key.mode;
+	}
+    };
+}
+namespace symx {
     class BaseState : public std::enable_shared_from_this<BaseState> {
 	public:
 	    const refExpr mem;
@@ -45,6 +54,8 @@ namespace symx {
 	    std::vector<refMemRecord> store_seq;
 	    std::vector<refBytVec> symbol;
 
+	    std::vector<refBlock> path;
+
 	    State(
 		    const ProgCtr &_pc,
 		    const refAddrSpace &_as,
@@ -57,6 +68,7 @@ namespace symx {
 	public:
 	    const refCond cond;
 	    const refExpr nextpc;
+	    int length;
 
 	    Block(
 		    const refExpr &_mem,
@@ -64,7 +76,9 @@ namespace symx {
 		    const std::vector<refCond> &_flag,
 		    const refCond &_cond,
 		    const refExpr &_nextpc
-		 ) : BaseState(_mem,_reg,_flag),cond(_cond),nextpc(_nextpc) {};
+		 ) : BaseState(_mem,_reg,_flag),cond(_cond),nextpc(_nextpc),length(0) {};
+
+	    bool operator<(const Block& other) const;
     };
     class BuildVisitor : public ExprVisitor {
 	private:
@@ -125,13 +139,6 @@ namespace symx {
 	    int post_visit(const refBytMem &mem);
 	    int post_visit(const refOperator &oper);
 	    int post_visit(const refCond &cond);
-    };
-}
-namespace std {
-    template<> struct hash<symx::ProgCtr> {
-	std::size_t operator()(const symx::ProgCtr &key) const {
-	    return (key.rawpc << 8) | key.mode;
-	}
     };
 }
 
