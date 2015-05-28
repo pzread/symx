@@ -407,7 +407,6 @@ namespace symx {
 		dbg("str idx %016lx val %016lx\n",concrete[(*it)->idx],concrete[(*it)->oper->operand[2]]);
 	    }
 
-	    /*
 	    auto fix_vis = new FixVisitor(cas,concrete);
 	    for(auto it = next_reg.begin(); it != next_reg.end(); it++) {
 		fix_vis->walk(*it);
@@ -416,7 +415,6 @@ namespace symx {
 		}
 	    }
 	    delete fix_vis;
-	    */
 
 	    auto cond_pc = condition_pc(next_exrpc,next_rawpc);
 	    nstate = ref<State>(
@@ -433,8 +431,8 @@ namespace symx {
 	    nstate->path = cstate->path;
 	    nstate->path.push_back(cblk);
 
-	    if(nstate->path.size() > 40) {
-		//err("long path %d\n",count);
+	    if(nstate->path.size() > 50) {
+		err("long path %d\n",count);
 	    }
 
 	    statelist.push_back(nstate);
@@ -449,8 +447,8 @@ namespace symx {
 
 	refSnapshot snap;
 	std::unordered_map<ProgCtr,std::vector<refBlock> > block_cache;
-	//std::priority_queue<refState> worklist;
-	std::queue<refState> worklist;
+	std::priority_queue<refState> worklist;
+	//std::queue<refState> worklist;
 	refState nstate,cstate;
 	std::vector<refBlock> blklist;
 	refBlock cblk;
@@ -483,7 +481,8 @@ namespace symx {
 	worklist.push(nstate);
 
 	while(!worklist.empty()) {
-	    cstate = worklist.front();
+	    cstate = worklist.top();
+	    //cstate = worklist.front();
 	    worklist.pop();
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
 

@@ -20,6 +20,9 @@ namespace openreil {
 	    VirtualMachine *const vm;
 
 	    static int inst_handler(reil_inst_t *inst,void *ctx);
+	    symx::refExpr translate_fixsize(
+		    symx::refExpr exr,
+		    unsigned int size) const;
 	    symx::refExpr translate_get_arg(
 		    const std::unordered_map<std::string,symx::refExpr> &regmap,
 		    const reil_arg_t &arg) const;

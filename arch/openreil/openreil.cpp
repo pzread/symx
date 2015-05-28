@@ -238,20 +238,14 @@ std::vector<symx::refBlock> Snapshot::translate(
 	    case I_ADD:
 	    case I_SUB:
 	    case I_MUL:
-	    case I_AND:
-	    case I_OR:
-	    case I_XOR:
 	    case I_SHR:
 	    case I_SHL:
-	    {
-		xra = translate_get_arg(regmap,ins->a);
-		xrb = translate_get_arg(regmap,ins->b);
-
-		if(xra->size < xrb->size) {
-		    xra = symx::expr_zext(xra,xrb->size);
-		} else if(xra->size > xrb->size) {
-		    xra = symx::expr_extract(xra,0,xrb->size);
-		}
+		xra = translate_fixsize(
+			translate_get_arg(regmap,ins->a),
+			ins->a.size);
+		xrb = translate_fixsize(
+			translate_get_arg(regmap,ins->b),
+			ins->b.size);
 
 		switch(ins->op) {
 		    case I_ADD:
@@ -262,15 +256,6 @@ std::vector<symx::refBlock> Snapshot::translate(
 			break;
 		    case I_MUL:
 			xrc = symx::expr_mul(xra,xrb);
-			break;
-		    case I_AND:
-			xrc = symx::expr_and(xra,xrb);
-			break;
-		    case I_OR:
-			xrc = symx::expr_or(xra,xrb);
-			break;
-		    case I_XOR:
-			xrc = symx::expr_xor(xra,xrb);
 			break;
 		    case I_SHR:
 			xrc = symx::expr_lshr(xra,xrb);
@@ -284,7 +269,36 @@ std::vector<symx::refBlock> Snapshot::translate(
 		}
 		translate_set_arg(&regmap,ins->c,xrc);
 		break;
-	    }
+
+	    case I_AND:
+	    case I_OR:
+	    case I_XOR:
+		xra = translate_get_arg(regmap,ins->a);
+		xrb = translate_get_arg(regmap,ins->b);
+
+		if(xra->size != xrb->size) {
+		    xra = translate_fixsize(xra,ins->c.size);
+		    xrb = translate_fixsize(xrb,ins->c.size);
+		}
+
+		switch(ins->op) {
+		    case I_AND:
+			xrc = symx::expr_and(xra,xrb);
+			break;
+		    case I_OR:
+			xrc = symx::expr_or(xra,xrb);
+			break;
+		    case I_XOR:
+			xrc = symx::expr_xor(xra,xrb);
+			break;
+		    
+		    default:
+			err("unexpected\n");
+			break;
+		}
+		translate_set_arg(&regmap,ins->c,xrc);
+		break;
+
 	    case I_NEG:
 	    case I_NOT:
 		xra = translate_get_arg(regmap,ins->a);
@@ -304,8 +318,13 @@ std::vector<symx::refBlock> Snapshot::translate(
 
 	    case I_EQ:
 	    case I_LT:
-		xra = translate_get_arg(regmap,ins->a);
-		xrb = translate_get_arg(regmap,ins->b);
+		xra = translate_fixsize(
+			translate_get_arg(regmap,ins->a),
+			ins->a.size);
+		xrb = translate_fixsize(
+			translate_get_arg(regmap,ins->b),
+			ins->b.size);
+
 		switch(ins->op) {
 		    case I_EQ:
 			xrc = symx::expr_ite(
@@ -327,7 +346,9 @@ std::vector<symx::refBlock> Snapshot::translate(
 		break;
 
 	    case I_LDM:
-		xra = translate_get_arg(regmap,ins->a);
+		xra = translate_fixsize(
+			translate_get_arg(regmap,ins->a),
+			ins->a.size);
 		translate_set_arg(
 			&regmap,
 			ins->c,
@@ -335,11 +356,13 @@ std::vector<symx::refBlock> Snapshot::translate(
 		break;
 
 	    case I_STM:
-		xra = translate_get_arg(regmap,ins->a);
+		xra = translate_fixsize(
+			translate_get_arg(regmap,ins->a),
+			ins->a.size);
 		mem = symx::expr_store(
 			mem,
 			translate_get_arg(regmap,ins->c),
-			translate_get_arg(regmap,ins->a));
+			xra);
 		break;
 
 	    case I_JCC:
@@ -355,8 +378,6 @@ std::vector<symx::refBlock> Snapshot::translate(
 		auto cond = symx::cond_eq(
 			xra,
 			symx::BytVec::create_imm(xra->size,0));
-
-		
 
 		if(prevcond == nullptr) {
 		    blklist.push_back(ref<symx::Block>(
@@ -395,10 +416,21 @@ std::vector<symx::refBlock> Snapshot::translate(
 
     return blklist;
 }
+symx::refExpr Snapshot::translate_fixsize(
+	symx::refExpr exr,
+	unsigned int size
+) const {
+    if(exr->size < REILSIZE[size]) {
+	return symx::expr_zext(exr,REILSIZE[size]);
+    } else if(exr->size > REILSIZE[size]) {
+	return symx::expr_extract(exr,0,REILSIZE[size]);
+    }
+    return exr;
+}
 symx::refExpr Snapshot::translate_get_arg(
 	const std::unordered_map<std::string,symx::refExpr> &regmap,
 	const reil_arg_t &arg) const {
-    unsigned int size = REILSIZE[arg.size];
+    //unsigned int size = REILSIZE[arg.size];
     symx::refExpr xrt;
 
     assert(arg.type == A_REG || arg.type == A_TEMP || arg.type == A_CONST);
@@ -412,11 +444,11 @@ symx::refExpr Snapshot::translate_get_arg(
 	}
 
 	xrt = it->second;
-	if(size < xrt->size) {
+	/*if(size < xrt->size) {
 	    xrt = symx::expr_extract(xrt,0,size);
 	} else if(size > xrt->size) {
 	    xrt = symx::expr_zext(xrt,size);
-	}
+	}*/
 	return xrt;
     } else {
 	return symx::BytVec::create_imm(REILSIZE[arg.size],arg.val);
