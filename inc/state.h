@@ -90,6 +90,7 @@ namespace symx {
 	    std::vector<refMemRecord> store_seq;
 
 	    refExpr solid_operator(const refOperator &oper);
+	    refExpr solid_mem_read(const refOperator &oper);
 
 	public:
 	    BuildVisitor(Solver *_solver,const refState &_state)

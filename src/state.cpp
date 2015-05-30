@@ -5,6 +5,7 @@
 #include<memory>
 #include<unordered_map>
 #include<algorithm>
+#include<bitset>
 #include<capstone/capstone.h>
 
 #include"utils.h"
@@ -199,6 +200,7 @@ namespace symx {
 
 	switch(oper->type) {
 	    case ExprOpSelect:
+		retexr = solid_mem_read(oper);
 		break;
 	    case ExprOpStore:
 		break;
@@ -231,6 +233,76 @@ namespace symx {
 		break;
 	    }
 	}
+
+	return retexr;
+    }
+    refExpr BuildVisitor::solid_mem_read(const refOperator &oper) {
+	refExpr retexr = oper;
+	unsigned int i;
+	refExpr memexr;
+	uint64_t addr;
+	unsigned int size;
+	int *bitmap;
+	std::unordered_set<refCond> constr;
+	std::unordered_map<refExpr,uint64_t> concrete;
+
+	assert(oper->type == ExprOpSelect);
+
+	if(oper->operand[1]->type != ExprImm) {
+	    return retexr;
+	}
+
+	addr = std::static_pointer_cast<BytVec>(oper->operand[1])->data;
+	size = oper->size;
+	memexr = oper->operand[0];
+
+	bitmap = new int[size];
+	for(i = 0; i < size; i++) {
+	    bitmap[i] = 0;
+	}
+
+	//TODO O(N^2) -> O(N)
+	while(memexr->type != ExprMem) {
+	    auto strexr = std::static_pointer_cast<Operator>(memexr);
+
+	    if(strexr->operand[1]->type != ExprImm) {
+		break;
+	    }
+
+	    auto straddr = std::static_pointer_cast<BytVec>(
+		    strexr->operand[1])->data;
+	    auto start = std::max(straddr,addr);
+	    auto end = std::min(straddr + strexr->operand[2]->size,addr + size);
+	    
+	    if(start < end) {
+		int val = 0;
+		if(strexr->operand[2]->type != ExprImm) {
+		    val = 1;
+		} else {
+		    val = 2;
+		}
+		for(i = start; i < end; i++) {
+		    bitmap[i - addr] = std::max(bitmap[i - addr],val);
+		}
+	    }
+
+	    memexr = strexr->operand[0];
+	}
+	if(memexr->type == ExprMem) {
+	    for(i = 0; i < size; i++) {
+		if(bitmap[i] != 2) {
+		    break;
+		}
+	    }
+	    if(i == size) {
+		concrete[oper] = 0;
+		if(solver->solve(constr,&concrete)) {
+		    retexr = BytVec::create_imm(oper->size,concrete[oper]);
+		}
+	    }
+	}
+
+	delete bitmap;
 
 	return retexr;
     }
