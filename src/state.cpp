@@ -200,7 +200,7 @@ namespace symx {
 
 	switch(oper->type) {
 	    case ExprOpSelect:
-		retexr = solid_mem_read(oper);
+		//retexr = solid_mem_read(oper);
 		break;
 	    case ExprOpStore:
 		break;
@@ -410,8 +410,11 @@ namespace symx {
 	refExpr next_mem;
 	std::vector<refExpr> next_reg;
 	std::vector<refCond> next_flag;
+
 	std::unordered_set<refMemRecord> next_selset;
 	std::vector<refMemRecord> next_strseq;
+	std::vector<uint64_t> solid_seladdr;
+	
 	std::unordered_set<refCond> constr;
 	std::unordered_map<refExpr,uint64_t> concrete;
 	refState nstate;
@@ -421,8 +424,11 @@ namespace symx {
 	cas = cstate->as;
 	next_reg.clear();
 	next_flag.clear();
+
 	next_selset.clear();
 	next_strseq.clear();
+	solid_seladdr.clear();
+
 	constr.clear();
 	concrete.clear();
 
@@ -440,9 +446,20 @@ namespace symx {
 	    build_vis->walk(*it);
 	    next_flag.push_back(build_vis->get_cond(*it));
 	}
-	next_selset = cstate->select_set;
+
+	//copy old store record
 	next_strseq = cstate->store_seq;
+	//get memory record
 	build_vis->get_mem_record(&next_selset,&next_strseq);   
+	//handle solid select address
+	for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
+	    if((*it)->idx->type == ExprImm) {
+		auto addr = std::static_pointer_cast<BytVec>((*it)->idx)->data;
+		cas->handle_select(addr,(*it)->size);
+	    }
+	}
+	//merge old select record
+	next_selset.insert(cstate->select_set.begin(),cstate->select_set.end());
 
 	//initialize reg, flag, constraint
 	constr.insert(jmp_cond);
@@ -502,10 +519,11 @@ namespace symx {
 		) {
 		    concrete[it->second] = 0;
 		}
+		count++;
 		continue;
 	    }
 
-	    dbg("eip %016lx\n",next_rawpc);
+	    /*dbg("eip %016lx\n",next_rawpc);
 	    dbg("ecx %016lx\n",concrete[next_reg[REGIDX_ECX]]);
 	    dbg("esp %016lx\n",concrete[next_reg[REGIDX_ESP]]);
 	    dbg("zf %016lx\n",concrete[next_reg[REGIDX_ZF]]);
@@ -514,7 +532,7 @@ namespace symx {
 	    }
 	    for(auto it = next_strseq.begin(); it != next_strseq.end(); it++) {
 		dbg("str idx %016lx val %016lx\n",concrete[(*it)->idx],concrete[(*it)->oper->operand[2]]);
-	    }
+	    }*/
 
 	    auto cond_pc = condition_pc(next_exrpc,next_rawpc);
 	    nstate = ref<State>(
@@ -531,7 +549,7 @@ namespace symx {
 	    nstate->path = cstate->path;
 	    nstate->path.push_back(cblk);
 
-	    if(nstate->path.size() > 50) {
+	    if(nstate->path.size() > 10) {
 		err("long path %d\n",count);
 	    }
 
@@ -585,8 +603,6 @@ namespace symx {
 	    //cstate = worklist.front();
 	    worklist.pop();
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
-
-	    count++;
 
 	    auto blklist_it = block_cache.find(cstate->pc);
 	    if(blklist_it == block_cache.end()) {

@@ -241,8 +241,6 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 
     assert(size % 8 == 0);
 
-    dbg("read idx %016lx\n",idx);
-
     pos = idx;
     while(pos < (idx + size / 8)) {
 	base = pos & ~(PAGE_SIZE - 1);

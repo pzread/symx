@@ -19,8 +19,8 @@ int main() {
     char s[100];
     char p[100];
 
-    get(s,20);
-    get(p,20);
+    get(s,100);
+    get(p,100);
 
 //out:
 
