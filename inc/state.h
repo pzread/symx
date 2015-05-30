@@ -61,8 +61,8 @@ namespace symx {
 		    const refAddrSpace &_as,
 		    const refExpr &_mem,
 		    const std::vector<refExpr> &_reg,
-		    const std::vector<refCond> &_flag
-		 ) : BaseState(_mem,_reg,_flag),pc(_pc),as(_as) {}
+		    const std::vector<refCond> &_flag)
+		: BaseState(_mem,_reg,_flag),pc(_pc),as(_as) {}
     };
     class Block : public BaseState {
 	public:
@@ -75,8 +75,11 @@ namespace symx {
 		    const std::vector<refExpr> &_reg,
 		    const std::vector<refCond> &_flag,
 		    const refCond &_cond,
-		    const refExpr &_nextpc
-		 ) : BaseState(_mem,_reg,_flag),cond(_cond),nextpc(_nextpc),length(0) {};
+		    const refExpr &_nextpc)
+		: BaseState(_mem,_reg,_flag),
+		cond(_cond),
+		nextpc(_nextpc),
+		length(0) {};
 
 	    bool operator<(const Block& other) const;
     };
@@ -109,6 +112,38 @@ namespace symx {
 	    int post_visit(const refOperator &oper);
 	    int post_visit(const refCond &cond);
     };
+
+    class ActiveVisitor : public ExprVisitor {
+	private:
+	    std::unordered_set<refExpr> visited_exr;
+	    std::unordered_set<refCond> visited_cond;
+
+	public:
+	    std::unordered_set<uint64_t> select_addr;
+
+	    int pre_visit(const refBytVec &vec);
+	    int pre_visit(const refBytMem &mem);
+	    int pre_visit(const refOperator &oper);
+	    int pre_visit(const refCond &cond);
+	    int post_visit(const refBytVec &vec);
+	    int post_visit(const refBytMem &mem);
+	    int post_visit(const refOperator &oper);
+	    int post_visit(const refCond &cond);
+    };
+    class ActiveSolver {
+	private:
+	    Solver *solver;
+	    const refAddrSpace as;
+
+	public:
+	    ActiveSolver(Solver *_solver,const refAddrSpace &_as)
+		: solver(_solver),as(_as) {}
+	    bool solve(
+		    const std::unordered_set<refCond> &target_constr,
+		    const std::unordered_set<refCond> &constr,
+		    std::unordered_map<refExpr,uint64_t> *concrete);
+    };
+
     class Executor {
 	private:
 	    Context *ctx;
@@ -124,28 +159,6 @@ namespace symx {
 	    ~Executor();
 	    int execute();
     };
-    /*
-    class SolidFixVisitor : public ExprVisitor {
-	private:
-	    Solver *solver;
-	    const refState state;
-	    std::unordered_set<refExpr> visited;
-
-	public:
-	    SolidFixVisitor(Solver *_solver,const refState &_state)
-		: solver(_solver),state(_state) {}
-
-	    bool get_fix(const refExpr &expr);
-	    int pre_visit(const refBytVec &vec);
-	    int pre_visit(const refBytMem &mem);
-	    int pre_visit(const refOperator &oper);
-	    int pre_visit(const refCond &cond);
-	    int post_visit(const refBytVec &vec);
-	    int post_visit(const refBytMem &mem);
-	    int post_visit(const refOperator &oper);
-	    int post_visit(const refCond &cond);
-    };
-    */
 }
 
 #endif
