@@ -29,6 +29,7 @@ namespace symx {
     class State;
     class ProgCtr;
     class MemRecord;
+    class Solver;
     typedef std::shared_ptr<const Snapshot> refSnapshot;
     typedef std::shared_ptr<AddrSpace> refAddrSpace;
     typedef std::shared_ptr<Block> refBlock;

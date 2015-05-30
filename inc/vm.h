@@ -174,8 +174,8 @@ namespace symx {
 		    const refOperator &_oper,
 		    const refExpr &_mem,
 		    const refExpr &_idx,
-		    const unsigned int _size
-		    ) : oper(_oper),mem(_mem),idx(_idx),size(_size) {}
+		    const unsigned int _size)
+		: oper(_oper),mem(_mem),idx(_idx),size(_size) {}
     };
 }
 

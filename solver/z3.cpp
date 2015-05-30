@@ -526,9 +526,20 @@ bool Z3Solver::solve(
 	const std::unordered_set<refCond> &cons,
 	std::unordered_map<refExpr,uint64_t> *var
 ) {
+	Z3TransVisitor *trans_vis;
+
 	refZ3SolvExpr expr;
 	Z3_model model;
 	Z3_ast res_ast;
+
+	trans_vis = new Z3TransVisitor(this);
+
+	for(auto it = var->begin(); it != var->end(); it++) {
+	    trans_vis->walk(it->first);
+	}
+	trans_vis->iter_walk(cons.begin(),cons.end());
+
+	delete trans_vis;
 
 	Z3_solver_reset(context,solver);
 

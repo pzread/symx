@@ -82,14 +82,18 @@ namespace symx {
     };
     class BuildVisitor : public ExprVisitor {
 	private:
+	    Solver *solver;
 	    const refState state;
 	    std::unordered_map<refExpr,refExpr> expr_map;
 	    std::unordered_map<refCond,refCond> cond_map;
 	    std::unordered_set<refMemRecord> select_set;
 	    std::vector<refMemRecord> store_seq;
 
+	    refExpr solid_operator(const refOperator &oper);
+
 	public:
-	    BuildVisitor(const refState &_state) : state(_state) {}
+	    BuildVisitor(Solver *_solver,const refState &_state)
+		: solver(_solver),state(_state) {}
 	    refExpr get_expr(const refExpr &expr);
 	    refCond get_cond(const refCond &cond);
 	    int get_mem_record(
@@ -107,7 +111,6 @@ namespace symx {
     class Executor {
 	private:
 	    Context *ctx;
-	    ExprVisitor *trans_vis;
 
 	    refCond condition_pc(const refExpr &exrpc,const uint64_t rawpc);
 	    std::vector<refState> solve_state(
@@ -116,20 +119,21 @@ namespace symx {
 		    const refBlock cblk);
 
 	public:
-	    Executor(Context *_ctx);
+	    Executor(Context *_ctx) : ctx(_ctx) {}
 	    ~Executor();
 	    int execute();
     };
-    class FixVisitor : public ExprVisitor {
+    /*
+    class SolidFixVisitor : public ExprVisitor {
 	private:
-	    const refAddrSpace &addrsp;
-	    const std::unordered_map<refExpr,uint64_t> &var;
-	    std::unordered_map<refExpr,bool> fix_expr;
+	    Solver *solver;
+	    const refState state;
+	    std::unordered_set<refExpr> visited;
+
 	public:
-	    FixVisitor(
-		    const refAddrSpace &_addrsp,
-		    const std::unordered_map<refExpr,uint64_t> &_var)
-		: addrsp(_addrsp),var(_var) {}
+	    SolidFixVisitor(Solver *_solver,const refState &_state)
+		: solver(_solver),state(_state) {}
+
 	    bool get_fix(const refExpr &expr);
 	    int pre_visit(const refBytVec &vec);
 	    int pre_visit(const refBytMem &mem);
@@ -140,6 +144,7 @@ namespace symx {
 	    int post_visit(const refOperator &oper);
 	    int post_visit(const refCond &cond);
     };
+    */
 }
 
 #endif
