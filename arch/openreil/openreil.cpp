@@ -68,8 +68,8 @@ static const unsigned int REILSIZE[] = {
     32,
     64,
 };
-static symx::refExpr IMMFALSE = symx::BytVec::create_imm(1,0x0);
-static symx::refExpr IMMTRUE = symx::BytVec::create_imm(1,0x1);
+static const symx::refExpr IMMFALSE = symx::BytVec::create_imm(1,0x0);
+static const symx::refExpr IMMTRUE = symx::BytVec::create_imm(1,0x1);
 
 VirtualMachine* Context::create_vm() {
     VirtualMachine *vm = new VirtualMachine();
@@ -438,17 +438,9 @@ symx::refExpr Snapshot::translate_get_arg(
     if(arg.type == A_REG || arg.type == A_TEMP) {
 	auto it = regmap.find(arg.name);
 
-	//assert(it != regmap.end());
-	if(it == regmap.end()) {
-	    return symx::BytVec::create_imm(REILSIZE[arg.size],0);
-	}
+	assert(it != regmap.end());
 
 	xrt = it->second;
-	/*if(size < xrt->size) {
-	    xrt = symx::expr_extract(xrt,0,size);
-	} else if(size > xrt->size) {
-	    xrt = symx::expr_zext(xrt,size);
-	}*/
 	return xrt;
     } else {
 	return symx::BytVec::create_imm(REILSIZE[arg.size],arg.val);

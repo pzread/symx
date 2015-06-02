@@ -17,12 +17,18 @@
 using namespace symx;
 
 int count = 0;
+unsigned long maxlen = 0;
 
 namespace symx {
-
-    bool Block::operator<(const Block& other) const {
-	return length > other.length;
-    }
+    static std::unordered_map<uint64_t,unsigned long> block_length;
+    static std::unordered_map<uint64_t,std::unordered_set<refState>> dep_state;
+    class Compare {
+	public:
+	    bool operator() (const refState &a,const refState &b) {
+		return a->length < b->length;
+	    }
+    };
+    static std::priority_queue<refState,std::vector<refState>,Compare> worklist;
 
     refExpr BuildVisitor::get_expr(const refExpr &expr) {
 	auto it = expr_map.find(expr);
@@ -412,7 +418,6 @@ namespace symx {
 	    BuildVisitor *build_vis,
 	    const refBlock cblk
     ) {
-	unsigned int i;
 	std::vector<refState> statelist;
 
 	refAddrSpace cas;
@@ -460,6 +465,7 @@ namespace symx {
 	    next_flag.push_back(build_vis->get_cond(*it));
 	}
 
+	//TODO remove same select record
 	//copy old store record
 	next_strseq = cstate->store_seq;
 	//get memory record
@@ -536,15 +542,26 @@ namespace symx {
 		continue;
 	    }
 
-	    dbg("eip %016lx\n",next_rawpc);
-	    /*dbg("ecx %016lx\n",concrete[next_reg[REGIDX_ECX]]);
-	    dbg("esp %016lx\n",concrete[next_reg[REGIDX_ESP]]);
+	    /*dbg("eip %016lx\n",next_rawpc);
+	    dbg("eax %016lx\n",concrete[next_reg[REGIDX_EAX]]);
+	    dbg("edx %016lx\n",concrete[next_reg[REGIDX_EDX]]);
 	    dbg("zf %016lx\n",concrete[next_reg[REGIDX_ZF]]);
+
+	    std::vector<std::pair<uint64_t,uint64_t>> tmpvec;
 	    for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
-		dbg("ldr idx %016lx val %016lx\n",concrete[(*it)->idx],concrete[(*it)->oper]);
+		tmpvec.push_back(std::make_pair(concrete[(*it)->idx],concrete[(*it)->oper]));
 	    }
+	    std::sort(tmpvec.begin(),tmpvec.end());
+	    for(auto it = tmpvec.begin(); it != tmpvec.end(); it++) {
+		dbg("ldr idx %016lx val %016lx\n",it->first,it->second);
+	    }
+	    tmpvec.clear();
 	    for(auto it = next_strseq.begin(); it != next_strseq.end(); it++) {
-		dbg("str idx %016lx val %016lx\n",concrete[(*it)->idx],concrete[(*it)->oper->operand[2]]);
+		tmpvec.push_back(std::make_pair(concrete[(*it)->idx],concrete[(*it)->oper->operand[2]]));
+	    }
+	    std::sort(tmpvec.begin(),tmpvec.end());
+	    for(auto it = tmpvec.begin(); it != tmpvec.end(); it++) {
+		dbg("str idx %016lx val %016lx\n",it->first,it->second);
 	    }*/
 
 	    auto cond_pc = condition_pc(next_exrpc,next_rawpc);
@@ -559,11 +576,59 @@ namespace symx {
 	    nstate->select_set = next_selset;
 	    nstate->store_seq = next_strseq;
 
-	    nstate->path = cstate->path;
-	    nstate->path.push_back(cblk);
+	    auto rawpc = nstate->pc.rawpc;
 
-	    if(nstate->path.size() > 100) {
-		err("long path %d\n",count);
+	    nstate->path = cstate->path;
+	    nstate->path.push_back(rawpc);
+	    nstate->blkmap = cstate->blkmap;
+
+	    dep_state[rawpc].insert(nstate);
+
+	    if(nstate->blkmap.find(rawpc) != nstate->blkmap.end()) {
+		auto it = block_length.find(rawpc);
+		if(it == block_length.end()) {
+		    block_length[rawpc] = nstate->path.size() - nstate->blkmap[rawpc];
+		} else {
+		    it->second = std::max(it->second,nstate->path.size() - nstate->blkmap[rawpc]);
+		}
+		nstate->length = block_length[rawpc];
+	    } else {
+		nstate->blkmap[rawpc] = nstate->path.size();
+		
+		auto it = block_length.find(rawpc);
+		if(it == block_length.end()) {
+		    nstate->length = 0;
+		} else {
+		    nstate->length = it->second;
+		}
+	    }
+
+	    maxlen = std::max(maxlen,nstate->path.size());
+	    dbg("maxlen %lu\n",maxlen);
+	    if(nstate->path.size() >= 1000) {
+		for(
+		    auto it = cas->mem_symbol.begin();
+		    it != cas->mem_symbol.end();
+		    it++
+		) {
+		    concrete[it->second] = 0;
+		}
+		ctx->solver->solve(constr,&concrete);
+
+		for(unsigned int j = 0;j < nstate->path.size();j++) {
+		    dbg("path %08lx\n",nstate->path[j]);
+		}
+
+		for(
+		    auto it = cas->mem_symbol.begin();
+		    it != cas->mem_symbol.end();
+		    it++
+		) {
+		    dbg("%x\n",concrete[it->second]);
+		}
+
+		dbg("long path %d\n",count);
+		exit(0);
 	    }
 
 	    statelist.push_back(nstate);
@@ -576,12 +641,10 @@ namespace symx {
 	return statelist;
     }
     int Executor::execute() {
-	unsigned int i;
-	uint64_t target_rawpc = 0x08048B01;
+	uint64_t target_rawpc = 0x08048B7F;
 
 	refSnapshot snap;
 	std::unordered_map<ProgCtr,std::vector<refBlock> > block_cache;
-	std::priority_queue<refState> worklist;
 	//std::queue<refState> worklist;
 	refState nstate,cstate;
 	std::vector<refBlock> blklist;
@@ -620,6 +683,8 @@ namespace symx {
 	    worklist.pop();
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
 
+	    dbg("length %u\n",cstate->length);
+
 	    count++;
 
 	    auto blklist_it = block_cache.find(cstate->pc);
@@ -638,28 +703,22 @@ namespace symx {
 	    for(auto blkit = blklist.begin(); blkit != blklist.end(); blkit++) {
 		auto statelist = solve_state(cstate,build_vis,*blkit);
 
-		if(statelist.size() == 0) {
-		    for(i = 0; i < cstate->path.size(); i++) {
-			auto blk = cstate->path[i];
-			blk->length = std::max(
-				blk->length,
-				(int)(cstate->path.size() - i));
-		    }
-		} else {
-		    for(auto it = statelist.begin();
-			    it != statelist.end();
-			    it++
-		    ) {
-			worklist.push(*it);
-		    }
+		for(auto it = statelist.begin();
+			it != statelist.end();
+			it++
+		) {
+		    worklist.push(*it);
 		}
 	    }
 
 	    delete build_vis;
+
+	    /*if(cstate->pc.rawpc == 0x8048b69) {
+		break;
+	    }*/
 	}
 
 	ctx->destroy_vm(vm);
 	return 0;
     }
-
 };

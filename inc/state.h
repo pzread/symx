@@ -45,6 +45,7 @@ namespace symx {
 		    const std::vector<refCond> _flag)
 		: mem(_mem),reg(_reg),flag(_flag) {}
     };
+
     class State : public BaseState {
 	public:
 	    const ProgCtr pc;
@@ -54,7 +55,9 @@ namespace symx {
 	    std::vector<refMemRecord> store_seq;
 	    std::vector<refBytVec> symbol;
 
-	    std::vector<refBlock> path;
+	    unsigned long length;
+	    std::vector<uint64_t> path;
+	    std::unordered_map<uint64_t,unsigned long> blkmap;
 
 	    State(
 		    const ProgCtr &_pc,
@@ -63,12 +66,13 @@ namespace symx {
 		    const std::vector<refExpr> &_reg,
 		    const std::vector<refCond> &_flag)
 		: BaseState(_mem,_reg,_flag),pc(_pc),as(_as) {}
+
+	    bool operator<(const State& other) const;
     };
     class Block : public BaseState {
 	public:
 	    const refCond cond;
 	    const refExpr nextpc;
-	    int length;
 
 	    Block(
 		    const refExpr &_mem,
@@ -76,12 +80,7 @@ namespace symx {
 		    const std::vector<refCond> &_flag,
 		    const refCond &_cond,
 		    const refExpr &_nextpc)
-		: BaseState(_mem,_reg,_flag),
-		cond(_cond),
-		nextpc(_nextpc),
-		length(0) {};
-
-	    bool operator<(const Block& other) const;
+		: BaseState(_mem,_reg,_flag),cond(_cond),nextpc(_nextpc) {};
     };
     class BuildVisitor : public ExprVisitor {
 	private:
