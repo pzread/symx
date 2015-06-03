@@ -45,7 +45,6 @@ namespace symx {
 		    const std::vector<refCond> _flag)
 		: mem(_mem),reg(_reg),flag(_flag) {}
     };
-
     class State : public BaseState {
 	public:
 	    const ProgCtr pc;
@@ -119,6 +118,8 @@ namespace symx {
 
 	public:
 	    std::unordered_set<uint64_t> select_addr;
+	    std::unordered_map<refExpr,std::unordered_set<uint64_t>> select;
+	    std::unordered_map<refExpr,std::unordered_set<uint64_t>> store;
 
 	    int pre_visit(const refBytVec &vec);
 	    int pre_visit(const refBytMem &mem);
@@ -134,10 +135,13 @@ namespace symx {
 	    Solver *solver;
 	    const refAddrSpace as;
 
+	    std::vector<refExpr> get_mem_layer(const refState &state);
+
 	public:
 	    ActiveSolver(Solver *_solver,const refAddrSpace &_as)
 		: solver(_solver),as(_as) {}
 	    bool solve(
+		    const refState &state,
 		    const std::unordered_set<refCond> &target_constr,
 		    const std::unordered_set<refCond> &constr,
 		    std::unordered_map<refExpr,uint64_t> *concrete);

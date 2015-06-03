@@ -146,7 +146,7 @@ namespace symx {
 	    MemPage(const uint64_t _start,const unsigned int _prot)
 		: start(_start),prot(_prot) {}
     };
-    class AddrSpace {
+    class AddrSpace : public std::enable_shared_from_this<AddrSpace>{
 	private:
 	    Context *ctx;
 	    const refSnapshot snap;

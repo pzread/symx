@@ -269,7 +269,7 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 		page.symbol.set(off);
 	    } else {
 		if(snap->mem_read(buf,pos,sizeof(*buf))) {
-		    info("read page failed\n");
+		    info("read page failed %016lx\n",pos);
 		    //TODO return read error
 		    continue;
 		}

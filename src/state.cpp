@@ -349,40 +349,117 @@ namespace symx {
     }
     int ActiveVisitor::post_visit(const refOperator &oper) {
 	unsigned int i;
+
 	switch(oper->type) {
 	    case ExprOpSelect:
 		if(oper->operand[1]->type == ExprImm) {
 		    auto addr = std::static_pointer_cast<BytVec>(
 			    oper->operand[1]);
+		    auto size = oper->size;
 
-		    assert(oper->size % 8 == 0);
+		    assert(size % 8 == 0);
 
-		    for(i = 0; i < oper->size / 8; i++) {
+		    auto mem_it = select.find(oper->operand[0]);
+		    if(mem_it == select.end()) {
+			mem_it = select.insert(std::make_pair(
+				    oper->operand[0],
+				    std::unordered_set<uint64_t>())).first;
+		    }
+		    for(i = 0; i < size / 8; i++) {
 			select_addr.insert(addr->data + ((uint64_t)i));
+			mem_it->second.insert(addr->data + ((uint64_t)i));
 		    }
 		}
 		break;
+
+	    case ExprOpStore:
+		if(oper->operand[1]->type == ExprImm) {
+		    auto addr = std::static_pointer_cast<BytVec>(
+			    oper->operand[1]);
+		    auto size = oper->operand[2]->size;
+
+		    assert(size % 8 == 0);
+		    
+		    auto mem_it = store.find(oper->operand[0]);
+		    if(mem_it == store.end()) {
+			mem_it = store.insert(std::make_pair(
+				    oper->operand[0],
+				    std::unordered_set<uint64_t>())).first;
+		    }
+		    for(i = 0; i < size / 8; i++) {
+			mem_it->second.insert(addr->data + ((uint64_t)i));
+		    }
+		}
+		break;
+
 	    default:
 		break;
 	}
+
 	return 1;
     }
     int ActiveVisitor::post_visit(const refCond &cond) {
 	return 1;
     }
 
+    std::vector<refExpr> ActiveSolver::get_mem_layer(const refState &state) {
+	refExpr mem = state->mem;
+	std::vector<refExpr> ret;
+
+	while(mem->type != ExprMem) {
+	    ret.push_back(mem);
+	    mem = std::static_pointer_cast<Operator>(mem)->operand[0];
+	}
+	ret.push_back(mem);
+
+	std::reverse(ret.begin(),ret.end());
+	return ret;
+    }
     bool ActiveSolver::solve(
+	    const refState &state,
 	    const std::unordered_set<refCond> &target_constr,
 	    const std::unordered_set<refCond> &constr,
 	    std::unordered_map<refExpr,uint64_t> *concrete
     ) {
 	ActiveVisitor inact_vis;
 	std::unordered_set<refCond> act_constr;
+	refAddrSpace as = state->as;
 
 	inact_vis.iter_walk(target_constr.begin(),target_constr.end());
 	for(auto it = concrete->begin(); it != concrete->end(); it++) {
 	    inact_vis.walk(it->first);
 	}
+
+	/*
+	auto mem_layer = get_mem_layer(state);
+	for(i = 0; i < mem_layer.size(); i++) {
+	    auto &mem = mem_layer[i];
+	    auto sel_it = inact_vis.select.find(mem);
+	    auto str_it = inact_vis.store.find(mem);
+
+	    if(sel_it != inact_vis.select.end()) {
+		for(
+		    auto addr_it = sel_it->second.begin();
+		    addr_it != sel_it->second.end();
+		    addr_it++
+		) {
+		    auto addr = *addr_it;
+		    dbg("sel %08lx\n",addr);
+		}
+	    }
+	    if(str_it != inact_vis.store.end()) {
+		for(
+		    auto addr_it = str_it->second.begin();
+		    addr_it != str_it->second.end();
+		    addr_it++
+		) {
+		    auto addr = *addr_it;
+		    dbg("str %08lx\n",addr);
+		}
+	    }
+	    dbg("--------\n");
+	}
+	*/
 
 	act_constr = target_constr;
 
@@ -397,6 +474,14 @@ namespace symx {
 		it++
 	    ) {
 		auto addr = *it;
+
+		if(as->mem_constr.find(*cond_it) == as->mem_constr.end()) {
+		    if(as->mem_symbol.find(addr) ==
+			    state->as->mem_symbol.end()) {
+			continue;
+		    }
+		}
+
 		if(inact_vis.select_addr.find(addr) !=
 			inact_vis.select_addr.end()) {
 		    act_constr.insert(*cond_it);
@@ -405,7 +490,7 @@ namespace symx {
 	    }
 	}
 
-	dbg("%d %d\n",constr.size(),act_constr.size());
+	dbg("%d %d %d %d %d\n",target_constr.size(),state->select_set.size(),concrete->size(),constr.size(),act_constr.size());
 
 	return solver->solve(act_constr,concrete);
     }
@@ -465,18 +550,21 @@ namespace symx {
 	    next_flag.push_back(build_vis->get_cond(*it));
 	}
 
-	//TODO remove same select record
 	//copy old store record
 	next_strseq = cstate->store_seq;
 	//get memory record
 	build_vis->get_mem_record(&next_selset,&next_strseq);   
 	//handle solid select address
+	std::unordered_set<refMemRecord> tmp_selset;
 	for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
 	    if((*it)->idx->type == ExprImm) {
 		auto addr = std::static_pointer_cast<BytVec>((*it)->idx)->data;
 		cas->handle_select(addr,(*it)->size);
+	    } else {
+		tmp_selset.insert(*it);
 	    }
 	}
+	next_selset = tmp_selset;
 	//merge old select record
 	next_selset.insert(cstate->select_set.begin(),cstate->select_set.end());
 
@@ -517,7 +605,7 @@ namespace symx {
 	while(true) {
 	    //solve
 
-	    if(!act_solver->solve(target_constr,constr,&concrete)) {
+	    if(!act_solver->solve(cstate,target_constr,constr,&concrete)) {
 		break;	
 	    }
 	    next_rawpc = concrete[next_exrpc];
@@ -624,7 +712,7 @@ namespace symx {
 		    it != cas->mem_symbol.end();
 		    it++
 		) {
-		    dbg("%x\n",concrete[it->second]);
+		    dbg("mem symbol %08lx %x\n",it->first,concrete[it->second]);
 		}
 
 		dbg("long path %d\n",count);
