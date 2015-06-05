@@ -106,13 +106,11 @@ namespace symx {
 		: Expr(old->type,old->size),data(old->data) {}
 	    int pre_accept(ExprVisitor *visitor) {
 		return visitor->pre_visit(
-			std::static_pointer_cast<BytVec>(
-			    shared_from_this()));
+			std::static_pointer_cast<BytVec>(shared_from_this()));
 	    }
 	    int post_accept(ExprVisitor *visitor) {
 		return visitor->post_visit(
-			std::static_pointer_cast<BytVec>(
-			    shared_from_this()));
+			std::static_pointer_cast<BytVec>(shared_from_this()));
 	    }
 	    BytVec(const unsigned int _size,const unsigned int _index) :
 		Expr(ExprDangle,_size),index(_index) {}
@@ -120,21 +118,18 @@ namespace symx {
 		Expr(ExprImm,_size),data(imm) {}
 	    BytVec(const unsigned int _size,Context *ctx);
 	    static refBytVec create_dangle(
-		    const unsigned int size,
+                    const unsigned int size,
 		    const unsigned int index
-		    ) {
+	    ) {
 		return ref<BytVec>(size,index);
 	    }
 	    static refBytVec create_imm(
 		    const unsigned int size,
 		    const uint64_t imm
-		    ) {
+	    ) {
 		return ref<BytVec>(size,imm);
 	    }
-	    static refBytVec create_var(
-		    const unsigned int size,
-		    Context *ctx
-		    ) {
+	    static refBytVec create_var(const unsigned int size,Context *ctx) {
 		return ref<BytVec>(size,ctx);
 	    }
     };
@@ -148,13 +143,11 @@ namespace symx {
 		: Expr(old->type,old->size),index(old->index) {}
 	    int pre_accept(ExprVisitor *visitor) {
 		return visitor->pre_visit(
-			std::static_pointer_cast<BytMem>(
-			    shared_from_this()));
+			std::static_pointer_cast<BytMem>(shared_from_this()));
 	    }
 	    int post_accept(ExprVisitor *visitor) {
 		return visitor->post_visit(
-			std::static_pointer_cast<BytMem>(
-			    shared_from_this()));
+			std::static_pointer_cast<BytMem>(shared_from_this()));
 	    }
 	    BytMem(const unsigned int _index)
 		: Expr(ExprDangle,0),index(_index) {}
@@ -174,26 +167,26 @@ namespace symx {
 	    const unsigned int op_count;
 
 	    Operator(
-		    const enum ExprType op_type,
+                    const enum ExprType op_type,
 		    const unsigned int _size,
 		    const refExpr &op1
-		    ) : Expr(op_type,_size),op_count(1) {
+	    ) : Expr(op_type,_size),op_count(1) {
 		operand[0] = op1;
 	    }
 	    Operator(
 		    const enum ExprType op_type,
 		    const unsigned int _size,
 		    const refExpr &op1,
-		    const refExpr &op2
-		    ) : Expr(op_type,_size),op_count(2) {
+		    const refExpr &op2)
+                : Expr(op_type,_size),op_count(2) {
 		operand[0] = op1;
 		operand[1] = op2;
 	    }
 	    Operator(
 		    const refExpr &mem,
 		    const refExpr &idx,
-		    const refExpr &val
-		    ) : Expr(ExprOpStore,0),op_count(3) {
+		    const refExpr &val)
+                : Expr(ExprOpStore,0),op_count(3) {
 		operand[0] = mem;
 		operand[1] = idx;
 		operand[2] = val;
@@ -201,36 +194,34 @@ namespace symx {
 	    Operator(
 		    const unsigned int _size,
 		    const refExpr &mem,
-		    const refExpr &idx
-		    ) : Expr(ExprOpSelect,_size),op_count(2) {
+		    const refExpr &idx)
+                : Expr(ExprOpSelect,_size),op_count(2) {
 		operand[0] = mem;
 		operand[1] = idx;
 	    }
 	    Operator(
 		    const unsigned int _size,
 		    const refExpr &op1,
-		    const unsigned int _start
-		    ) : Expr(ExprOpExtract,_size),start(_start),op_count(1) {
+		    const unsigned int _start)
+                : Expr(ExprOpExtract,_size),start(_start),op_count(1) {
 		operand[0] = op1;
 	    }
 	    Operator(
 		    const unsigned int _size,
 		    const refCond &_cond,
 		    const refExpr &op1,
-		    const refExpr &op2
-		    ) : Expr(ExprOpIte,_size),cond(_cond),op_count(2) {
+		    const refExpr &op2)
+                : Expr(ExprOpIte,_size),cond(_cond),op_count(2) {
 		operand[0] = op1;
 		operand[1] = op2;
 	    }
 	    int pre_accept(ExprVisitor *visitor) {
 		return visitor->pre_visit(
-			std::static_pointer_cast<Operator>(
-			    shared_from_this()));
+			std::static_pointer_cast<Operator>(shared_from_this()));
 	    }
 	    int post_accept(ExprVisitor *visitor) {
 		return visitor->post_visit(
-			std::static_pointer_cast<Operator>(
-			    shared_from_this()));
+			std::static_pointer_cast<Operator>(shared_from_this()));
 	    }
     };
 
@@ -265,23 +256,23 @@ namespace symx {
 
 	    Cond(
 		    const enum CondType _type,
-		    const refCond &op1
-		) : type(_type),expr_count(0),cond_count(1) {
+		    const refCond &op1)
+                : type(_type),expr_count(0),cond_count(1) {
 		cond[0] = op1;
 	    }
 	    Cond(
 		    const enum CondType _type,
 		    const refCond &op1,
-		    const refCond &op2
-		) : type(_type),expr_count(0),cond_count(2) {
+		    const refCond &op2)
+                : type(_type),expr_count(0),cond_count(2) {
 		cond[0] = op1;
 		cond[1] = op2;
 	    }
 	    Cond(
 		    const refCond &op1,
 		    const refCond &op2,
-		    const refCond &op3
-		) : type(CondIte),expr_count(0),cond_count(3) {
+		    const refCond &op3)
+                : type(CondIte),expr_count(0),cond_count(3) {
 		cond[0] = op1;
 		cond[1] = op2;
 		cond[2] = op3;
@@ -289,28 +280,26 @@ namespace symx {
 	    Cond(
 		    const enum CondType _type,
 		    const refExpr &op1,
-		    const refExpr &op2
-		) : type(_type),expr_count(2),cond_count(0) {
+		    const refExpr &op2)
+                : type(_type),expr_count(2),cond_count(0) {
 		expr[0] = op1;
 		expr[1] = op2;
 	    }
 	    int pre_accept(ExprVisitor *visitor) {
 		return visitor->pre_visit(
-			std::static_pointer_cast<Cond>(
-			    shared_from_this()));
+			std::static_pointer_cast<Cond>(shared_from_this()));
 	    }
 	    int post_accept(ExprVisitor *visitor) {
 		return visitor->post_visit(
-			std::static_pointer_cast<Cond>(
-			    shared_from_this()));
+			std::static_pointer_cast<Cond>(shared_from_this()));
 	    }
 	    Cond(const unsigned int _index) :
 		type(CondDangle),
 		expr_count(0),
 		cond_count(0),
 		index(_index) {}
-	    Cond(const enum CondType _type) :
-		type(_type),expr_count(0),cond_count(0) {}
+	    Cond(const enum CondType _type)
+                : type(_type),expr_count(0),cond_count(0) {}
 	    static refCond create_dangle(const unsigned int index) {
 		return ref<Cond>(index);
 	    }

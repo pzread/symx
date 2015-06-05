@@ -3,9 +3,10 @@
 #include<assert.h>
 #include<vector>
 #include<memory>
-#include<unordered_map>
-#include<algorithm>
 #include<bitset>
+#include<unordered_map>
+#include<unordered_set>
+#include<algorithm>
 #include<capstone/capstone.h>
 
 #include"utils.h"
@@ -29,6 +30,7 @@ namespace symx {
 	    }
     };
     static std::priority_queue<refState,std::vector<refState>,Compare> worklist;
+    //static std::queue<refState> worklist;
 
     refExpr BuildVisitor::get_expr(const refExpr &expr) {
 	auto it = expr_map.find(expr);
@@ -242,7 +244,7 @@ namespace symx {
 
 	return retexr;
     }
-    refExpr BuildVisitor::solid_mem_read(const refOperator &oper) {
+    /*refExpr BuildVisitor::solid_mem_read(const refOperator &oper) {
 	refExpr retexr = oper;
 	unsigned int i;
 	refExpr memexr;
@@ -311,186 +313,190 @@ namespace symx {
 	delete bitmap;
 
 	return retexr;
-    }
+    }*/
 
+    const std::vector<uint64_t>& ActiveVisitor::get_expr_addr(
+            const refExpr &expr
+    ) {
+        auto it = cache_expr.find(expr);
+
+        assert(it != cache_expr.end());
+
+        return it->second;
+    }
+    const std::vector<uint64_t>& ActiveVisitor::get_cond_addr(
+            const refCond &cond
+    ) {
+        auto it = cache_cond.find(cond);
+
+        assert(it != cache_cond.end());
+
+        return it->second;
+    }
     int ActiveVisitor::pre_visit(const refBytVec &vec) {
-	if(visited_exr.find(vec) != visited_exr.end()) {
+	if(cache_expr.find(vec) != cache_expr.end()) {
 	    return 0;
 	}
-	visited_exr.insert(vec);
 	return 1;
     }
     int ActiveVisitor::pre_visit(const refBytMem &mem) {
-	if(visited_exr.find(mem) != visited_exr.end()) {
+	if(cache_expr.find(mem) != cache_expr.end()) {
 	    return 0;
 	}
-	visited_exr.insert(mem);
 	return 1;
     }
     int ActiveVisitor::pre_visit(const refOperator &oper) {
-	if(visited_exr.find(oper) != visited_exr.end()) {
+	if(cache_expr.find(oper) != cache_expr.end()) {
 	    return 0;
 	}
-	visited_exr.insert(oper);
 	return 1;
     }
     int ActiveVisitor::pre_visit(const refCond &cond) {
-	if(visited_cond.find(cond) != visited_cond.end()) {
+	if(cache_cond.find(cond) != cache_cond.end()) {
 	    return 0;
 	}
-	visited_cond.insert(cond);
 	return 1;
     }
     int ActiveVisitor::post_visit(const refBytVec &vec) {
+	cache_expr[vec] = {};
 	return 1;
     }
     int ActiveVisitor::post_visit(const refBytMem &mem) {
+        cache_expr[mem] = {};
 	return 1;
     }
     int ActiveVisitor::post_visit(const refOperator &oper) {
 	unsigned int i;
 
-	switch(oper->type) {
-	    case ExprOpSelect:
-		if(oper->operand[1]->type == ExprImm) {
-		    auto addr = std::static_pointer_cast<BytVec>(
-			    oper->operand[1]);
-		    auto size = oper->size;
+        auto cache_set = &cache_expr.insert(
+                std::make_pair(oper,std::vector<uint64_t>())).first->second;
+        for(i = 0; i < oper->op_count; i++) {
+            auto it = cache_expr.find(oper->operand[i]);
 
-		    assert(size % 8 == 0);
+            assert(it != cache_expr.end());
 
-		    auto mem_it = select.find(oper->operand[0]);
-		    if(mem_it == select.end()) {
-			mem_it = select.insert(std::make_pair(
-				    oper->operand[0],
-				    std::unordered_set<uint64_t>())).first;
-		    }
-		    for(i = 0; i < size / 8; i++) {
-			select_addr.insert(addr->data + ((uint64_t)i));
-			mem_it->second.insert(addr->data + ((uint64_t)i));
-		    }
-		}
-		break;
+            cache_set->insert(
+                    cache_set->end(),
+                    it->second.begin(),
+                    it->second.end());
+        }
 
-	    case ExprOpStore:
-		if(oper->operand[1]->type == ExprImm) {
-		    auto addr = std::static_pointer_cast<BytVec>(
-			    oper->operand[1]);
-		    auto size = oper->operand[2]->size;
+        if(oper->type == ExprOpIte) {
+            auto it = cache_cond.find(oper->cond);
 
-		    assert(size % 8 == 0);
-		    
-		    auto mem_it = store.find(oper->operand[0]);
-		    if(mem_it == store.end()) {
-			mem_it = store.insert(std::make_pair(
-				    oper->operand[0],
-				    std::unordered_set<uint64_t>())).first;
-		    }
-		    for(i = 0; i < size / 8; i++) {
-			mem_it->second.insert(addr->data + ((uint64_t)i));
-		    }
-		}
-		break;
+            assert(it != cache_cond.end());
 
-	    default:
-		break;
-	}
+            cache_set->insert(
+                    cache_set->end(),
+                    it->second.begin(),
+                    it->second.end());
+        }
+
+        /*
+        if(oper->type == ExprOpStore) {
+            if(oper->operand[2]->type == ExprOpSelect) {
+	        auto immexr = std::static_pointer_cast<BytVec>(std::static_pointer_cast<Operator>(oper->operand[2])->operand[1]);
+                assert(immexr->data > 0x3000);
+            }
+        }
+        */
+
+        if(oper->type == ExprOpSelect && oper->operand[1]->type == ExprImm) {
+	    auto immexr = std::static_pointer_cast<BytVec>(oper->operand[1]);
+
+            for(i = 0; i < oper->size / 8; i++) {
+                cache_set->insert(cache_set->end(),immexr->data + (uint64_t)i);
+            }
+        }
+
+        std::sort(cache_set->begin(),cache_set->end());
+        auto last_it = std::unique(cache_set->begin(),cache_set->end());
+        cache_set->erase(last_it,cache_set->end());
 
 	return 1;
     }
     int ActiveVisitor::post_visit(const refCond &cond) {
+        unsigned int i;
+
+        auto cache_set = &cache_cond.insert(
+                std::make_pair(cond,std::vector<uint64_t>())).first->second;
+        for(i = 0; i < cond->expr_count; i++) {
+            auto it = cache_expr.find(cond->expr[i]);
+
+            assert(it != cache_expr.end());
+
+            cache_set->insert(
+                    cache_set->end(),
+                    it->second.begin(),
+                    it->second.end());
+        }
+        for(i = 0; i < cond->cond_count; i++) {
+            auto it = cache_cond.find(cond->cond[i]);
+
+            assert(it != cache_cond.end());
+
+            cache_set->insert(
+                    cache_set->end(),
+                    it->second.begin(),
+                    it->second.end());
+        }
+
+        std::sort(cache_set->begin(),cache_set->end());
+        auto last_it = std::unique(cache_set->begin(),cache_set->end());
+        cache_set->erase(last_it,cache_set->end());
+        
 	return 1;
     }
 
-    std::vector<refExpr> ActiveSolver::get_mem_layer(const refState &state) {
-	refExpr mem = state->mem;
-	std::vector<refExpr> ret;
-
-	while(mem->type != ExprMem) {
-	    ret.push_back(mem);
-	    mem = std::static_pointer_cast<Operator>(mem)->operand[0];
-	}
-	ret.push_back(mem);
-
-	std::reverse(ret.begin(),ret.end());
-	return ret;
-    }
     bool ActiveSolver::solve(
-	    const refState &state,
 	    const std::unordered_set<refCond> &target_constr,
 	    const std::unordered_set<refCond> &constr,
 	    std::unordered_map<refExpr,uint64_t> *concrete
     ) {
-	ActiveVisitor inact_vis;
 	std::unordered_set<refCond> act_constr;
-	refAddrSpace as = state->as;
+        std::vector<uint64_t> in_addr;
 
-	inact_vis.iter_walk(target_constr.begin(),target_constr.end());
-	for(auto it = concrete->begin(); it != concrete->end(); it++) {
-	    inact_vis.walk(it->first);
-	}
+        act_vis.iter_walk(target_constr.begin(),target_constr.end());
+        for(auto it = target_constr.begin(); it != target_constr.end(); it++) {
+            act_vis.walk(*it);
 
-	/*
-	auto mem_layer = get_mem_layer(state);
-	for(i = 0; i < mem_layer.size(); i++) {
-	    auto &mem = mem_layer[i];
-	    auto sel_it = inact_vis.select.find(mem);
-	    auto str_it = inact_vis.store.find(mem);
+            const auto &tmpvec = act_vis.get_cond_addr(*it);
+            in_addr.insert(in_addr.end(),tmpvec.begin(),tmpvec.end());
+        }
+        for(auto it = concrete->begin(); it != concrete->end(); it++) {
+            act_vis.walk(it->first);
 
-	    if(sel_it != inact_vis.select.end()) {
-		for(
-		    auto addr_it = sel_it->second.begin();
-		    addr_it != sel_it->second.end();
-		    addr_it++
-		) {
-		    auto addr = *addr_it;
-		    dbg("sel %08lx\n",addr);
-		}
-	    }
-	    if(str_it != inact_vis.store.end()) {
-		for(
-		    auto addr_it = str_it->second.begin();
-		    addr_it != str_it->second.end();
-		    addr_it++
-		) {
-		    auto addr = *addr_it;
-		    dbg("str %08lx\n",addr);
-		}
-	    }
-	    dbg("--------\n");
-	}
-	*/
+            const auto &tmpvec = act_vis.get_expr_addr(it->first);
+            in_addr.insert(in_addr.end(),tmpvec.begin(),tmpvec.end());
+        }
+        std::sort(in_addr.begin(),in_addr.end());
+        auto last_it = std::unique(in_addr.begin(),in_addr.end());
+        in_addr.erase(last_it,in_addr.end());
 
 	act_constr = target_constr;
+        //act_constr.insert(constr.begin(),constr.end());
 
 	for(auto cond_it = constr.begin(); cond_it != constr.end(); cond_it++) {
-	    ActiveVisitor outact_vis;
+            act_vis.walk(*cond_it);
 
-	    outact_vis.walk(*cond_it);
+            const auto &out_addr = act_vis.get_cond_addr(*cond_it);
 
-	    for(
-		auto it = outact_vis.select_addr.begin();
-		it != outact_vis.select_addr.end();
-		it++
-	    ) {
-		auto addr = *it;
-
-		if(as->mem_constr.find(*cond_it) == as->mem_constr.end()) {
-		    if(as->mem_symbol.find(addr) ==
-			    state->as->mem_symbol.end()) {
-			continue;
-		    }
-		}
-
-		if(inact_vis.select_addr.find(addr) !=
-			inact_vis.select_addr.end()) {
+            auto in_it = in_addr.begin();
+            auto out_it = out_addr.begin();
+            while(in_it != in_addr.end() && out_it != out_addr.end()) {
+                if(*in_it == *out_it) {
 		    act_constr.insert(*cond_it);
 		    break;
-		}
-	    }
+                }
+                if(*in_it < *out_it) {
+                    in_it++;
+                } else {
+                    out_it++;
+                }
+            }
 	}
 
-	dbg("%d %d %d %d %d\n",target_constr.size(),state->select_set.size(),concrete->size(),constr.size(),act_constr.size());
+	dbg("%d %d %d %d\n",in_addr.size(),concrete->size(),constr.size(),act_constr.size());
 
 	return solver->solve(act_constr,concrete);
     }
@@ -550,21 +556,18 @@ namespace symx {
 	    next_flag.push_back(build_vis->get_cond(*it));
 	}
 
+	//TODO remove same select record
 	//copy old store record
 	next_strseq = cstate->store_seq;
 	//get memory record
 	build_vis->get_mem_record(&next_selset,&next_strseq);   
 	//handle solid select address
-	std::unordered_set<refMemRecord> tmp_selset;
 	for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
 	    if((*it)->idx->type == ExprImm) {
 		auto addr = std::static_pointer_cast<BytVec>((*it)->idx)->data;
 		cas->handle_select(addr,(*it)->size);
-	    } else {
-		tmp_selset.insert(*it);
 	    }
 	}
-	next_selset = tmp_selset;
 	//merge old select record
 	next_selset.insert(cstate->select_set.begin(),cstate->select_set.end());
 
@@ -599,13 +602,11 @@ namespace symx {
 	    concrete[*it] = 0;
 	}*/
 
-	ActiveSolver *act_solver = new ActiveSolver(ctx->solver,cas);
 	target_constr.insert(jmp_cond);
 
 	while(true) {
 	    //solve
-
-	    if(!act_solver->solve(cstate,target_constr,constr,&concrete)) {
+	    if(!act_solver->solve(target_constr,constr,&concrete)) {
 		break;	
 	    }
 	    next_rawpc = concrete[next_exrpc];
@@ -693,7 +694,7 @@ namespace symx {
 
 	    maxlen = std::max(maxlen,nstate->path.size());
 	    dbg("maxlen %lu\n",maxlen);
-	    if(nstate->path.size() >= 1000) {
+	    if(nstate->path.size() >= 2000) {
 		for(
 		    auto it = cas->mem_symbol.begin();
 		    it != cas->mem_symbol.end();
@@ -707,13 +708,20 @@ namespace symx {
 		    dbg("path %08lx\n",nstate->path[j]);
 		}
 
+                std::map<uint64_t,uint64_t> tmpmap;
 		for(
 		    auto it = cas->mem_symbol.begin();
 		    it != cas->mem_symbol.end();
 		    it++
 		) {
-		    dbg("mem symbol %08lx %x\n",it->first,concrete[it->second]);
+                    bool ret = tmpmap.insert(std::make_pair(it->first,concrete[it->second])).second;
+                    if(ret == false) {
+                        err("duplicate symbol %08lx\n",it->first);
+                    }
 		}
+                for(auto it = tmpmap.begin(); it != tmpmap.end(); it++) {
+		    dbg("sym %08lx %x\n",it->first,it->second);
+                }
 
 		dbg("long path %d\n",count);
 		exit(0);
@@ -724,16 +732,13 @@ namespace symx {
 	    target_constr.insert(cond_not(cond_pc));
 	}
 
-	delete act_solver;
-
 	return statelist;
     }
     int Executor::execute() {
-	uint64_t target_rawpc = 0x08048B7F;
+	uint64_t target_rawpc = 0x08048f0f;
 
 	refSnapshot snap;
 	std::unordered_map<ProgCtr,std::vector<refBlock> > block_cache;
-	//std::queue<refState> worklist;
 	refState nstate,cstate;
 	std::vector<refBlock> blklist;
 	refBlock cblk;
@@ -756,6 +761,9 @@ namespace symx {
 	}
 	snap = vm->event_suspend();
 
+        //Init ActiveSolver
+	act_solver = new ActiveSolver(ctx->solver);
+
 	auto base_as = ref<AddrSpace>(ctx,snap);
 	nstate = ref<State>(
 		ProgCtr(target_rawpc,CS_MODE_32),
@@ -771,7 +779,7 @@ namespace symx {
 	    worklist.pop();
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
 
-	    dbg("length %u\n",cstate->length);
+	    dbg("length %u state %u\n",cstate->length,count);
 
 	    count++;
 
@@ -800,11 +808,9 @@ namespace symx {
 	    }
 
 	    delete build_vis;
-
-	    /*if(cstate->pc.rawpc == 0x8048b69) {
-		break;
-	    }*/
 	}
+
+        delete act_solver;
 
 	ctx->destroy_vm(vm);
 	return 0;

@@ -45,6 +45,7 @@ namespace symx {
 		    const std::vector<refCond> _flag)
 		: mem(_mem),reg(_reg),flag(_flag) {}
     };
+
     class State : public BaseState {
 	public:
 	    const ProgCtr pc;
@@ -91,7 +92,7 @@ namespace symx {
 	    std::vector<refMemRecord> store_seq;
 
 	    refExpr solid_operator(const refOperator &oper);
-	    refExpr solid_mem_read(const refOperator &oper);
+	    //refExpr solid_mem_read(const refOperator &oper);
 
 	public:
 	    BuildVisitor(Solver *_solver,const refState &_state)
@@ -113,14 +114,12 @@ namespace symx {
 
     class ActiveVisitor : public ExprVisitor {
 	private:
-	    std::unordered_set<refExpr> visited_exr;
-	    std::unordered_set<refCond> visited_cond;
+	    std::unordered_map<refExpr,std::vector<uint64_t>> cache_expr;
+	    std::unordered_map<refCond,std::vector<uint64_t>> cache_cond;
 
 	public:
-	    std::unordered_set<uint64_t> select_addr;
-	    std::unordered_map<refExpr,std::unordered_set<uint64_t>> select;
-	    std::unordered_map<refExpr,std::unordered_set<uint64_t>> store;
-
+            const std::vector<uint64_t>& get_expr_addr(const refExpr &expr);
+            const std::vector<uint64_t>& get_cond_addr(const refCond &cond);
 	    int pre_visit(const refBytVec &vec);
 	    int pre_visit(const refBytMem &mem);
 	    int pre_visit(const refOperator &oper);
@@ -133,15 +132,11 @@ namespace symx {
     class ActiveSolver {
 	private:
 	    Solver *solver;
-	    const refAddrSpace as;
-
-	    std::vector<refExpr> get_mem_layer(const refState &state);
+            ActiveVisitor act_vis;
 
 	public:
-	    ActiveSolver(Solver *_solver,const refAddrSpace &_as)
-		: solver(_solver),as(_as) {}
+	    ActiveSolver(Solver *_solver) : solver(_solver) {}
 	    bool solve(
-		    const refState &state,
 		    const std::unordered_set<refCond> &target_constr,
 		    const std::unordered_set<refCond> &constr,
 		    std::unordered_map<refExpr,uint64_t> *concrete);
@@ -150,6 +145,7 @@ namespace symx {
     class Executor {
 	private:
 	    Context *ctx;
+            ActiveSolver *act_solver;
 
 	    refCond condition_pc(const refExpr &exrpc,const uint64_t rawpc);
 	    std::vector<refState> solve_state(
