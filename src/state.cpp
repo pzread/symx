@@ -734,9 +734,7 @@ namespace symx {
 
 	return statelist;
     }
-    int Executor::execute() {
-	uint64_t target_rawpc = 0x08048f0f;
-
+    int Executor::execute(uint64_t target_rawpc) {
 	refSnapshot snap;
 	std::unordered_map<ProgCtr,std::vector<refBlock> > block_cache;
 	refState nstate,cstate;

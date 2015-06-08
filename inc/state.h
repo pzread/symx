@@ -156,7 +156,7 @@ namespace symx {
 	public:
 	    Executor(Context *_ctx) : ctx(_ctx) {}
 	    ~Executor();
-	    int execute();
+	    int execute(uint64_t target_rawpc);
     };
 }
 

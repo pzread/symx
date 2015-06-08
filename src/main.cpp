@@ -26,7 +26,7 @@ int main() {
     Context *context = new openreil::Context(solver,"./sample");
     Executor *engine = new Executor(context);
 
-    engine->execute();
+    engine->execute(0x08048b7f);
 
     delete context;
     return 0;
