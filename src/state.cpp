@@ -29,8 +29,8 @@ namespace symx {
 		return a->length < b->length;
 	    }
     };
-    static std::priority_queue<refState,std::vector<refState>,Compare> worklist;
-    //static std::queue<refState> worklist;
+    //static std::priority_queue<refState,std::vector<refState>,Compare> worklist;
+    static std::queue<refState> worklist;
 
     refExpr BuildVisitor::get_expr(const refExpr &expr) {
 	auto it = expr_map.find(expr);
@@ -244,13 +244,9 @@ namespace symx {
 
 	return retexr;
     }
-    /*refExpr BuildVisitor::solid_mem_read(const refOperator &oper) {
+    refExpr BuildVisitor::solid_mem_read(const refOperator &oper) {
 	refExpr retexr = oper;
-	unsigned int i;
-	refExpr memexr;
-	uint64_t addr;
-	unsigned int size;
-	int *bitmap;
+        refExpr immexr;
 	std::unordered_set<refCond> constr;
 	std::unordered_map<refExpr,uint64_t> concrete;
 
@@ -260,7 +256,20 @@ namespace symx {
 	    return retexr;
 	}
 
-	addr = std::static_pointer_cast<BytVec>(oper->operand[1])->data;
+        concrete[oper] = 0;
+        if(!solver->solve(constr,&concrete)) {
+            return retexr;
+        }
+        immexr = BytVec::create_imm(oper->size,concrete[oper]);
+        constr.insert(cond_not(cond_eq(oper,immexr)));
+        if(solver->solve(constr,&concrete)) {
+            return retexr;
+        }
+        //retexr = immexr;
+
+	return retexr;
+
+	/*addr = std::static_pointer_cast<BytVec>(oper->operand[1])->data;
 	size = oper->size;
 	memexr = oper->operand[0];
 
@@ -310,10 +319,8 @@ namespace symx {
 	    }
 	}
 
-	delete bitmap;
-
-	return retexr;
-    }*/
+	delete bitmap;*/
+    }
 
     const std::vector<uint64_t>& ActiveVisitor::get_expr_addr(
             const refExpr &expr
@@ -392,15 +399,6 @@ namespace symx {
                     it->second.end());
         }
 
-        /*
-        if(oper->type == ExprOpStore) {
-            if(oper->operand[2]->type == ExprOpSelect) {
-	        auto immexr = std::static_pointer_cast<BytVec>(std::static_pointer_cast<Operator>(oper->operand[2])->operand[1]);
-                assert(immexr->data > 0x3000);
-            }
-        }
-        */
-
         if(oper->type == ExprOpSelect && oper->operand[1]->type == ExprImm) {
 	    auto immexr = std::static_pointer_cast<BytVec>(oper->operand[1]);
 
@@ -456,7 +454,7 @@ namespace symx {
 	std::unordered_set<refCond> act_constr;
         std::vector<uint64_t> in_addr;
 
-        act_vis.iter_walk(target_constr.begin(),target_constr.end());
+        /*act_vis.iter_walk(target_constr.begin(),target_constr.end());
         for(auto it = target_constr.begin(); it != target_constr.end(); it++) {
             act_vis.walk(*it);
 
@@ -471,12 +469,12 @@ namespace symx {
         }
         std::sort(in_addr.begin(),in_addr.end());
         auto last_it = std::unique(in_addr.begin(),in_addr.end());
-        in_addr.erase(last_it,in_addr.end());
+        in_addr.erase(last_it,in_addr.end());*/
 
 	act_constr = target_constr;
-        //act_constr.insert(constr.begin(),constr.end());
+        act_constr.insert(constr.begin(),constr.end());
 
-	for(auto cond_it = constr.begin(); cond_it != constr.end(); cond_it++) {
+	/*for(auto cond_it = constr.begin(); cond_it != constr.end(); cond_it++) {
             act_vis.walk(*cond_it);
 
             const auto &out_addr = act_vis.get_cond_addr(*cond_it);
@@ -494,7 +492,7 @@ namespace symx {
                     out_it++;
                 }
             }
-	}
+	}*/
 
 	dbg("%d %d %d %d\n",in_addr.size(),concrete->size(),constr.size(),act_constr.size());
 
@@ -569,7 +567,7 @@ namespace symx {
 	    }
 	}
 	//merge old select record
-	next_selset.insert(cstate->select_set.begin(),cstate->select_set.end());
+	//next_selset.insert(cstate->select_set.begin(),cstate->select_set.end());
 
 	//initialize reg, flag, constraint
 	constr.insert(jmp_cond);
@@ -694,7 +692,7 @@ namespace symx {
 
 	    maxlen = std::max(maxlen,nstate->path.size());
 	    dbg("maxlen %lu\n",maxlen);
-	    if(nstate->path.size() >= 2000) {
+	    if(nstate->path.size() >= 3200000) {
 		for(
 		    auto it = cas->mem_symbol.begin();
 		    it != cas->mem_symbol.end();
@@ -703,10 +701,6 @@ namespace symx {
 		    concrete[it->second] = 0;
 		}
 		ctx->solver->solve(constr,&concrete);
-
-		for(unsigned int j = 0;j < nstate->path.size();j++) {
-		    dbg("path %08lx\n",nstate->path[j]);
-		}
 
                 std::map<uint64_t,uint64_t> tmpmap;
 		for(
@@ -740,6 +734,8 @@ namespace symx {
 	refState nstate,cstate;
 	std::vector<refBlock> blklist;
 	refBlock cblk;
+
+        FILE *f = fopen("pathlog","w");
 	
 	//Create base component
 	VirtualMachine *vm = ctx->create_vm();
@@ -772,8 +768,8 @@ namespace symx {
 	worklist.push(nstate);
 
 	while(!worklist.empty()) {
-	    cstate = worklist.top();
-	    //cstate = worklist.front();
+	    //cstate = worklist.top();
+	    cstate = worklist.front();
 	    worklist.pop();
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
 
@@ -784,13 +780,19 @@ namespace symx {
 	    auto blklist_it = block_cache.find(cstate->pc);
 	    if(blklist_it == block_cache.end()) {
 		blklist = snap->translate_bb(cstate->pc);
-		if(blklist.size() == 0) {
-		    continue;
-		}
 		block_cache[cstate->pc] = blklist;
 	    } else {
 		blklist = blklist_it->second;
 	    }
+            
+            if(blklist.size() == 0) {
+                unsigned int j;
+                fprintf(f,"\n");
+		for(j = 0; j < cstate->path.size(); j++) {
+		    fprintf(f,"%08lx\n",cstate->path[j]);
+		}
+                fflush(f);
+            }
 
 	    auto build_vis = new BuildVisitor(ctx->solver,cstate);
 
