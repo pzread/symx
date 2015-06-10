@@ -152,6 +152,7 @@ namespace symx {
 		    const refState cstate,
 		    BuildVisitor *build_vis,
 		    const refBlock cblk);
+            int work_dispatch();
 
 	public:
 	    Executor(Context *_ctx) : ctx(_ctx) {}

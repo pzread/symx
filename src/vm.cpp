@@ -13,6 +13,7 @@
 #include<sys/un.h>
 #include<map>
 #include<unordered_map>
+#include<thread>
 #include<capstone/capstone.h>
 
 #define LINUX
@@ -285,6 +286,7 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 	    ret += 1;
 	}
     }
+
     return ret;
 }
 std::vector<refOperator> AddrSpace::source_select(
@@ -309,7 +311,7 @@ std::vector<refOperator> AddrSpace::source_select(
 
 	assert(mem->type == ExprOpStore);
 
-	auto str = std::static_pointer_cast<Operator>(mem);
+	auto str = std::static_pointer_cast<const Operator>(mem);
 	auto idx_it = var.find(str->operand[1]);
 
 	assert(idx_it != var.end());

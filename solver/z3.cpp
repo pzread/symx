@@ -14,24 +14,19 @@ using namespace symx;
 
 namespace z3_solver {
 
-Z3SolvExpr::Z3SolvExpr(
-	Z3_context _context,
-	Z3_ast _ast
-) :
-	context(_context),
-	ast(_ast)
-{
-	Z3_inc_ref(context,ast);
+Z3SolvExpr::Z3SolvExpr(Z3_context _context,Z3_ast _ast)
+    : context(_context),ast(_ast) {
+    Z3_inc_ref(context,ast);
 }
 Z3SolvExpr::~Z3SolvExpr() {
-	Z3_dec_ref(context,ast);
+    Z3_dec_ref(context,ast);
 }
 Z3SolvCond::Z3SolvCond(Z3_context _context,Z3_ast _ast)
-	: context(_context),ast(_ast) {
-	Z3_inc_ref(context,ast);
+    : context(_context),ast(_ast) {
+    Z3_inc_ref(context,ast);
 }
 Z3SolvCond::~Z3SolvCond() {
-	Z3_dec_ref(context,ast);
+    Z3_dec_ref(context,ast);
 }
 Z3TransVisitor::Z3TransVisitor(const Z3Solver *_solver) : solver(_solver) {
 	bvsort1 = Z3_mk_bv_sort(solver->context,8);
@@ -53,37 +48,39 @@ Z3TransVisitor::Z3TransVisitor(const Z3Solver *_solver) : solver(_solver) {
 		Z3_TRUE);
 }
 Z3_ast Z3TransVisitor::expr_to_ast(const refExpr &expr) {
-	if(expr->solvexpr == nullptr) {
+        auto it = cache_expr.find(expr);
+	if(it == cache_expr.end()) {
 		err("expr hasn't been translated\n");
 	}
-	return std::static_pointer_cast<Z3SolvExpr>(expr->solvexpr)->ast;
+	return it->second->ast;
 }
 Z3_ast Z3TransVisitor::cond_to_ast(const refCond &cond) {
-	if(cond->solver_cond == nullptr) {
+        auto it = cache_cond.find(cond);
+        if(it == cache_cond.end()) {
 		err("cond hasn't been translated\n");
 	}
-	return std::static_pointer_cast<Z3SolvCond>(cond->solver_cond)->ast;
+        return it->second->ast;
 }
 int Z3TransVisitor::pre_visit(const refBytVec &vec) {
-	if(vec->solvexpr != nullptr) {
+	if(cache_expr.find(vec) != cache_expr.end()) {
 		return 0;
 	}
 	return 1;
 }
 int Z3TransVisitor::pre_visit(const refBytMem &mem) {
-	if(mem->solvexpr != nullptr) {
+	if(cache_expr.find(mem) != cache_expr.end()) {
 		return 0;
 	}
 	return 1;
 }
 int Z3TransVisitor::pre_visit(const refOperator &oper) {
-	if(oper->solvexpr != nullptr) {
+	if(cache_expr.find(oper) != cache_expr.end()) {
 		return 0;
 	}
 	return 1;
 }
 int Z3TransVisitor::pre_visit(const refCond &cond) {
-	if(cond->solver_cond != nullptr) {
+	if(cache_cond.find(cond) != cache_cond.end()) {
 		return 0;
 	}
 	return 1;
@@ -111,7 +108,7 @@ int Z3TransVisitor::post_visit(const refBytVec &vec) {
 		err("illegal case\n");
 		return -1;
 	}
-	vec->solvexpr = ref<Z3SolvExpr>(solver->context,res_ast);
+        cache_expr[vec] = ref<Z3SolvExpr>(solver->context,res_ast);
 	DECREF(res_ast);
 	return 0;
 }
@@ -134,7 +131,7 @@ int Z3TransVisitor::post_visit(const refBytMem &mem) {
 		err("illegal case\n");
 		return -1;
 	}
-	mem->solvexpr = ref<Z3SolvExpr>(solver->context,res_ast);
+        cache_expr[mem] = ref<Z3SolvExpr>(solver->context,res_ast);
 	DECREF(res_ast);
 	return 0;
 }
@@ -371,9 +368,7 @@ int Z3TransVisitor::post_visit(const refOperator &oper) {
 	INCREF(res_ast);
 	DECREF(old_ast);
 
-	assert(oper->solvexpr == nullptr);
-
-	oper->solvexpr = ref<Z3SolvExpr>(solver->context,res_ast);
+	cache_expr[oper] = ref<Z3SolvExpr>(solver->context,res_ast);
 	DECREF(res_ast);
 	return 0;
 }
@@ -504,9 +499,7 @@ int Z3TransVisitor::post_visit(const refCond &cond) {
 	INCREF(res_ast);
 	DECREF(old_ast);
 
-	assert(cond->solver_cond == nullptr);
-
-	cond->solver_cond = ref<Z3SolvCond>(solver->context,res_ast);
+        cache_cond[cond] = ref<Z3SolvCond>(solver->context,res_ast);
 	DECREF(res_ast);
 	return 0;
 }
@@ -518,35 +511,28 @@ Z3Solver::Z3Solver() {
 	
 	solver = Z3_mk_solver(context);
 	Z3_solver_inc_ref(context,solver);
+
+        trans_vis = new Z3TransVisitor(this);
 }
-symx::ExprVisitor* Z3Solver::create_translator() {
-	return new Z3TransVisitor(this);
+Z3Solver::~Z3Solver() {
+        delete trans_vis;
 }
 bool Z3Solver::solve(
 	const std::unordered_set<refCond> &cons,
 	std::unordered_map<refExpr,uint64_t> *var
 ) {
-	Z3TransVisitor *trans_vis;
-
-	refZ3SolvExpr expr;
 	Z3_model model;
 	Z3_ast res_ast;
-
-	trans_vis = new Z3TransVisitor(this);
 
 	for(auto it = var->begin(); it != var->end(); it++) {
 	    trans_vis->walk(it->first);
 	}
 	trans_vis->iter_walk(cons.begin(),cons.end());
 
-	delete trans_vis;
-
 	Z3_solver_reset(context,solver);
 
 	for(auto it = cons.begin(); it != cons.end(); it++) {
-		auto cond = std::static_pointer_cast<Z3SolvCond>
-			((*it)->solver_cond);
-		Z3_solver_assert(context,solver,cond->ast);
+		Z3_solver_assert(context,solver,trans_vis->cond_to_ast(*it));
 	}
 	if(Z3_solver_check(context,solver) != Z3_TRUE) {
 		return false;
@@ -555,12 +541,10 @@ bool Z3Solver::solve(
 	model = Z3_solver_get_model(context,solver);
 	Z3_model_inc_ref(context,model);
 	for(auto it = var->begin(); it != var->end(); it++) {
-		expr = std::static_pointer_cast<Z3SolvExpr>
-			(it->first->solvexpr);
 		if(Z3_model_eval(
 			context,
 			model,
-			expr->ast,
+			trans_vis->expr_to_ast(it->first),
 			Z3_TRUE,
 			&res_ast
 		) == Z3_FALSE) {

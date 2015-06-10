@@ -10,6 +10,8 @@
 #include<bitset>
 #include<map>
 #include<unordered_map>
+#include<thread>
+#include<mutex>
 
 #include"utils.h"
 #include"expr.h"
@@ -151,6 +153,7 @@ namespace symx {
 	    Context *ctx;
 	    const refSnapshot snap;
 	    std::map<uint64_t,MemPage> page_map;
+            std::mutex access_lock;
 
 	public:
 	    refExpr mem;

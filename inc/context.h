@@ -16,7 +16,6 @@ namespace symx {
 
     class Solver {
 	public:
-	    virtual ExprVisitor* create_translator() = 0;
 	    virtual bool solve(
 		    const std::unordered_set<refCond> &cons,
 		    std::unordered_map<refExpr,uint64_t> *var) = 0;

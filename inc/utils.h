@@ -14,9 +14,8 @@ void internal_info(const char *prefix,const char *fmt,...);
 void internal_dbg(const char *prefix,const char *fmt,...);
 
 template<typename T,typename... Args>
-std::shared_ptr<T> ref(Args&&... args)
-{
-	return std::make_shared<T>(std::forward<Args>(args)...);
+std::shared_ptr<T> ref(Args&&... args) {
+    return std::make_shared<T>(std::forward<Args>(args)...);
 }
 
 //Predefine
@@ -32,7 +31,7 @@ namespace symx {
     class Solver;
     typedef std::shared_ptr<const Snapshot> refSnapshot;
     typedef std::shared_ptr<AddrSpace> refAddrSpace;
-    typedef std::shared_ptr<Block> refBlock;
+    typedef std::shared_ptr<const Block> refBlock;
     typedef std::shared_ptr<State> refState;
     typedef std::shared_ptr<const MemRecord> refMemRecord;
 }

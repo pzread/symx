@@ -16,15 +16,11 @@ namespace symx {
     class Operator;
     class Cond;
     class ExprVisitor;
-    class SolvExpr;
-    class SolvCond;
-    typedef std::shared_ptr<Expr> refExpr;
-    typedef std::shared_ptr<BytVec> refBytVec;
-    typedef std::shared_ptr<BytMem> refBytMem;
-    typedef std::shared_ptr<Operator> refOperator;
-    typedef std::shared_ptr<Cond> refCond;
-    typedef std::shared_ptr<SolvExpr> refSolvExpr;
-    typedef std::shared_ptr<SolvCond> refSolvCond;
+    typedef std::shared_ptr<const Expr> refExpr;
+    typedef std::shared_ptr<const BytVec> refBytVec;
+    typedef std::shared_ptr<const BytMem> refBytMem;
+    typedef std::shared_ptr<const Operator> refOperator;
+    typedef std::shared_ptr<const Cond> refCond;
 
     class ExprVisitor {
 	private:
@@ -42,8 +38,8 @@ namespace symx {
 	    virtual int post_visit(const refOperator &oper) = 0;
 	    virtual int post_visit(const refCond &cond) = 0;
 
-	    int walk(refExpr expr);
-	    int walk(refCond cond);
+	    int walk(const refExpr &expr);
+	    int walk(const refCond &cond);
 
 	    template<class refIt>
 	    int iter_walk(refIt begin,refIt end) {
@@ -53,8 +49,6 @@ namespace symx {
 		return 0;
 	    }
     };
-    class SolvExpr {};
-    class SolvCond {};
 
     enum ExprType {
 	ExprDangle,
@@ -89,11 +83,11 @@ namespace symx {
 	public:
 	    const enum ExprType type;
 	    const unsigned int size;
-	    refSolvExpr solvexpr = nullptr;
+
 	    Expr(const enum ExprType _type,const unsigned int _size)
-		:type(_type),size(_size) {}
-	    virtual int pre_accept(ExprVisitor *visitor) = 0;
-	    virtual int post_accept(ExprVisitor *visitor) = 0;
+                : type(_type),size(_size) {}
+	    virtual int pre_accept(ExprVisitor *visitor) const = 0;
+	    virtual int post_accept(ExprVisitor *visitor) const = 0;
     };
     class BytVec : public Expr {
 	public:
@@ -104,13 +98,15 @@ namespace symx {
 	    };
 	    BytVec(const refBytVec old)
 		: Expr(old->type,old->size),data(old->data) {}
-	    int pre_accept(ExprVisitor *visitor) {
+	    int pre_accept(ExprVisitor *visitor) const {
 		return visitor->pre_visit(
-			std::static_pointer_cast<BytVec>(shared_from_this()));
+			std::static_pointer_cast<const BytVec>(
+                            shared_from_this()));
 	    }
-	    int post_accept(ExprVisitor *visitor) {
+	    int post_accept(ExprVisitor *visitor) const {
 		return visitor->post_visit(
-			std::static_pointer_cast<BytVec>(shared_from_this()));
+			std::static_pointer_cast<const BytVec>(
+                            shared_from_this()));
 	    }
 	    BytVec(const unsigned int _size,const unsigned int _index) :
 		Expr(ExprDangle,_size),index(_index) {}
@@ -141,13 +137,15 @@ namespace symx {
 	    };
 	    BytMem(const refBytMem old)
 		: Expr(old->type,old->size),index(old->index) {}
-	    int pre_accept(ExprVisitor *visitor) {
+	    int pre_accept(ExprVisitor *visitor) const {
 		return visitor->pre_visit(
-			std::static_pointer_cast<BytMem>(shared_from_this()));
+			std::static_pointer_cast<const BytMem>(
+                            shared_from_this()));
 	    }
-	    int post_accept(ExprVisitor *visitor) {
+	    int post_accept(ExprVisitor *visitor) const {
 		return visitor->post_visit(
-			std::static_pointer_cast<BytMem>(shared_from_this()));
+			std::static_pointer_cast<const BytMem>(
+                            shared_from_this()));
 	    }
 	    BytMem(const unsigned int _index)
 		: Expr(ExprDangle,0),index(_index) {}
@@ -215,13 +213,15 @@ namespace symx {
 		operand[0] = op1;
 		operand[1] = op2;
 	    }
-	    int pre_accept(ExprVisitor *visitor) {
+	    int pre_accept(ExprVisitor *visitor) const {
 		return visitor->pre_visit(
-			std::static_pointer_cast<Operator>(shared_from_this()));
+			std::static_pointer_cast<const Operator>(
+                            shared_from_this()));
 	    }
-	    int post_accept(ExprVisitor *visitor) {
+	    int post_accept(ExprVisitor *visitor) const {
 		return visitor->post_visit(
-			std::static_pointer_cast<Operator>(shared_from_this()));
+			std::static_pointer_cast<const Operator>(
+                            shared_from_this()));
 	    }
     };
 
@@ -252,7 +252,6 @@ namespace symx {
 	    unsigned int index;
 	    refCond cond[3];
 	    refExpr expr[2];
-	    refSolvCond solver_cond = nullptr;
 
 	    Cond(
 		    const enum CondType _type,
@@ -285,13 +284,15 @@ namespace symx {
 		expr[0] = op1;
 		expr[1] = op2;
 	    }
-	    int pre_accept(ExprVisitor *visitor) {
+	    int pre_accept(ExprVisitor *visitor) const {
 		return visitor->pre_visit(
-			std::static_pointer_cast<Cond>(shared_from_this()));
+			std::static_pointer_cast<const Cond>(
+                            shared_from_this()));
 	    }
-	    int post_accept(ExprVisitor *visitor) {
+	    int post_accept(ExprVisitor *visitor) const {
 		return visitor->post_visit(
-			std::static_pointer_cast<Cond>(shared_from_this()));
+			std::static_pointer_cast<const Cond>(
+                            shared_from_this()));
 	    }
 	    Cond(const unsigned int _index) :
 		type(CondDangle),
@@ -311,7 +312,10 @@ namespace symx {
 	    }
     };
 
-    refExpr expr_store(const refExpr &mem,const refExpr &idx,const refExpr &val);
+    refExpr expr_store(
+            const refExpr &mem,
+            const refExpr &idx,
+            const refExpr &val);
     refExpr expr_select(
 	    const refExpr &mem,
 	    const refExpr &idx,

@@ -1,5 +1,6 @@
 #define LOG_PREFIX "state"
 
+#include<pthread.h>
 #include<assert.h>
 #include<vector>
 #include<memory>
@@ -7,6 +8,7 @@
 #include<unordered_map>
 #include<unordered_set>
 #include<algorithm>
+#include<future>
 #include<capstone/capstone.h>
 
 #include"utils.h"
@@ -29,8 +31,8 @@ namespace symx {
 		return a->length < b->length;
 	    }
     };
-    //static std::priority_queue<refState,std::vector<refState>,Compare> worklist;
-    static std::queue<refState> worklist;
+    static std::priority_queue<refState,std::vector<refState>,Compare> worklist;
+    //static std::queue<refState> worklist;
 
     refExpr BuildVisitor::get_expr(const refExpr &expr) {
 	auto it = expr_map.find(expr);
@@ -150,17 +152,18 @@ namespace symx {
 		break;
 	}
 
-	bldexr = solid_operator(std::static_pointer_cast<Operator>(bldexr));
+	bldexr = solid_operator(
+                std::static_pointer_cast<const Operator>(bldexr));
 
 	if(bldexr->type == ExprOpSelect) {
-	    auto bldoper = std::static_pointer_cast<Operator>(bldexr);
+	    auto bldoper = std::static_pointer_cast<const Operator>(bldexr);
 	    select_set.insert(ref<MemRecord>(
 			bldoper,
 			bldoper->operand[0],
 			bldoper->operand[1],
 			oper->size));
 	} else if(oper->type == ExprOpStore) {
-	    auto bldoper = std::static_pointer_cast<Operator>(bldexr);
+	    auto bldoper = std::static_pointer_cast<const Operator>(bldexr);
 	    store_seq.push_back(ref<MemRecord>(
 			bldoper,
 			bldoper->operand[0],
@@ -400,7 +403,8 @@ namespace symx {
         }
 
         if(oper->type == ExprOpSelect && oper->operand[1]->type == ExprImm) {
-	    auto immexr = std::static_pointer_cast<BytVec>(oper->operand[1]);
+	    auto immexr = std::static_pointer_cast<const BytVec>(
+                    oper->operand[1]);
 
             for(i = 0; i < oper->size / 8; i++) {
                 cache_set->insert(cache_set->end(),immexr->data + (uint64_t)i);
@@ -562,12 +566,13 @@ namespace symx {
 	//handle solid select address
 	for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
 	    if((*it)->idx->type == ExprImm) {
-		auto addr = std::static_pointer_cast<BytVec>((*it)->idx)->data;
+		auto addr = std::static_pointer_cast<const BytVec>(
+                        (*it)->idx)->data;
 		cas->handle_select(addr,(*it)->size);
 	    }
 	}
 	//merge old select record
-	//next_selset.insert(cstate->select_set.begin(),cstate->select_set.end());
+	next_selset.insert(cstate->select_set.begin(),cstate->select_set.end());
 
 	//initialize reg, flag, constraint
 	constr.insert(jmp_cond);
@@ -692,7 +697,7 @@ namespace symx {
 
 	    maxlen = std::max(maxlen,nstate->path.size());
 	    dbg("maxlen %lu\n",maxlen);
-	    if(nstate->path.size() >= 3200000) {
+	    if(nstate->path.size() >= 1000) {
 		for(
 		    auto it = cas->mem_symbol.begin();
 		    it != cas->mem_symbol.end();
@@ -727,6 +732,23 @@ namespace symx {
 	}
 
 	return statelist;
+    }
+
+    int test(int i) {
+        dbg("%d\n",i);
+        while(1);
+        return i * i;
+    }
+    int Executor::work_dispatch() {
+        int i;
+
+        for(i = 0;i < 8;i++) {
+            std::packaged_task<int(int)> task(test);
+            auto ret = task.get_future();
+            auto t = std::thread(std::move(task),i);
+            t.detach();
+        }
+        return 0;
     }
     int Executor::execute(uint64_t target_rawpc) {
 	refSnapshot snap;
@@ -768,12 +790,14 @@ namespace symx {
 	worklist.push(nstate);
 
 	while(!worklist.empty()) {
-	    //cstate = worklist.top();
-	    cstate = worklist.front();
+	    cstate = worklist.top();
+	    //cstate = worklist.front();
 	    worklist.pop();
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
 
 	    dbg("length %u state %u\n",cstate->length,count);
+
+            //work_dispatch();
 
 	    count++;
 

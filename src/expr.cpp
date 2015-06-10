@@ -11,7 +11,7 @@
 using namespace symx;
 
 namespace symx {
-    int ExprVisitor::walk(refExpr expr) {
+    int ExprVisitor::walk(const refExpr &expr) {
 	unsigned int i;
 
 	if(expr->pre_accept(this) == 0) {
@@ -25,14 +25,14 @@ namespace symx {
 		break;
 	    case ExprOpIte:
 	    {
-		auto oper = std::static_pointer_cast<Operator>(expr);
+		auto oper = std::static_pointer_cast<const Operator>(expr);
 		walk(oper->cond);
 		walk(oper->operand[0]);
 		walk(oper->operand[1]);
 		break;
 	    }
 	    default:
-		auto oper = std::static_pointer_cast<Operator>(expr);
+		auto oper = std::static_pointer_cast<const Operator>(expr);
 		for(i = 0; i < oper->op_count; i++) {
 		    walk(oper->operand[i]);
 		}
@@ -41,7 +41,7 @@ namespace symx {
 
 	return expr->post_accept(this);
     }
-    int ExprVisitor::walk(refCond cond) {
+    int ExprVisitor::walk(const refCond &cond) {
 	unsigned int i;
 
 	if(cond->pre_accept(this) == 0){
@@ -68,24 +68,32 @@ namespace symx {
     BytMem::BytMem(Context *ctx)
 	: Expr(ExprMem,0),id(ctx->get_next_varid()) {}
 
-    refExpr expr_store(const refExpr &mem,const refExpr &idx,const refExpr &val) {
+    refExpr expr_store(
+            const refExpr &mem,
+            const refExpr &idx,
+            const refExpr &val
+    ) {
 	return ref<Operator>(mem,idx,val);
     }
     refExpr expr_select(
 	    const refExpr &mem,
 	    const refExpr &idx,
 	    const unsigned int size
-	    ) {
+    ) {
 	return ref<Operator>(size,mem,idx);
     }
     refExpr expr_extract(
 	    const refExpr &op1,
 	    const unsigned int start,
 	    const unsigned int end
-	    ) {
+    ) {
 	return ref<Operator>(end - start,op1,start);
     }
-    refExpr expr_ite(const refCond &cond,const refExpr &op1,const refExpr &op2) {
+    refExpr expr_ite(
+            const refCond &cond,
+            const refExpr &op1,
+            const refExpr &op2
+    ) {
 	assert(op1->size == op2->size);
 	return ref<Operator>(op1->size,cond,op1,op2);
     }
