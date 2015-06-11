@@ -1,6 +1,7 @@
 #include<vector>
 #include<string>
 #include<unordered_map>
+#include<mutex>
 #include<libopenreil.h>
 
 #include"utils.h"
@@ -40,6 +41,9 @@ namespace openreil {
 	    int mem_read(uint8_t *buf,uint64_t pos,size_t len) const;
     };
     class VirtualMachine : public symx::VirtualMachine {
+        private:
+            std::mutex access_lock;
+
 	public:
 	    uint64_t event_get_pc() const;
 	    symx::refSnapshot event_suspend();

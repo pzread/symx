@@ -113,6 +113,9 @@ symx::refSnapshot VirtualMachine::event_suspend() {
     return ref<Snapshot>(this,reg);
 }
 int VirtualMachine::mem_read(uint8_t *buf,uint64_t pos,size_t len) {
+
+    access_lock.lock();
+
     assert(len < sizeof(com_mem->membuf.buf));
 
     com_mem->membuf.pos = (uint32_t)pos;
@@ -125,6 +128,9 @@ int VirtualMachine::mem_read(uint8_t *buf,uint64_t pos,size_t len) {
     }
 
     memcpy(buf,com_mem->membuf.buf,len);
+
+    access_lock.unlock();
+
     return 0;
 }
 
@@ -137,7 +143,7 @@ Snapshot::Snapshot(VirtualMachine *_vm,const uint64_t *_reg)
     }
 }
 int Snapshot::mem_read(uint8_t *buf,uint64_t pos,size_t len) const {
-    return vm->mem_read(buf,pos,len);
+    return  vm->mem_read(buf,pos,len);
 }
 
 #define MAX_ARG_STR 50

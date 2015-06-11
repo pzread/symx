@@ -8,7 +8,9 @@
 #include<unordered_map>
 #include<unordered_set>
 #include<algorithm>
-#include<future>
+#include<thread>
+#include<mutex>
+#include<condition_variable>
 #include<capstone/capstone.h>
 
 #include"utils.h"
@@ -23,14 +25,17 @@ int count = 0;
 unsigned long maxlen = 0;
 
 namespace symx {
+    static std::mutex test_lock;
     static std::unordered_map<uint64_t,unsigned long> block_length;
-    static std::unordered_map<uint64_t,std::unordered_set<refState>> dep_state;
     class Compare {
 	public:
 	    bool operator() (const refState &a,const refState &b) {
 		return a->length < b->length;
 	    }
     };
+
+    static std::mutex worklist_mutex;
+    static std::condition_variable worklist_ready;
     static std::priority_queue<refState,std::vector<refState>,Compare> worklist;
     //static std::queue<refState> worklist;
 
@@ -498,18 +503,21 @@ namespace symx {
             }
 	}*/
 
-	dbg("%d %d %d %d\n",in_addr.size(),concrete->size(),constr.size(),act_constr.size());
+	//dbg("%d %d %d %d\n",in_addr.size(),concrete->size(),constr.size(),act_constr.size());
 
 	return solver->solve(act_constr,concrete);
     }
 
-    refCond Executor::condition_pc(const refExpr &exrpc,const uint64_t rawpc) {
+    refCond ExecutorWorker::condition_pc(
+            const refExpr &exrpc,
+            const uint64_t rawpc
+    ) {
 	return cond_eq(exrpc,BytVec::create_imm(exrpc->size,rawpc));
     }
-    std::vector<refState> Executor::solve_state(
-	    const refState cstate,
+    std::vector<refState> ExecutorWorker::solve_state(
+	    const refState &cstate,
 	    BuildVisitor *build_vis,
-	    const refBlock cblk
+	    const refBlock &cblk
     ) {
 	std::vector<refState> statelist;
 
@@ -541,6 +549,7 @@ namespace symx {
 	solid_seladdr.clear();
 
 	constr.clear();
+        target_constr.clear();
 	concrete.clear();
 
 	build_vis->walk(cblk->cond);
@@ -577,7 +586,10 @@ namespace symx {
 	//initialize reg, flag, constraint
 	constr.insert(jmp_cond);
 	constr.insert(cstate->constr.begin(),cstate->constr.end());
+
+        cas->access_lock.lock();
 	constr.insert(cas->mem_constr.begin(),cas->mem_constr.end());
+        cas->access_lock.unlock();
 
 	//initialize solver variable
 	//TODO support instruction mode
@@ -623,7 +635,10 @@ namespace symx {
 		}
 	    }
 	    if(as_update) {
+                cas->access_lock.lock();
 		constr.insert(cas->mem_constr.begin(),cas->mem_constr.end());
+                cas->access_lock.unlock();
+
 		/*for(
 		    auto it = cas->mem_symbol.begin();
 		    it != cas->mem_symbol.end();
@@ -656,6 +671,7 @@ namespace symx {
 		dbg("str idx %016lx val %016lx\n",it->first,it->second);
 	    }*/
 
+            //fork state
 	    auto cond_pc = condition_pc(next_exrpc,next_rawpc);
 	    nstate = ref<State>(
 		    ProgCtr(next_rawpc,CS_MODE_32),
@@ -668,13 +684,17 @@ namespace symx {
 	    nstate->select_set = next_selset;
 	    nstate->store_seq = next_strseq;
 
+	    statelist.push_back(nstate);
+	    target_constr.insert(cond_not(cond_pc));
+
+            //Test
 	    auto rawpc = nstate->pc.rawpc;
 
 	    nstate->path = cstate->path;
 	    nstate->path.push_back(rawpc);
 	    nstate->blkmap = cstate->blkmap;
 
-	    dep_state[rawpc].insert(nstate);
+            test_lock.lock();
 
 	    if(nstate->blkmap.find(rawpc) != nstate->blkmap.end()) {
 		auto it = block_length.find(rawpc);
@@ -694,10 +714,15 @@ namespace symx {
 		    nstate->length = it->second;
 		}
 	    }
-
 	    maxlen = std::max(maxlen,nstate->path.size());
+
+            test_lock.unlock();
+
 	    dbg("maxlen %lu\n",maxlen);
-	    if(nstate->path.size() >= 1000) {
+	    if(nstate->path.size() >= 10000) {
+
+                cas->access_lock.lock();
+
 		for(
 		    auto it = cas->mem_symbol.begin();
 		    it != cas->mem_symbol.end();
@@ -705,7 +730,8 @@ namespace symx {
 		) {
 		    concrete[it->second] = 0;
 		}
-		ctx->solver->solve(constr,&concrete);
+
+		solver->solve(constr,&concrete);
 
                 std::map<uint64_t,uint64_t> tmpmap;
 		for(
@@ -718,6 +744,9 @@ namespace symx {
                         err("duplicate symbol %08lx\n",it->first);
                     }
 		}
+
+                cas->access_lock.unlock();
+
                 for(auto it = tmpmap.begin(); it != tmpmap.end(); it++) {
 		    dbg("sym %08lx %x\n",it->first,it->second);
                 }
@@ -725,29 +754,79 @@ namespace symx {
 		dbg("long path %d\n",count);
 		exit(0);
 	    }
-
-	    statelist.push_back(nstate);
-
-	    target_constr.insert(cond_not(cond_pc));
 	}
 
 	return statelist;
     }
 
-    int test(int i) {
-        dbg("%d\n",i);
-        while(1);
-        return i * i;
+    #include"solver/z3.h"
+    static std::mutex queue_mutex;
+    static std::condition_variable queue_ready;
+    static std::queue<std::pair<refState,std::vector<refBlock>>> work_queue;
+    int ExecutorWorker::loop() {
+        solver = new z3_solver::Z3Solver();
+        act_solver = new ActiveSolver(solver);
+
+        while(true) {
+            std::unique_lock<std::mutex> lk(queue_mutex);
+            queue_ready.wait(lk,[]{return !work_queue.empty();});
+
+            auto work  = work_queue.front();
+            work_queue.pop();
+
+            lk.unlock();
+
+            const auto &cstate = work.first;
+            const auto &blklist = work.second;
+
+            auto build_vis = new BuildVisitor(solver,cstate);
+
+	    for(auto blkit = blklist.begin(); blkit != blklist.end(); blkit++) {
+		auto statelist = solve_state(cstate,build_vis,*blkit);
+                {
+                    std::lock_guard<std::mutex> worklist_lk(worklist_mutex);
+
+                    for(auto it = statelist.begin();
+                            it != statelist.end();
+                            it++
+                    ) {
+                        worklist.push(*it);
+                    }
+                }
+                worklist_ready.notify_one();
+	    }
+
+	    delete build_vis;          
+        }
+
+        delete act_solver;
+        delete solver;
+
+        return 0;
     }
-    int Executor::work_dispatch() {
+    int ExecutorWorker::push_work(
+            refState state,
+            std::vector<refBlock> blklist
+    ) {
+        {
+            std::lock_guard<std::mutex> lk(queue_mutex);
+            work_queue.push(std::make_pair(state,blklist));
+        }
+        queue_ready.notify_one();
+
+        return 0;
+    }
+    int Executor::worker_init() {
         int i;
 
-        for(i = 0;i < 8;i++) {
-            std::packaged_task<int(int)> task(test);
-            auto ret = task.get_future();
-            auto t = std::thread(std::move(task),i);
-            t.detach();
+        for(i = 0; i < 16; i++) {
+            std::thread task([]{
+                auto worker = new ExecutorWorker();
+                worker->loop();
+            });
+            task.detach();
         }
+
         return 0;
     }
     int Executor::execute(uint64_t target_rawpc) {
@@ -777,8 +856,7 @@ namespace symx {
 	}
 	snap = vm->event_suspend();
 
-        //Init ActiveSolver
-	act_solver = new ActiveSolver(ctx->solver);
+        worker_init();
 
 	auto base_as = ref<AddrSpace>(ctx,snap);
 	nstate = ref<State>(
@@ -789,16 +867,18 @@ namespace symx {
 		snap->flag);
 	worklist.push(nstate);
 
-	while(!worklist.empty()) {
-	    cstate = worklist.top();
-	    //cstate = worklist.front();
-	    worklist.pop();
+        while(true) {
+            std::unique_lock<std::mutex> lk(worklist_mutex);
+            worklist_ready.wait(lk,[]{return !worklist.empty();});
+
+            cstate = worklist.top();
+            //cstate = worklist.front();
+            worklist.pop();
+
+            lk.unlock();
+
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
-
 	    dbg("length %u state %u\n",cstate->length,count);
-
-            //work_dispatch();
-
 	    count++;
 
 	    auto blklist_it = block_cache.find(cstate->pc);
@@ -818,23 +898,8 @@ namespace symx {
                 fflush(f);
             }
 
-	    auto build_vis = new BuildVisitor(ctx->solver,cstate);
-
-	    for(auto blkit = blklist.begin(); blkit != blklist.end(); blkit++) {
-		auto statelist = solve_state(cstate,build_vis,*blkit);
-
-		for(auto it = statelist.begin();
-			it != statelist.end();
-			it++
-		) {
-		    worklist.push(*it);
-		}
-	    }
-
-	    delete build_vis;
+	    ExecutorWorker::push_work(cstate,blklist);   
 	}
-
-        delete act_solver;
 
 	ctx->destroy_vm(vm);
 	return 0;

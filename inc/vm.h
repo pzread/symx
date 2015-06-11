@@ -10,7 +10,6 @@
 #include<bitset>
 #include<map>
 #include<unordered_map>
-#include<thread>
 #include<mutex>
 
 #include"utils.h"
@@ -153,9 +152,9 @@ namespace symx {
 	    Context *ctx;
 	    const refSnapshot snap;
 	    std::map<uint64_t,MemPage> page_map;
-            std::mutex access_lock;
 
 	public:
+            std::mutex access_lock;
 	    refExpr mem;
 	    std::unordered_map<uint64_t,refBytVec> mem_symbol;
 	    std::unordered_set<refCond> mem_constr;
@@ -163,9 +162,6 @@ namespace symx {
 	    AddrSpace(Context *_ctx,const refSnapshot &_snap);
 	    int read(refState state,uint8_t *buf,uint64_t pos,size_t len);
 	    int handle_select(const uint64_t idx,const unsigned int size);
-	    std::vector<refOperator> source_select(
-		    const refOperator &sel,
-		    const std::unordered_map<refExpr,uint64_t> &var) const;
     };
     class MemRecord : public std::enable_shared_from_this<MemRecord> {
 	public:

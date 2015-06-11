@@ -240,6 +240,8 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
     refBytVec val;
     std::map<uint64_t,MemPage>::iterator page_it;
 
+    access_lock.lock();
+
     assert(size % 8 == 0);
 
     pos = idx;
@@ -287,8 +289,11 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 	}
     }
 
+    access_lock.unlock();
+
     return ret;
 }
+/*
 std::vector<refOperator> AddrSpace::source_select(
 	const refOperator &sel,
 	const std::unordered_map<refExpr,uint64_t> &var
@@ -328,3 +333,4 @@ std::vector<refOperator> AddrSpace::source_select(
 
     return retseq;
 }
+*/

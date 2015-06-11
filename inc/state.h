@@ -6,6 +6,8 @@
 #include<vector>
 #include<memory>
 #include<queue>
+#include<mutex>
+#include<condition_variable>
 
 #include"utils.h"
 #include"expr.h"
@@ -142,17 +144,31 @@ namespace symx {
 		    std::unordered_map<refExpr,uint64_t> *concrete);
     };
 
-    class Executor {
-	private:
-	    Context *ctx;
+    class ExecutorWorker {
+        private:
+            Solver *solver;
             ActiveSolver *act_solver;
 
 	    refCond condition_pc(const refExpr &exrpc,const uint64_t rawpc);
-	    std::vector<refState> solve_state(
-		    const refState cstate,
-		    BuildVisitor *build_vis,
-		    const refBlock cblk);
-            int work_dispatch();
+            std::vector<refState> solve_state(
+                    const refState &cstate,
+                    BuildVisitor *build_vis,
+		    const refBlock &cblk);
+        
+        public:
+            static int push_work(
+                    refState state,
+                    std::vector<refBlock> blklist);
+
+            ExecutorWorker() {}
+            int loop();
+    };
+    class Executor {
+	private:
+	    Context *ctx;
+            std::vector<const ExecutorWorker*> worker_list;
+
+            int worker_init();
 
 	public:
 	    Executor(Context *_ctx) : ctx(_ctx) {}
