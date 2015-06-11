@@ -27,17 +27,11 @@ unsigned long maxlen = 0;
 namespace symx {
     static std::mutex test_lock;
     static std::unordered_map<uint64_t,unsigned long> block_length;
-    class Compare {
-	public:
-	    bool operator() (const refState &a,const refState &b) {
-		return a->length < b->length;
-	    }
-    };
 
-    static std::mutex worklist_mutex;
-    static std::condition_variable worklist_ready;
-    static std::priority_queue<refState,std::vector<refState>,Compare> worklist;
-    //static std::queue<refState> worklist;
+    static std::mutex workvec_mutex;
+    static std::condition_variable workvec_ready;
+    static std::vector<refState> workvec;
+    //static std::queue<refState> workvec;
 
     refExpr BuildVisitor::get_expr(const refExpr &expr) {
 	auto it = expr_map.find(expr);
@@ -762,8 +756,24 @@ namespace symx {
     #include"solver/z3.h"
     static std::mutex queue_mutex;
     static std::condition_variable queue_ready;
-    static std::queue<std::pair<refState,std::vector<refBlock>>> work_queue;
+
+    class Compare {
+	public:
+	    bool operator() (
+                    const std::pair<refState,std::vector<refBlock>> &a,
+                    const std::pair<refState,std::vector<refBlock>> &b
+            ) {
+		return a.first->length < b.first->length;
+	    }
+    };
+    static std::priority_queue<
+        std::pair<refState,std::vector<refBlock>>,
+        std::vector<std::pair<refState,std::vector<refBlock>>>,
+        Compare> work_queue;
+
     int ExecutorWorker::loop() {
+        std::vector<refState> statelist;
+
         solver = new z3_solver::Z3Solver();
         act_solver = new ActiveSolver(solver);
 
@@ -771,7 +781,7 @@ namespace symx {
             std::unique_lock<std::mutex> lk(queue_mutex);
             queue_ready.wait(lk,[]{return !work_queue.empty();});
 
-            auto work  = work_queue.front();
+            auto work  = work_queue.top();
             work_queue.pop();
 
             lk.unlock();
@@ -781,20 +791,16 @@ namespace symx {
 
             auto build_vis = new BuildVisitor(solver,cstate);
 
+            statelist.clear();
 	    for(auto blkit = blklist.begin(); blkit != blklist.end(); blkit++) {
-		auto statelist = solve_state(cstate,build_vis,*blkit);
-                {
-                    std::lock_guard<std::mutex> worklist_lk(worklist_mutex);
-
-                    for(auto it = statelist.begin();
-                            it != statelist.end();
-                            it++
-                    ) {
-                        worklist.push(*it);
-                    }
-                }
-                worklist_ready.notify_one();
+		auto retlist = solve_state(cstate,build_vis,*blkit);
+                statelist.insert(statelist.end(),retlist.begin(),retlist.end());
 	    }
+            {
+                std::lock_guard<std::mutex> workvec_lk(workvec_mutex);
+                workvec.insert(workvec.end(),statelist.begin(),statelist.end());
+            }
+            workvec_ready.notify_one();
 
 	    delete build_vis;          
         }
@@ -813,6 +819,8 @@ namespace symx {
             work_queue.push(std::make_pair(state,blklist));
         }
         queue_ready.notify_one();
+
+        dbg("%d\n",work_queue.size());
 
         return 0;
     }
@@ -865,17 +873,22 @@ namespace symx {
 		base_as->mem,
 		snap->reg,
 		snap->flag);
-	worklist.push(nstate);
+	workvec.push_back(nstate);
 
+        std::vector<refState> tmpvec;
         while(true) {
-            std::unique_lock<std::mutex> lk(worklist_mutex);
-            worklist_ready.wait(lk,[]{return !worklist.empty();});
+            if(tmpvec.size() == 0) {
+                std::unique_lock<std::mutex> lk(workvec_mutex);
+                workvec_ready.wait(lk,[]{return !workvec.empty();});
 
-            cstate = worklist.top();
-            //cstate = worklist.front();
-            worklist.pop();
+                tmpvec = workvec;
+                workvec.clear();
 
-            lk.unlock();
+                lk.unlock();
+            }
+
+            cstate = tmpvec.back();
+            tmpvec.pop_back();
 
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
 	    dbg("length %u state %u\n",cstate->length,count);
