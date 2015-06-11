@@ -11,6 +11,7 @@
 #include<map>
 #include<unordered_map>
 #include<mutex>
+#include<shared_mutex>
 
 #include"utils.h"
 #include"expr.h"
@@ -154,7 +155,7 @@ namespace symx {
 	    std::map<uint64_t,MemPage> page_map;
 
 	public:
-            std::mutex access_lock;
+            std::shared_timed_mutex access_lock;
 	    refExpr mem;
 	    std::unordered_map<uint64_t,refBytVec> mem_symbol;
 	    std::unordered_set<refCond> mem_constr;

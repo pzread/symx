@@ -10,6 +10,7 @@
 #include<algorithm>
 #include<thread>
 #include<mutex>
+#include<shared_mutex>
 #include<condition_variable>
 #include<capstone/capstone.h>
 
@@ -25,7 +26,7 @@ int count = 0;
 unsigned long maxlen = 0;
 
 namespace symx {
-    static std::mutex test_lock;
+    static std::shared_timed_mutex test_lock;
     static std::unordered_map<uint64_t,unsigned long> block_length;
 
     static std::mutex workvec_mutex;
@@ -581,9 +582,9 @@ namespace symx {
 	constr.insert(jmp_cond);
 	constr.insert(cstate->constr.begin(),cstate->constr.end());
 
-        cas->access_lock.lock();
+        cas->access_lock.lock_shared();
 	constr.insert(cas->mem_constr.begin(),cas->mem_constr.end());
-        cas->access_lock.unlock();
+        cas->access_lock.unlock_shared();
 
 	//initialize solver variable
 	//TODO support instruction mode
@@ -629,9 +630,9 @@ namespace symx {
 		}
 	    }
 	    if(as_update) {
-                cas->access_lock.lock();
+                cas->access_lock.lock_shared();
 		constr.insert(cas->mem_constr.begin(),cas->mem_constr.end());
-                cas->access_lock.unlock();
+                cas->access_lock.unlock_shared();
 
 		/*for(
 		    auto it = cas->mem_symbol.begin();
@@ -688,12 +689,20 @@ namespace symx {
 	    nstate->path.push_back(rawpc);
 	    nstate->blkmap = cstate->blkmap;
 
-            test_lock.lock();
+            test_lock.lock_shared();
 
 	    if(nstate->blkmap.find(rawpc) != nstate->blkmap.end()) {
 		auto it = block_length.find(rawpc);
 		if(it == block_length.end()) {
+
+                    test_lock.unlock_shared();
+                    test_lock.lock();
+
 		    block_length[rawpc] = nstate->path.size() - nstate->blkmap[rawpc];
+
+                    test_lock.unlock();
+                    test_lock.lock_shared();
+
 		} else {
 		    it->second = std::max(it->second,nstate->path.size() - nstate->blkmap[rawpc]);
 		}
@@ -710,10 +719,9 @@ namespace symx {
 	    }
 	    maxlen = std::max(maxlen,nstate->path.size());
 
-            test_lock.unlock();
+            test_lock.unlock_shared();
 
-	    dbg("maxlen %lu\n",maxlen);
-	    if(nstate->path.size() >= 10000) {
+	    if(nstate->path.size() >= 1000) {
 
                 cas->access_lock.lock();
 
@@ -820,14 +828,12 @@ namespace symx {
         }
         queue_ready.notify_one();
 
-        dbg("%d\n",work_queue.size());
-
         return 0;
     }
     int Executor::worker_init() {
         int i;
 
-        for(i = 0; i < 16; i++) {
+        for(i = 0; i < 2; i++) {
             std::thread task([]{
                 auto worker = new ExecutorWorker();
                 worker->loop();
@@ -891,7 +897,7 @@ namespace symx {
             tmpvec.pop_back();
 
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
-	    dbg("length %u state %u\n",cstate->length,count);
+	    dbg("length %u state %u maxlen %u\n",cstate->length,count,maxlen);
 	    count++;
 
 	    auto blklist_it = block_cache.find(cstate->pc);

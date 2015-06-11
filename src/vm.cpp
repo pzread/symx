@@ -239,8 +239,9 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
     uint8_t buf[1];
     refBytVec val;
     std::map<uint64_t,MemPage>::iterator page_it;
+    bool exclock = false;
 
-    access_lock.lock();
+    access_lock.lock_shared();
 
     assert(size % 8 == 0);
 
@@ -251,6 +252,12 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 
 	page_it = page_map.find(base);
 	if(page_it == page_map.end()) {
+            if(!exclock) {
+                access_lock.unlock_shared();
+                access_lock.lock();
+                exclock = true;
+            }
+
 	    //err("page out bound\n");
 	    //for test
 	    auto page = MemPage(base,PROT_READ | PROT_WRITE);
@@ -262,6 +269,11 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 	    if(page.dirty.test(off)) {
 		continue;
 	    }
+            if(!exclock) {
+                access_lock.unlock_shared();
+                access_lock.lock();
+                exclock = true;
+            }
 
 	    if(pos < 0x3000) {
 		//for test
@@ -289,7 +301,11 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 	}
     }
 
-    access_lock.unlock();
+    if(!exclock) {
+        access_lock.unlock_shared();
+    } else {
+        access_lock.unlock();
+    }
 
     return ret;
 }
