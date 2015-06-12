@@ -1,6 +1,5 @@
 #define LOG_PREFIX "state"
 
-#include<pthread.h>
 #include<assert.h>
 #include<vector>
 #include<memory>
@@ -8,7 +7,6 @@
 #include<unordered_map>
 #include<unordered_set>
 #include<algorithm>
-#include<future>
 #include<capstone/capstone.h>
 
 #include"utils.h"
@@ -458,7 +456,7 @@ namespace symx {
 	std::unordered_set<refCond> act_constr;
         std::vector<uint64_t> in_addr;
 
-        /*act_vis.iter_walk(target_constr.begin(),target_constr.end());
+        act_vis.iter_walk(target_constr.begin(),target_constr.end());
         for(auto it = target_constr.begin(); it != target_constr.end(); it++) {
             act_vis.walk(*it);
 
@@ -473,12 +471,12 @@ namespace symx {
         }
         std::sort(in_addr.begin(),in_addr.end());
         auto last_it = std::unique(in_addr.begin(),in_addr.end());
-        in_addr.erase(last_it,in_addr.end());*/
+        in_addr.erase(last_it,in_addr.end());
 
 	act_constr = target_constr;
-        act_constr.insert(constr.begin(),constr.end());
+        //act_constr.insert(constr.begin(),constr.end());
 
-	/*for(auto cond_it = constr.begin(); cond_it != constr.end(); cond_it++) {
+	for(auto cond_it = constr.begin(); cond_it != constr.end(); cond_it++) {
             act_vis.walk(*cond_it);
 
             const auto &out_addr = act_vis.get_cond_addr(*cond_it);
@@ -496,7 +494,7 @@ namespace symx {
                     out_it++;
                 }
             }
-	}*/
+	}
 
 	dbg("%d %d %d %d\n",in_addr.size(),concrete->size(),constr.size(),act_constr.size());
 
@@ -597,10 +595,10 @@ namespace symx {
 	    //concrete[(*it)->oper] = 0;
 	    concrete[(*it)->idx] = 0;
 	}
-	for(auto it = next_strseq.begin(); it != next_strseq.end(); it++) {
+	/*for(auto it = next_strseq.begin(); it != next_strseq.end(); it++) {
 	    //concrete[(*it)->oper->operand[2]] = 0;
 	    concrete[(*it)->idx] = 0;
-	}
+	}*/
 	/*for(auto it = next_reg.begin(); it != next_reg.end(); it++) {
 	    concrete[*it] = 0;
 	}*/
@@ -734,22 +732,6 @@ namespace symx {
 	return statelist;
     }
 
-    int test(int i) {
-        dbg("%d\n",i);
-        while(1);
-        return i * i;
-    }
-    int Executor::work_dispatch() {
-        int i;
-
-        for(i = 0;i < 8;i++) {
-            std::packaged_task<int(int)> task(test);
-            auto ret = task.get_future();
-            auto t = std::thread(std::move(task),i);
-            t.detach();
-        }
-        return 0;
-    }
     int Executor::execute(uint64_t target_rawpc) {
 	refSnapshot snap;
 	std::unordered_map<ProgCtr,std::vector<refBlock> > block_cache;
