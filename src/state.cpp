@@ -48,13 +48,8 @@ namespace symx {
 	}
 	return it->second;
     }
-    int BuildVisitor::get_mem_record(
-	    std::unordered_set<refMemRecord> *selset,
-	    std::vector<refMemRecord> *strseq
-    ) {
-	selset->insert(select_set.begin(),select_set.end());
-	strseq->insert(strseq->end(),store_seq.begin(),store_seq.end());
-	return 0;
+    const std::unordered_set<refMemRecord>& BuildVisitor::get_mem_record() {
+        return select_set;
     }
     int BuildVisitor::pre_visit(const refBytVec &vec) {
 	if(expr_map.find(vec) != expr_map.end()) {
@@ -156,13 +151,6 @@ namespace symx {
 	if(bldexr->type == ExprOpSelect) {
 	    auto bldoper = std::static_pointer_cast<const Operator>(bldexr);
 	    select_set.insert(ref<MemRecord>(
-			bldoper,
-			bldoper->operand[0],
-			bldoper->operand[1],
-			oper->size));
-	} else if(oper->type == ExprOpStore) {
-	    auto bldoper = std::static_pointer_cast<const Operator>(bldexr);
-	    store_seq.push_back(ref<MemRecord>(
 			bldoper,
 			bldoper->operand[0],
 			bldoper->operand[1],
@@ -520,7 +508,6 @@ namespace symx {
 	std::vector<refCond> next_flag;
 
 	std::unordered_set<refMemRecord> next_selset;
-	std::vector<refMemRecord> next_strseq;
 	std::vector<uint64_t> solid_seladdr;
 	
 	std::unordered_set<refCond> constr;
@@ -535,7 +522,6 @@ namespace symx {
 	next_flag.clear();
 
 	next_selset.clear();
-	next_strseq.clear();
 	solid_seladdr.clear();
 
 	constr.clear();
@@ -556,21 +542,20 @@ namespace symx {
 	    next_flag.push_back(build_vis->get_cond(*it));
 	}
 
-	//TODO remove same select record
-	//copy old store record
-	next_strseq = cstate->store_seq;
 	//get memory record
-	build_vis->get_mem_record(&next_selset,&next_strseq);   
+	const auto &tmp_selset = build_vis->get_mem_record();
+	//copy old select record
+        next_selset = cstate->select_set;
 	//handle solid select address
-	for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
+	for(auto it = tmp_selset.begin(); it != tmp_selset.end(); it++) {
 	    if((*it)->idx->type == ExprImm) {
 		auto addr = std::static_pointer_cast<const BytVec>(
                         (*it)->idx)->data;
 		cas->handle_select(addr,(*it)->size);
-	    }
+	    } else {
+                next_selset.insert(*it);
+            }
 	}
-	//merge old select record
-	next_selset.insert(cstate->select_set.begin(),cstate->select_set.end());
 
 	//initialize reg, flag, constraint
 	constr.insert(jmp_cond);
@@ -595,10 +580,6 @@ namespace symx {
 	    //concrete[(*it)->oper] = 0;
 	    concrete[(*it)->idx] = 0;
 	}
-	/*for(auto it = next_strseq.begin(); it != next_strseq.end(); it++) {
-	    //concrete[(*it)->oper->operand[2]] = 0;
-	    concrete[(*it)->idx] = 0;
-	}*/
 	/*for(auto it = next_reg.begin(); it != next_reg.end(); it++) {
 	    concrete[*it] = 0;
 	}*/
@@ -664,7 +645,6 @@ namespace symx {
 	    nstate->constr = constr;
 	    nstate->constr.insert(cond_pc);
 	    nstate->select_set = next_selset;
-	    nstate->store_seq = next_strseq;
 
 	    auto rawpc = nstate->pc.rawpc;
 
