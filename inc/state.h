@@ -142,6 +142,7 @@ namespace symx {
 
     class ExecutorWorker {
         private:
+            const int work_id;
             Solver *solver;
             ActiveSolver *act_solver;
 
@@ -152,12 +153,12 @@ namespace symx {
 		    const refBlock &cblk);
         
         public:
+            ExecutorWorker(int _work_id) : work_id(_work_id) {}
+            int loop();
             static int push_work(
+                    int workid,
                     refState state,
                     std::vector<refBlock> blklist);
-
-            ExecutorWorker() {}
-            int loop();
     };
     class Executor {
 	private:

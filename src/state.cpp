@@ -11,6 +11,7 @@
 #include<mutex>
 #include<shared_mutex>
 #include<condition_variable>
+#include<atomic>
 #include<capstone/capstone.h>
 
 #include"utils.h"
@@ -21,7 +22,9 @@
 
 using namespace symx;
 
-int count = 0;
+#define NUM_THD 1
+
+std::atomic_uint count;
 unsigned long maxlen = 0;
 
 namespace symx {
@@ -30,8 +33,7 @@ namespace symx {
 
     static std::mutex workvec_mutex;
     static std::condition_variable workvec_ready;
-    static std::vector<refState> workvec;
-    //static std::queue<refState> workvec;
+    static std::vector<std::pair<int,refState>> workvec;
 
     refExpr BuildVisitor::get_expr(const refExpr &expr) {
 	auto it = expr_map.find(expr);
@@ -198,7 +200,7 @@ namespace symx {
 
 	switch(oper->type) {
 	    case ExprOpSelect:
-		retexr = solid_mem_read(oper);
+		//retexr = solid_mem_read(oper);
 		break;
 	    case ExprOpStore:
 		break;
@@ -705,7 +707,7 @@ namespace symx {
 
             test_lock.unlock_shared();
 
-	    if(nstate->path.size() >= 100000) {
+	    if(nstate->path.size() >= 1000) {
 
                 cas->access_lock.lock();
 
@@ -737,7 +739,7 @@ namespace symx {
 		    dbg("sym %08lx %x\n",it->first,it->second);
                 }
 
-		dbg("long path %d\n",count);
+		dbg("long path %d\n",count.load(std::memory_order_relaxed));
 		exit(0);
 	    }
 	}
@@ -746,9 +748,9 @@ namespace symx {
     }
 
     #include"solver/z3.h"
-    static std::mutex queue_mutex;
-    static std::condition_variable queue_ready;
-
+    static std::mutex queue_mutex[NUM_THD];
+    static std::condition_variable queue_ready[NUM_THD];
+    static std::atomic_uint starve;
     class Compare {
 	public:
 	    bool operator() (
@@ -761,38 +763,68 @@ namespace symx {
     static std::priority_queue<
         std::pair<refState,std::vector<refBlock>>,
         std::vector<std::pair<refState,std::vector<refBlock>>>,
-        Compare> work_queue;
+        Compare> work_queue[NUM_THD];
 
     int ExecutorWorker::loop() {
-        std::vector<refState> statelist;
+        std::vector<std::pair<int,refState>> statelist;
+	std::unordered_map<ProgCtr,std::vector<refBlock>> block_cache;
 
         solver = new z3_solver::Z3Solver();
         act_solver = new ActiveSolver(solver);
 
         while(true) {
-            std::unique_lock<std::mutex> lk(queue_mutex);
-            queue_ready.wait(lk,[]{return !work_queue.empty();});
+            std::unique_lock<std::mutex> lk(queue_mutex[work_id]);
+            while(work_queue[work_id].empty()) {
+                starve += 1;
+                queue_ready[work_id].wait(lk);
+                starve -= 1;
+            }
 
-            auto work  = work_queue.top();
-            work_queue.pop();
-
-            lk.unlock();
+            const auto work = work_queue[work_id].top();
+            work_queue[work_id].pop();
 
             const auto &cstate = work.first;
             const auto &blklist = work.second;
+
+	    count++;
+            if(count % 256 == 0) {
+                info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
+	        dbg("%d length %u state %u maxlen %u queue %u\n",
+                        work_id,
+                        cstate->length,
+                        count.load(std::memory_order_relaxed),
+                        maxlen,
+                        work_queue[work_id].size());
+            }
+
+            lk.unlock();
+
+            block_cache[cstate->pc] = blklist;
 
             auto build_vis = new BuildVisitor(solver,cstate);
 
             statelist.clear();
 	    for(auto blkit = blklist.begin(); blkit != blklist.end(); blkit++) {
 		auto retlist = solve_state(cstate,build_vis,*blkit);
-                statelist.insert(statelist.end(),retlist.begin(),retlist.end());
+                for(auto it = retlist.begin(); it != retlist.end(); it++) {
+                    auto blkit = block_cache.find((*it)->pc);
+                    if(starve == 0 && blkit != block_cache.end()) {
+                        push_work(work_id,*it,blkit->second);
+                    } else {
+                        statelist.push_back(std::make_pair(work_id,*it));
+                    }
+                }
 	    }
-            {
-                std::lock_guard<std::mutex> workvec_lk(workvec_mutex);
-                workvec.insert(workvec.end(),statelist.begin(),statelist.end());
+            if(statelist.size() > 0) {
+                {
+                    std::lock_guard<std::mutex> workvec_lk(workvec_mutex);
+                    workvec.insert(
+                            workvec.end(),
+                            statelist.begin(),
+                            statelist.end());
+                }
+                workvec_ready.notify_one();
             }
-            workvec_ready.notify_one();
 
 	    delete build_vis;          
         }
@@ -803,36 +835,38 @@ namespace symx {
         return 0;
     }
     int ExecutorWorker::push_work(
+            int workid,
             refState state,
             std::vector<refBlock> blklist
     ) {
         {
-            std::lock_guard<std::mutex> lk(queue_mutex);
-            work_queue.push(std::make_pair(state,blklist));
+            std::lock_guard<std::mutex> lk(queue_mutex[workid]);
+            work_queue[workid].push(std::make_pair(state,blklist));
         }
-        queue_ready.notify_one();
-
+        queue_ready[workid].notify_one();
         return 0;
     }
     int Executor::worker_init() {
         int i;
 
-        for(i = 0; i < 2; i++) {
-            std::thread task([]{
-                auto worker = new ExecutorWorker();
+        for(i = 0; i < NUM_THD; i++) {
+            std::thread task([](int workid){
+                auto worker = new ExecutorWorker(workid);
                 worker->loop();
-            });
+            },i);
             task.detach();
         }
 
         return 0;
     }
     int Executor::execute(uint64_t target_rawpc) {
+        unsigned int i;
 	refSnapshot snap;
-	std::unordered_map<ProgCtr,std::vector<refBlock> > block_cache;
+	std::unordered_map<ProgCtr,std::vector<refBlock>> block_cache;
 	refState nstate,cstate;
 	std::vector<refBlock> blklist;
 	refBlock cblk;
+        int workid;
 
         FILE *f = fopen("pathlog","w");
 	
@@ -863,9 +897,9 @@ namespace symx {
 		base_as->mem,
 		snap->reg,
 		snap->flag);
-	workvec.push_back(nstate);
+	workvec.push_back(std::make_pair(0,nstate));
 
-        std::vector<refState> tmpvec;
+        std::vector<std::pair<int,refState>> tmpvec;
         while(true) {
             if(tmpvec.size() == 0) {
                 std::unique_lock<std::mutex> lk(workvec_mutex);
@@ -877,12 +911,10 @@ namespace symx {
                 lk.unlock();
             }
 
-            cstate = tmpvec.back();
+            const auto work = tmpvec.back();
+            workid = work.first;
+            cstate = work.second;
             tmpvec.pop_back();
-
-	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
-	    dbg("length %u state %u maxlen %u\n",cstate->length,count,maxlen);
-	    count++;
 
 	    auto blklist_it = block_cache.find(cstate->pc);
 	    if(blklist_it == block_cache.end()) {
@@ -901,7 +933,15 @@ namespace symx {
                 fflush(f);
             }
 
-	    ExecutorWorker::push_work(cstate,blklist);   
+            if(starve > 0) {
+                for(i = 0; i < NUM_THD; i++) {
+                    if(work_queue[i].size() == 0) {
+                        workid = i;
+                        break;
+                    }
+                }
+            }
+	    ExecutorWorker::push_work(workid,cstate,blklist);   
 	}
 
 	ctx->destroy_vm(vm);
