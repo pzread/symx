@@ -22,7 +22,7 @@
 
 using namespace symx;
 
-#define NUM_THD 1
+#define NUM_THD 8
 
 std::atomic_uint count;
 unsigned long maxlen = 0;
