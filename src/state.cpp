@@ -1,6 +1,5 @@
 #define LOG_PREFIX "state"
 
-#include<pthread.h>
 #include<assert.h>
 #include<vector>
 #include<memory>
@@ -50,13 +49,8 @@ namespace symx {
 	}
 	return it->second;
     }
-    int BuildVisitor::get_mem_record(
-	    std::unordered_set<refMemRecord> *selset,
-	    std::vector<refMemRecord> *strseq
-    ) {
-	selset->insert(select_set.begin(),select_set.end());
-	strseq->insert(strseq->end(),store_seq.begin(),store_seq.end());
-	return 0;
+    const std::unordered_set<refMemRecord>& BuildVisitor::get_mem_record() {
+        return select_set;
     }
     int BuildVisitor::pre_visit(const refBytVec &vec) {
 	if(expr_map.find(vec) != expr_map.end()) {
@@ -162,13 +156,6 @@ namespace symx {
 			bldoper->operand[0],
 			bldoper->operand[1],
 			oper->size));
-	} else if(oper->type == ExprOpStore) {
-	    auto bldoper = std::static_pointer_cast<const Operator>(bldexr);
-	    store_seq.push_back(ref<MemRecord>(
-			bldoper,
-			bldoper->operand[0],
-			bldoper->operand[1],
-			oper->size));
 	}
 
 	expr_map[oper] = bldexr;
@@ -211,7 +198,7 @@ namespace symx {
 
 	switch(oper->type) {
 	    case ExprOpSelect:
-		//retexr = solid_mem_read(oper);
+		retexr = solid_mem_read(oper);
 		break;
 	    case ExprOpStore:
 		break;
@@ -248,29 +235,34 @@ namespace symx {
 	return retexr;
     }
     refExpr BuildVisitor::solid_mem_read(const refOperator &oper) {
-	refExpr retexr = oper;
-        refExpr immexr;
-	std::unordered_set<refCond> constr;
-	std::unordered_map<refExpr,uint64_t> concrete;
+        uint64_t addr;
+        unsigned int size;
+        refExpr tmpexr;
 
 	assert(oper->type == ExprOpSelect);
 
 	if(oper->operand[1]->type != ExprImm) {
-	    return retexr;
+	    return oper;
 	}
+        addr = std::static_pointer_cast<const BytVec>(oper->operand[1])->data;
+        size = oper->operand[1]->size;
 
-        concrete[oper] = 0;
-        if(!solver->solve(constr,&concrete)) {
-            return retexr;
+        tmpexr = oper->operand[0];
+        while(tmpexr->type != ExprMem) {
+            auto strexr = std::static_pointer_cast<const Operator>(tmpexr);
+            if(strexr->operand[1]->type != ExprImm) {
+                return oper;
+            }
+            if(
+                addr == std::static_pointer_cast<const BytVec>(
+                    strexr->operand[1])->data &&
+                size == strexr->operand[2]->size
+            ) {
+                return strexr->operand[2];
+            }
+            tmpexr = strexr->operand[0];
         }
-        immexr = BytVec::create_imm(oper->size,concrete[oper]);
-        constr.insert(cond_not(cond_eq(oper,immexr)));
-        if(solver->solve(constr,&concrete)) {
-            return retexr;
-        }
-        //retexr = immexr;
-
-	return retexr;
+	return oper;
 
 	/*addr = std::static_pointer_cast<BytVec>(oper->operand[1])->data;
 	size = oper->size;
@@ -525,7 +517,6 @@ namespace symx {
 	std::vector<refCond> next_flag;
 
 	std::unordered_set<refMemRecord> next_selset;
-	std::vector<refMemRecord> next_strseq;
 	std::vector<uint64_t> solid_seladdr;
 	
 	std::unordered_set<refCond> constr;
@@ -540,7 +531,6 @@ namespace symx {
 	next_flag.clear();
 
 	next_selset.clear();
-	next_strseq.clear();
 	solid_seladdr.clear();
 
 	constr.clear();
@@ -562,21 +552,20 @@ namespace symx {
 	    next_flag.push_back(build_vis->get_cond(*it));
 	}
 
-	//TODO remove same select record
-	//copy old store record
-	next_strseq = cstate->store_seq;
 	//get memory record
-	build_vis->get_mem_record(&next_selset,&next_strseq);   
+	const auto &tmp_selset = build_vis->get_mem_record();
+	//copy old select record
+        next_selset = cstate->select_set;
 	//handle solid select address
-	for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
+	for(auto it = tmp_selset.begin(); it != tmp_selset.end(); it++) {
 	    if((*it)->idx->type == ExprImm) {
 		auto addr = std::static_pointer_cast<const BytVec>(
                         (*it)->idx)->data;
 		cas->handle_select(addr,(*it)->size);
-	    }
+	    } else {
+                next_selset.insert(*it);
+            }
 	}
-	//merge old select record
-	next_selset.insert(cstate->select_set.begin(),cstate->select_set.end());
 
 	//initialize reg, flag, constraint
 	constr.insert(jmp_cond);
@@ -604,10 +593,6 @@ namespace symx {
 	    //concrete[(*it)->oper] = 0;
 	    concrete[(*it)->idx] = 0;
 	}
-	/*for(auto it = next_strseq.begin(); it != next_strseq.end(); it++) {
-	    //concrete[(*it)->oper->operand[2]] = 0;
-	    concrete[(*it)->idx] = 0;
-	}*/
 	/*for(auto it = next_reg.begin(); it != next_reg.end(); it++) {
 	    concrete[*it] = 0;
 	}*/
@@ -677,7 +662,6 @@ namespace symx {
 	    nstate->constr = constr;
 	    nstate->constr.insert(cond_pc);
 	    nstate->select_set = next_selset;
-	    nstate->store_seq = next_strseq;
 
 	    statelist.push_back(nstate);
 	    target_constr.insert(cond_not(cond_pc));

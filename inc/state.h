@@ -54,7 +54,6 @@ namespace symx {
 	    const refAddrSpace as;
 	    std::unordered_set<refCond> constr;
 	    std::unordered_set<refMemRecord> select_set;
-	    std::vector<refMemRecord> store_seq;
 	    std::vector<refBytVec> symbol;
 
 	    unsigned long length;
@@ -91,7 +90,6 @@ namespace symx {
 	    std::unordered_map<refExpr,refExpr> expr_map;
 	    std::unordered_map<refCond,refCond> cond_map;
 	    std::unordered_set<refMemRecord> select_set;
-	    std::vector<refMemRecord> store_seq;
 
 	    refExpr solid_operator(const refOperator &oper);
 	    refExpr solid_mem_read(const refOperator &oper);
@@ -101,9 +99,7 @@ namespace symx {
 		: solver(_solver),state(_state) {}
 	    refExpr get_expr(const refExpr &expr);
 	    refCond get_cond(const refCond &cond);
-	    int get_mem_record(
-		    std::unordered_set<refMemRecord> *selset,
-		    std::vector<refMemRecord> *strseq);
+            const std::unordered_set<refMemRecord>& get_mem_record();
 	    int pre_visit(const refBytVec &vec);
 	    int pre_visit(const refBytMem &mem);
 	    int pre_visit(const refOperator &oper);
