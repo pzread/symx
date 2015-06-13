@@ -197,7 +197,7 @@ namespace symx {
 
 	switch(oper->type) {
 	    case ExprOpSelect:
-		//retexr = solid_mem_read(oper);
+		retexr = solid_mem_read(oper);
 		break;
 	    case ExprOpStore:
 		break;
@@ -234,29 +234,34 @@ namespace symx {
 	return retexr;
     }
     refExpr BuildVisitor::solid_mem_read(const refOperator &oper) {
-	refExpr retexr = oper;
-        refExpr immexr;
-	std::unordered_set<refCond> constr;
-	std::unordered_map<refExpr,uint64_t> concrete;
+        uint64_t addr;
+        unsigned int size;
+        refExpr tmpexr;
 
 	assert(oper->type == ExprOpSelect);
 
 	if(oper->operand[1]->type != ExprImm) {
-	    return retexr;
+	    return oper;
 	}
+        addr = std::static_pointer_cast<const BytVec>(oper->operand[1])->data;
+        size = oper->operand[1]->size;
 
-        concrete[oper] = 0;
-        if(!solver->solve(constr,&concrete)) {
-            return retexr;
+        tmpexr = oper->operand[0];
+        while(tmpexr->type != ExprMem) {
+            auto strexr = std::static_pointer_cast<const Operator>(tmpexr);
+            if(strexr->operand[1]->type != ExprImm) {
+                return oper;
+            }
+            if(
+                addr == std::static_pointer_cast<const BytVec>(
+                    strexr->operand[1])->data &&
+                size == strexr->operand[2]->size
+            ) {
+                return strexr->operand[2];
+            }
+            tmpexr = strexr->operand[0];
         }
-        immexr = BytVec::create_imm(oper->size,concrete[oper]);
-        constr.insert(cond_not(cond_eq(oper,immexr)));
-        if(solver->solve(constr,&concrete)) {
-            return retexr;
-        }
-        //retexr = immexr;
-
-	return retexr;
+	return oper;
 
 	/*addr = std::static_pointer_cast<BytVec>(oper->operand[1])->data;
 	size = oper->size;
@@ -675,7 +680,7 @@ namespace symx {
 
 	    maxlen = std::max(maxlen,nstate->path.size());
 	    dbg("maxlen %lu\n",maxlen);
-	    if(nstate->path.size() >= 1000) {
+	    if(nstate->path.size() >= 10000) {
 		for(
 		    auto it = cas->mem_symbol.begin();
 		    it != cas->mem_symbol.end();
@@ -757,11 +762,10 @@ namespace symx {
 	    worklist.pop();
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
 
+	    count++;
 	    dbg("length %u state %u\n",cstate->length,count);
 
             //work_dispatch();
-
-	    count++;
 
 	    auto blklist_it = block_cache.find(cstate->pc);
 	    if(blklist_it == block_cache.end()) {
