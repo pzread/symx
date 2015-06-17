@@ -23,10 +23,10 @@ int main() {
     delete vm;*/
 
     Solver *solver = new z3_solver::Z3Solver();
-    Context *context = new openreil::Context(solver,"./sample");
+    Context *context = new openreil::Context(solver,"./sample3");
     Executor *engine = new Executor(context);
 
-    engine->execute(0x08048f0f);
+    engine->execute(0x08048285);
 
     delete context;
     return 0;

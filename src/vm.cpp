@@ -261,7 +261,7 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 		continue;
 	    }
 
-	    if(pos < 0x3000) {
+	    if(pos >= 0x1000 && pos < 0x2000) {
 		//for test
 		//val = BytVec::create_imm(8,0xb);
 		//page.symbol.reset(off);
@@ -270,7 +270,7 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 		page.symbol.set(off);
 	    } else {
 		if(snap->mem_read(buf,pos,sizeof(*buf))) {
-		    info("read page failed %016lx\n",pos);
+		    err("read page failed %016lx\n",pos);
 		    //TODO return read error
 		    continue;
 		}
@@ -278,9 +278,9 @@ int AddrSpace::handle_select(const uint64_t idx,const unsigned int size) {
 		page.symbol.reset(off);
 	    }
 
-	    mem_constr.insert(cond_eq(
-			expr_select(mem,BytVec::create_imm(32,pos),8),
-			val));
+	    mem_constr.push_back(cond_eq(
+                        expr_select(mem,BytVec::create_imm(32,pos),8),
+                        val));
 
 	    page.dirty.set(off);
 	    ret += 1;

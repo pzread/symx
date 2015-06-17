@@ -22,7 +22,6 @@ unsigned long maxlen = 0;
 
 namespace symx {
     static std::unordered_map<uint64_t,unsigned long> block_length;
-    static std::unordered_map<uint64_t,std::unordered_set<refState>> dep_state;
     class Compare {
 	public:
 	    bool operator() (const refState &a,const refState &b) {
@@ -197,7 +196,7 @@ namespace symx {
 
 	switch(oper->type) {
 	    case ExprOpSelect:
-		retexr = solid_mem_read(oper);
+		//retexr = solid_mem_read(oper);
 		break;
 	    case ExprOpStore:
 		break;
@@ -397,6 +396,10 @@ namespace symx {
 	    auto immexr = std::static_pointer_cast<const BytVec>(
                     oper->operand[1]);
 
+            if(immexr->data < 0x2000) {
+                err("test\n");
+            }
+
             for(i = 0; i < oper->size / 8; i++) {
                 cache_set->insert(cache_set->end(),immexr->data + (uint64_t)i);
             }
@@ -447,7 +450,8 @@ namespace symx {
 	    std::unordered_map<refExpr,uint64_t> *concrete
     ) {
 	std::unordered_set<refCond> act_constr;
-        std::vector<uint64_t> in_addr;
+        /*std::vector<uint64_t> in_addr;
+        std::unordered_set<uint64_t> in_addrset;
 
         act_vis.iter_walk(target_constr.begin(),target_constr.end());
         for(auto it = target_constr.begin(); it != target_constr.end(); it++) {
@@ -456,20 +460,35 @@ namespace symx {
             const auto &tmpvec = act_vis.get_cond_addr(*it);
             in_addr.insert(in_addr.end(),tmpvec.begin(),tmpvec.end());
         }
-        for(auto it = concrete->begin(); it != concrete->end(); it++) {
-            act_vis.walk(it->first);
-
-            const auto &tmpvec = act_vis.get_expr_addr(it->first);
-            in_addr.insert(in_addr.end(),tmpvec.begin(),tmpvec.end());
-        }
         std::sort(in_addr.begin(),in_addr.end());
         auto last_it = std::unique(in_addr.begin(),in_addr.end());
         in_addr.erase(last_it,in_addr.end());
 
-	act_constr = target_constr;
-        //act_constr.insert(constr.begin(),constr.end());
+        in_addrset.insert(in_addr.begin(),in_addr.end());
 
-	for(auto cond_it = constr.begin(); cond_it != constr.end(); cond_it++) {
+	act_constr = target_constr;
+        act_constr.insert(constr.begin(),constr.end());
+        
+        //Try to use previous symbol value
+        for(auto it = in_addrset.begin(); it != in_addrset.end(); it++) {
+            if(*it < 0x2000) {
+                err("  *%08lx\n",*it);
+            }
+        }*/
+        /*for(
+            auto sym_it = mem_symbol_concrete.begin();
+            sym_it != mem_symbol_concrete.end();
+            sym_it++
+        ) {
+            info("  %08lx\n",sym_it->first);
+            if(in_addrset.find(sym_it->first) == in_addrset.end()) {
+                act_constr.insert(sym_it->second);
+            } else {
+                err("conflict\n");
+            }
+        }*/
+
+	/*for(auto cond_it = constr.begin(); cond_it != constr.end(); cond_it++) {
             act_vis.walk(*cond_it);
 
             const auto &out_addr = act_vis.get_cond_addr(*cond_it);
@@ -487,9 +506,11 @@ namespace symx {
                     out_it++;
                 }
             }
-	}
+	}*/
 
-	dbg("%d %d %d %d\n",in_addr.size(),concrete->size(),constr.size(),act_constr.size());
+        act_constr = constr;
+        act_constr.insert(target_constr.begin(),target_constr.end());
+	dbg("%u %u\n",concrete->size(),act_constr.size());
 
 	return solver->solve(act_constr,concrete);
     }
@@ -562,19 +583,17 @@ namespace symx {
             }
 	}
 
-	//initialize reg, flag, constraint
+	//initialize constraint
 	constr.insert(jmp_cond);
 	constr.insert(cstate->constr.begin(),cstate->constr.end());
-	constr.insert(cas->mem_constr.begin(),cas->mem_constr.end());
+        constr.insert(cas->mem_constr.begin(),cas->mem_constr.end());
+	target_constr.insert(jmp_cond);
 
 	//initialize solver variable
 	//TODO support instruction mode
 
 	concrete[next_exrpc] = 0;
-	/*for(i = 0; i < cstate->symbol.size(); i++) {
-	    concrete[cstate->symbol[i]] = 0;
-	}
-	for(
+	/*for(
 	    auto it = cas->mem_symbol.begin();
 	    it != cas->mem_symbol.end();
 	    it++
@@ -582,18 +601,15 @@ namespace symx {
 	    concrete[it->second] = 0;
 	}*/
 	for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
-	    //concrete[(*it)->oper] = 0;
 	    concrete[(*it)->idx] = 0;
 	}
-	/*for(auto it = next_reg.begin(); it != next_reg.end(); it++) {
-	    concrete[*it] = 0;
-	}*/
-
-	target_constr.insert(jmp_cond);
 
 	while(true) {
 	    //solve
-	    if(!act_solver->solve(target_constr,constr,&concrete)) {
+	    if(!act_solver->solve(
+                        target_constr,
+                        constr,
+                        &concrete)) {
 		break;	
 	    }
 	    next_rawpc = concrete[next_exrpc];
@@ -607,7 +623,7 @@ namespace symx {
 		}
 	    }
 	    if(as_update) {
-		constr.insert(cas->mem_constr.begin(),cas->mem_constr.end());
+                constr.insert(cas->mem_constr.begin(),cas->mem_constr.end());
 		/*for(
 		    auto it = cas->mem_symbol.begin();
 		    it != cas->mem_symbol.end();
@@ -651,13 +667,27 @@ namespace symx {
 	    nstate->constr.insert(cond_pc);
 	    nstate->select_set = next_selset;
 
+            /*for(
+	        auto it = cas->mem_symbol.begin();
+		it != cas->mem_symbol.end();
+		it++
+	    ) {
+                assert(it->second->size == 8);
+		nstate->mem_symbol_concrete[it->first] = cond_eq(
+                        it->second,
+                        BytVec::create_imm(
+                            it->second->size,
+                            concrete[it->second]));
+	    }*/
+
+	    statelist.push_back(nstate);
+	    target_constr.insert(cond_not(cond_pc));
+
 	    auto rawpc = nstate->pc.rawpc;
 
 	    nstate->path = cstate->path;
 	    nstate->path.push_back(rawpc);
 	    nstate->blkmap = cstate->blkmap;
-
-	    dep_state[rawpc].insert(nstate);
 
 	    if(nstate->blkmap.find(rawpc) != nstate->blkmap.end()) {
 		auto it = block_length.find(rawpc);
@@ -679,8 +709,7 @@ namespace symx {
 	    }
 
 	    maxlen = std::max(maxlen,nstate->path.size());
-	    dbg("maxlen %lu\n",maxlen);
-	    if(nstate->path.size() >= 10000) {
+	    if(nstate->path.size() >= 1000) {
 		for(
 		    auto it = cas->mem_symbol.begin();
 		    it != cas->mem_symbol.end();
@@ -708,10 +737,6 @@ namespace symx {
 		dbg("long path %d\n",count);
 		exit(0);
 	    }
-
-	    statelist.push_back(nstate);
-
-	    target_constr.insert(cond_not(cond_pc));
 	}
 
 	return statelist;
@@ -763,7 +788,7 @@ namespace symx {
 	    info("\e[1;32mrun state 0x%016lx\e[m\n",cstate->pc.rawpc);
 
 	    count++;
-	    dbg("length %u state %u\n",cstate->length,count);
+	    dbg("length %u state %u maxlen %u queue %u\n",cstate->length,count,maxlen,worklist.size());
 
             //work_dispatch();
 

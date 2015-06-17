@@ -52,7 +52,7 @@ namespace symx {
 	    const refAddrSpace as;
 	    std::unordered_set<refCond> constr;
 	    std::unordered_set<refMemRecord> select_set;
-	    std::vector<refBytVec> symbol;
+	    std::unordered_map<uint64_t,refCond> mem_symbol_concrete;
 
 	    unsigned long length;
 	    std::vector<uint64_t> path;

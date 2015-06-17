@@ -158,7 +158,7 @@ namespace symx {
 	public:
 	    refExpr mem;
 	    std::unordered_map<uint64_t,refBytVec> mem_symbol;
-	    std::unordered_set<refCond> mem_constr;
+	    std::vector<refCond> mem_constr;
 
 	    AddrSpace(Context *_ctx,const refSnapshot &_snap);
 	    int read(refState state,uint8_t *buf,uint64_t pos,size_t len);
