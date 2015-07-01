@@ -25,7 +25,13 @@ namespace symx {
     class Compare {
 	public:
 	    bool operator() (const refState &a,const refState &b) {
-		return a->length < b->length;
+                if(a->length != 0 && b->length != 0) {
+		    return a->length < b->length;
+                }
+                if(a->length == 0) {
+                    return false;
+                }
+                return true;
 	    }
     };
     static std::priority_queue<refState,std::vector<refState>,Compare> worklist;
@@ -196,7 +202,10 @@ namespace symx {
 
 	switch(oper->type) {
 	    case ExprOpSelect:
-		//retexr = solid_mem_read(oper);
+		retexr = solid_mem_read(oper);
+
+                assert(retexr->size == oper->size);
+
 		break;
 	    case ExprOpStore:
 		break;
@@ -223,7 +232,7 @@ namespace symx {
 		if(solid) {
 		    concrete[oper] = 0;
 		    if(solver->solve(constr,&concrete)) {
-			retexr = BytVec::create_imm(oper->size,concrete[oper]);
+		        retexr = BytVec::create_imm(oper->size,concrete[oper]);
 		    }
 		}
 		break;
@@ -243,7 +252,7 @@ namespace symx {
 	    return oper;
 	}
         addr = std::static_pointer_cast<const BytVec>(oper->operand[1])->data;
-        size = oper->operand[1]->size;
+        size = oper->size;
 
         tmpexr = oper->operand[0];
         while(tmpexr->type != ExprMem) {
@@ -593,13 +602,13 @@ namespace symx {
 	//TODO support instruction mode
 
 	concrete[next_exrpc] = 0;
-	/*for(
+	for(
 	    auto it = cas->mem_symbol.begin();
 	    it != cas->mem_symbol.end();
 	    it++
 	) {
 	    concrete[it->second] = 0;
-	}*/
+	}
 	for(auto it = next_selset.begin(); it != next_selset.end(); it++) {
 	    concrete[(*it)->idx] = 0;
 	}
@@ -624,13 +633,13 @@ namespace symx {
 	    }
 	    if(as_update) {
                 constr.insert(cas->mem_constr.begin(),cas->mem_constr.end());
-		/*for(
+		for(
 		    auto it = cas->mem_symbol.begin();
 		    it != cas->mem_symbol.end();
 		    it++
 		) {
 		    concrete[it->second] = 0;
-		}*/
+		}
 		continue;
 	    }
 
@@ -799,7 +808,7 @@ namespace symx {
 	    } else {
 		blklist = blklist_it->second;
 	    }
-            
+
             if(blklist.size() == 0) {
                 unsigned int j;
                 fprintf(f,"\n");
